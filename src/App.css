@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/* ── Range slider reset ───────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: #3a3a3a;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  background: #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+/* ── Compact react-colorful ───────────────────────────────────── */
+.compact-picker .react-colorful__saturation {
+  height: 90px !important;
+  border-radius: 4px 4px 0 0 !important;
+}
+
+.compact-picker .react-colorful__hue {
+  height: 10px !important;
+  border-radius: 0 0 4px 4px !important;
+  margin-top: 0 !important;
+}
+
+.compact-picker .react-colorful__pointer {
+  width: 12px !important;
+  height: 12px !important;
+}

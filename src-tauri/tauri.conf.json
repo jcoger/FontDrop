@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FontDrop",
+  "version": "0.1.0",
+  "identifier": "co.dynolabs.fontdrop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FontDrop",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "titleBarStyle": "Overlay",
+        "backgroundColor": "#171717",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "/System/Library/Fonts/**",
+          "/Library/Fonts/**",
+          "$HOME/Library/Fonts/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "copyright": "© 2026 Dyno Labs",
+    "category": "DeveloperTool",
+    "shortDescription": "Font pairing tool for brand concepting",
+    "longDescription": "A native Mac app for exploring logo and brand typography. Drop your logo, preview every font on your system, find the one.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
