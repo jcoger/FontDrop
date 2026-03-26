@@ -1,6 +1,6 @@
 # FontDrop
-![image](assets/TypeExplorer.png)
-![image](assets/Columnview.png)
+![Column View](Assets/Columnview.png)
+![Type Explorer](Assets/TypeExplorer.png)
 
 A native Mac app for exploring logo and brand typography.
 Drop your logo, preview every font on your system, find the one.
