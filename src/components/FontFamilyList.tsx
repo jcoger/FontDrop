@@ -45,7 +45,7 @@ function ChevronIcon({ open }: { open: boolean }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms" }}
+      style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform var(--dur-fast) var(--ease-out)" }}
     >
       <polyline points="9 18 15 12 9 6" />
     </svg>

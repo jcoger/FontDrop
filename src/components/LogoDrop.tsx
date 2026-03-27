@@ -63,14 +63,14 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         {/* Scale: − / % / + */}
         <button
           className="text-neutral-500 hover:text-white w-5 h-5 flex items-center justify-center text-sm font-mono leading-none cursor-pointer"
-          style={{ transition: "color 150ms ease-out" }}
+          style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => stepScale(-0.1)}
         >
           −
         </button>
         <button
           className="text-neutral-500 hover:text-white text-[10px] font-mono tabular-nums cursor-pointer min-w-[30px] text-center leading-none"
-          style={{ transition: "color 150ms ease-out" }}
+          style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => onScaleChange?.(1.0)}
           title="Reset to 100%"
         >
@@ -78,7 +78,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         </button>
         <button
           className="text-neutral-500 hover:text-white w-5 h-5 flex items-center justify-center text-sm font-mono leading-none cursor-pointer"
-          style={{ transition: "color 150ms ease-out" }}
+          style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => stepScale(0.1)}
         >
           +
@@ -90,7 +90,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         {/* Swap */}
         <button
           className="text-neutral-500 hover:text-white text-[10px] font-mono cursor-pointer px-1"
-          style={{ transition: "color 150ms ease-out" }}
+          style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => inputRef.current?.click()}
         >
           swap
@@ -99,7 +99,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         {/* Clear */}
         <button
           className="text-neutral-500 hover:text-white text-[11px] font-mono cursor-pointer px-0.5"
-          style={{ transition: "color 150ms ease-out" }}
+          style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={onClear}
         >
           ×

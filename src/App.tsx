@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from "react";
+import { Agentation } from "agentation";
 import "./App.css";
 import { motion } from "framer-motion";
+import { springSnap, easeOut, dur } from "./lib/motion";
 import { Menu } from "bloom-menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useFonts, type FontInfo } from "./hooks/useFonts";
@@ -23,11 +25,12 @@ import { ControlsBar } from "./components/ControlsBar";
 import { Toast } from "./components/Toast";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { QuickView } from "./components/QuickView";
+import { ColorExplorer } from "./components/ColorExplorer";
 import { DEFAULT_CONTROLS, type Controls } from "./types/controls";
 
 const appWindow = getCurrentWindow();
 
-type Mode = "grid" | "explorer";
+type Mode = "grid" | "explorer" | "color";
 type SourceFilter = "all" | "user" | "system";
 
 const CATEGORIES = ["sans-serif", "serif", "script", "decorative", "monospace", "other"] as const;
@@ -66,7 +69,7 @@ function SegmentedControl<T extends string | number>({
         <button
           key={String(opt)}
           className="relative px-2.5 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap"
-          style={{ color: opt === value ? "#ffffff" : "#6b7280", transition: "color 150ms ease-out" }}
+          style={{ color: opt === value ? "#ffffff" : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
           onMouseEnter={(e) => {
             if (opt !== value) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
           }}
@@ -80,7 +83,7 @@ function SegmentedControl<T extends string | number>({
               layoutId={`seg-${id}`}
               initial={false}
               className="absolute inset-0 bg-neutral-700 rounded-md"
-              transition={{ type: "spring", bounce: 0.15, duration: 0.25 }}
+              transition={springSnap}
             />
           )}
           <span className="relative">{getLabel ? getLabel(opt) : String(opt)}</span>
@@ -109,7 +112,7 @@ function StarFilterToggle({
         <button
           key={String(opt)}
           className="relative px-2.5 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap"
-          style={{ color: showStarred === opt ? (opt ? "#facc15" : "#ffffff") : "#6b7280", transition: "color 150ms ease-out" }}
+          style={{ color: showStarred === opt ? (opt ? "#facc15" : "#ffffff") : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
           onMouseEnter={(e) => {
             if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
           }}
@@ -123,7 +126,7 @@ function StarFilterToggle({
               layoutId={`star-${id}`}
               initial={false}
               className="absolute inset-0 bg-neutral-700 rounded-md"
-              transition={{ type: "spring", bounce: 0.15, duration: 0.25 }}
+              transition={springSnap}
             />
           )}
           <span className="relative flex items-center gap-1.5">
@@ -224,6 +227,19 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("grid");
   const [wordmark, setWordmark] = useState("Fontdrop");
   const [logoSvg, setLogoSvg] = useState<string | null>(null);
+
+  // Brand Colors tab state (lifted so top bar can render controls)
+  const [ceBrandName, setCeBrandName] = useState(
+    () => localStorage.getItem("fontdrop-brand-name") || "",
+  );
+  const [ceColCount, setCeColCount] = useState(4);
+  const ceExportRef = useRef<(() => void) | null>(null);
+
+  function handleCeBrandNameChange(v: string) {
+    const clamped = v.slice(0, 30);
+    setCeBrandName(clamped);
+    localStorage.setItem("fontdrop-brand-name", clamped);
+  }
   const [logoScale, setLogoScale] = useState(1.0);
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
 
@@ -305,7 +321,11 @@ export default function App() {
       if (inInput) return;
       if (e.key === "Tab") {
         e.preventDefault();
-        setMode((m) => (m === "grid" ? "explorer" : "grid"));
+        setMode((m) => {
+          if (m === "grid") return "explorer";
+          if (m === "explorer") return "color";
+          return "grid";
+        });
         return;
       }
       if (e.key === "f" || e.key === "F") {
@@ -519,55 +539,133 @@ Letter spacing: ${track}`;
               onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
             />
             <SegmentedControl
-              options={["grid", "explorer"] as const}
+              options={["grid", "explorer", "color"] as const}
               value={mode}
               onChange={setMode}
-              getLabel={(m) => (m === "grid" ? "Logo Grid" : "Type Explorer")}
+              getLabel={(m) =>
+                m === "grid"
+                  ? "Logo Grid"
+                  : m === "explorer"
+                    ? "Type Explorer"
+                    : "Brand Colors"
+              }
             />
           </div>
 
-          {/* Center: Search + (grid) SVG drop + Wordmark */}
-          <div
-            className="flex items-center justify-center gap-2 px-6 min-w-0 overflow-hidden"
-            onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
-          >
-            <div className="relative flex-shrink-0 w-44">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-600 pointer-events-none"
-                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+          {/* Center: Search + SVG drop + Wordmark/Brand name */}
+          {mode === "color" ? (
+            <div
+              className="flex items-center justify-center gap-2 px-6 min-w-0 overflow-hidden"
+              onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
+            >
+              <LogoDrop
+                svg={logoSvg}
+                onLoad={setLogoSvg}
+                onClear={() => setLogoSvg(null)}
+                onScaleChange={setLogoScale}
+                logoScale={logoScale}
+              />
               <input
-                ref={searchInputRef}
-                className="w-full bg-neutral-800 text-white text-xs rounded-md pl-8 pr-3 h-9 outline-none
-                           placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-700"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search fonts…"
+                className="flex-shrink-0 w-40 bg-neutral-800 text-white text-sm rounded-md px-3 h-9 outline-none
+                           placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 select-text"
+                value={ceBrandName}
+                onChange={(e) => handleCeBrandNameChange(e.target.value)}
+                placeholder="Brand name…"
+                maxLength={30}
                 spellCheck={false}
               />
             </div>
-            {mode === "grid" && (
-              <>
-                <LogoDrop
-                  svg={logoSvg}
-                  onLoad={setLogoSvg}
-                  onClear={() => setLogoSvg(null)}
-                  onScaleChange={setLogoScale}
-                  logoScale={logoScale}
-                />
+          ) : (
+            <div
+              className="flex items-center justify-center gap-2 px-6 min-w-0 overflow-hidden"
+              onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
+            >
+              <div className="relative flex-shrink-0 w-44">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-600 pointer-events-none"
+                  width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
                 <input
-                  className="flex-shrink-0 w-40 bg-neutral-800 text-white text-sm rounded-md px-3 h-9 outline-none
-                             placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 select-text"
-                  value={wordmark}
-                  onChange={(e) => setWordmark(e.target.value)}
-                  placeholder="Type a word…"
+                  ref={searchInputRef}
+                  className="w-full bg-neutral-800 text-white text-xs rounded-md pl-8 pr-3 h-9 outline-none
+                             placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-700"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search fonts…"
                   spellCheck={false}
                 />
-              </>
-            )}
-          </div>
+              </div>
+              {mode === "grid" && (
+                <>
+                  <LogoDrop
+                    svg={logoSvg}
+                    onLoad={setLogoSvg}
+                    onClear={() => setLogoSvg(null)}
+                    onScaleChange={setLogoScale}
+                    logoScale={logoScale}
+                  />
+                  <input
+                    className="flex-shrink-0 w-40 bg-neutral-800 text-white text-sm rounded-md px-3 h-9 outline-none
+                               placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 select-text"
+                    value={wordmark}
+                    onChange={(e) => setWordmark(e.target.value)}
+                    placeholder="Type a word…"
+                    spellCheck={false}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
-          {/* Right: Col count + Families/Individual + | + Export — ALWAYS present in both modes */}
+          {/* Right: Col count + Export */}
+          {mode === "color" ? (
+          <div
+            className="flex items-center gap-2 flex-shrink-0"
+            onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
+          >
+            <SegmentedControl
+              options={[1, 2, 4] as const}
+              value={ceColCount}
+              onChange={setCeColCount}
+            />
+            <div
+              className="w-px h-4 bg-neutral-800 flex-shrink-0"
+              onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
+            />
+            <Menu.Root direction="bottom" anchor="end">
+              <Menu.Container
+                buttonSize={{ width: 78, height: 30 }}
+                menuWidth={172}
+                menuRadius={10}
+                buttonRadius={6}
+                className="bg-neutral-900 ring-1 ring-neutral-700 shadow-2xl"
+              >
+                <Menu.Trigger>
+                  <div className="flex items-center justify-center gap-1.5 w-full h-full px-2.5">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span className="text-[11px] text-neutral-400 font-medium leading-none">Export</span>
+                  </div>
+                </Menu.Trigger>
+                <Menu.Content className="p-1.5 flex flex-col gap-0.5">
+                  <Menu.Item
+                    onSelect={() => ceExportRef.current?.()}
+                    className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-neutral-400">
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    Copy Palette
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Container>
+            </Menu.Root>
+          </div>
+          ) : (
           <div
             className="flex items-center gap-2 flex-shrink-0"
             onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
@@ -641,11 +739,12 @@ Letter spacing: ${track}`;
               </>
             )}
           </div>
+          )}
         </div>
       </div>
 
-      {/* ── Row 2: Unified filters (all modes) ── */}
-      <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-neutral-800 bg-neutral-900 overflow-x-auto">
+      {/* ── Row 2: Unified filters (hidden in color mode) ── */}
+      {mode !== "color" && <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-neutral-800 bg-neutral-900 overflow-x-auto">
         {/* Left: source filter + category pills + style filters (always shown) */}
         {!loading && !error && (
           <>
@@ -669,7 +768,7 @@ Letter spacing: ${track}`;
                 <button
                   key={filter}
                   className="relative px-2.5 py-1 text-[11px] font-medium cursor-pointer capitalize flex-shrink-0 whitespace-nowrap"
-                  style={{ color: isActive ? "#ffffff" : "#6b7280", transition: "color 150ms ease-out" }}
+                  style={{ color: isActive ? "#ffffff" : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
                   onMouseEnter={(e) => {
                     if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
                   }}
@@ -683,7 +782,7 @@ Letter spacing: ${track}`;
                       className="absolute inset-0 bg-neutral-700 rounded-md"
                       layoutId={`style-${filter}`}
                       initial={false}
-                      transition={{ type: "spring", bounce: 0.15, duration: 0.25 }}
+                      transition={springSnap}
                     />
                   )}
                   <span className="relative">{filter}</span>
@@ -742,18 +841,27 @@ Letter spacing: ${track}`;
 
         {loading && <span className="text-neutral-600 text-xs font-mono flex-shrink-0">scanning…</span>}
         {error && <span className="text-red-500 text-xs font-mono flex-shrink-0">error</span>}
-      </div>
+      </div>}
 
-      {/* ── Content area (fades when Quick View is open, background follows bgColor) ── */}
+      {/* ── Content area ── */}
+      {mode === "color" ? (
+        <ColorExplorer
+          fonts={baseFonts}
+          logoSvg={logoSvg}
+          brandName={ceBrandName}
+          colCount={ceColCount}
+          exportRef={ceExportRef}
+          onSwitchToGrid={() => setMode("grid")}
+        />
+      ) : (
       <motion.div
         ref={gridContainerRef}
         className="flex-1 min-h-0 flex flex-col"
         style={{ backgroundColor: controls.bgColor }}
         animate={{
           opacity: quickViewState ? 0 : 1,
-          filter: quickViewState ? "blur(4px)" : "none",
         }}
-        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+        transition={{ duration: dur.normal, ease: easeOut }}
       >
 
         {/* Loading / error / empty */}
@@ -853,9 +961,10 @@ Letter spacing: ${track}`;
           />
         )}
       </motion.div>
+      )}
 
-      {/* ── Controls bar ── */}
-      {!loading && !error && (
+      {/* ── Controls bar (hidden in color mode) ── */}
+      {!loading && !error && mode !== "color" && (
         <ControlsBar
           controls={controls}
           onChange={patchControls}
@@ -885,6 +994,7 @@ Letter spacing: ${track}`;
 
       {/* ── Toast ── */}
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
+      {import.meta.env.DEV && <Agentation />}
     </div>
   );
 }
@@ -914,7 +1024,7 @@ function CategoryFilterBar({
           <button
             key={cat}
             className="relative px-2.5 py-1 text-[11px] font-medium cursor-pointer flex-shrink-0 whitespace-nowrap"
-            style={{ color: isActive ? "#ffffff" : "#6b7280", transition: "color 150ms ease-out" }}
+            style={{ color: isActive ? "#ffffff" : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
             onMouseEnter={(e) => {
               if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
             }}
@@ -928,7 +1038,7 @@ function CategoryFilterBar({
                 className="absolute inset-0 bg-neutral-700 rounded-md"
                 layoutId={`cat-${id}`}
                 initial={false}
-                transition={{ type: "spring", bounce: 0.15, duration: 0.25 }}
+                transition={springSnap}
               />
             )}
             <span className="relative">

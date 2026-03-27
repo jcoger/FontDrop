@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fontFamily } from "../lib/fontFace";
+import { easeOut, dur, springModal, useReducedMotion } from "../lib/motion";
 import type { FontInfo } from "../hooks/useFonts";
 import type { Controls } from "../types/controls";
 
@@ -39,6 +40,7 @@ export function QuickView({
   onNavigate,
   topOffset = TOP_OFFSET,
 }: Props) {
+  const reduced = useReducedMotion();
   const currentIndex = font ? allFonts.findIndex((f) => f.file_path === font.file_path) : -1;
   const isStarred = font ? starred.has(font.file_path) : false;
 
@@ -81,10 +83,10 @@ export function QuickView({
           <motion.div
             className="fixed bg-black/70 backdrop-blur-sm"
             style={{ zIndex: 48, top: topOffset, left: 0, right: 0, bottom: BOTTOM_OFFSET }}
-            initial={{ opacity: 0 }}
+            initial={reduced ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: dur.normal, ease: easeOut }}
             onClick={onClose}
           />
 
@@ -96,7 +98,8 @@ export function QuickView({
               backgroundColor: controls.bgColor,
             }}
             initial={
-              sourceRect
+              reduced ? false
+              : sourceRect
                 ? {
                     left: sourceRect.left,
                     top: sourceRect.top,
@@ -127,7 +130,8 @@ export function QuickView({
               filter: "blur(0px)",
             }}
             exit={
-              sourceRect
+              reduced ? { opacity: 0 }
+              : sourceRect
                 ? {
                     left: sourceRect.left,
                     top: sourceRect.top,
@@ -144,12 +148,10 @@ export function QuickView({
                   }
             }
             transition={{
-              type: "spring",
-              bounce: 0.2,
-              duration: 0.28,
-              opacity: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
-              filter: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] },
-              scale: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] },
+              ...springModal,
+              opacity: { duration: dur.normal, ease: easeOut },
+              filter: { duration: dur.exit, ease: easeOut },
+              scale: { duration: dur.exit, ease: easeOut },
             }}
           >
             {/* Content */}

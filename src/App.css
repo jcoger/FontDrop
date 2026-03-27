@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+/* ── Animation tokens ─────────────────────────────────────────── */
+:root {
+  /* Easing curves */
+  --ease-out:     cubic-bezier(0.25, 0.46, 0.45, 0.94);   /* entering / exiting  */
+  --ease-in-out:  cubic-bezier(0.45, 0.03, 0.515, 0.955);  /* on-screen movement  */
+  --ease-hover:   cubic-bezier(0.25, 0.1, 0.25, 1);        /* hover / color shift  */
+
+  /* Duration scale */
+  --dur-micro:   100ms;  /* thumb scale, active press      */
+  --dur-fast:    150ms;  /* hover color, toggles, toasts   */
+  --dur-normal:  200ms;  /* modals, overlays, dropdowns    */
+  --dur-exit:    160ms;  /* exits ≈ 20 % faster than enter */
+
+  /* ── Typography scale ──────────────────────────────────────── */
+  --text-micro:  8px;    /* Albers labels, fine print         */
+  --text-badge:  9px;    /* badges, slider labels             */
+  --text-label:  10px;   /* section headings, values, hints   */
+  --text-body:   11px;   /* method pills, toggle labels       */
+  --text-ui:     12px;   /* card font name, general UI text   */
+  --text-title:  13px;   /* app title, starred icons          */
+
+  /* ── Font tracking ─────────────────────────────────────────── */
+  --track-caps:  0.05em; /* all uppercase labels              */
+
+  /* ── Text colors (simplified neutral palette) ──────────────── */
+  --c-text:      #ffffff;           /* primary text / active       */
+  --c-text-2:    #a1a1aa;           /* secondary text (neutral-400)*/
+  --c-text-3:    #6b7280;           /* tertiary / inactive         */
+  --c-text-4:    #52525b;           /* muted / counts              */
+  --c-accent:    #D97736;           /* brand accent                */
+}
+
+/* ── Reduced motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── Range slider reset ───────────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;
@@ -19,7 +61,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: #ffffff;
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 0.1s ease;
+  transition: transform var(--dur-micro) var(--ease-hover);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
