@@ -18,11 +18,11 @@ import { HLParams, HLBottomControls, generateHueMode, hlFlipCard, hlContrastRang
 import type { HLRampColor } from "./methods/HLParams";
 import { TCParams, TCBottomControls, generateDualCorridor } from "./methods/TemperatureCorridor";
 import { generateContrastSafe } from "./methods/ContrastSafe";
-import { RBBottomControls, deriveRoles, rolePairings } from "./methods/RoleBuilder";
+import { RBBottomControls, deriveRoles, rolePairings, proposeRoles } from "./methods/RoleBuilder";
 import { EXParams, EXBottomControls } from "./methods/Extract";
 import { WPParams, WPBottomControls, generateWordPicker } from "./methods/WordPicker";
 import type { WPRampColor } from "./methods/WordPicker";
-import { MKParams, MKBottomControls, generateMacroKnob, flipCard, getNeutralMeta } from "./methods/MacroKnob";
+import { MKParams, MKBottomControls, generateMacroKnob, flipCard } from "./methods/MacroKnob";
 import type { MKRampColor } from "./methods/MacroKnob";
 
 // Shared components
@@ -46,6 +46,7 @@ const CANVAS_COLOR = hexToOklch("#0A0A0A");
 
 interface ColorExplorerProps {
   fonts: FontInfo[];
+  starred: Set<string>;
   logoSvg?: string | null;
   brandName?: string;
   colCount?: number;
@@ -57,6 +58,7 @@ interface ColorExplorerProps {
 
 export function ColorExplorer({
   fonts,
+  starred: starredPaths,
   logoSvg,
   brandName = "",
   colCount = 4,
@@ -76,21 +78,60 @@ export function ColorExplorer({
 
   // ── Build System mode ───────────────────────────────────────────
   const [buildSystemOpen, setBuildSystemOpen] = useState(false);
+  const [heroCard, setHeroCard] = useState<{ bg: OklchColor; fg: OklchColor; fontName: string; fontWeight: string; fontPath?: string } | undefined>();
 
   function openBuildSystem() {
-    // Auto-populate primary from working color
-    const hex = oklchToHex(workingColor);
-    s.handleRbPrimaryHex(hex);
-    // Pulse spotlight card (find by color key)
-    if (spotlightColorKey !== null) {
-      const spotIdx = cards.findIndex((c) => colorKey(c.rampColor.color, c.fgOklch) === spotlightColorKey);
-      if (spotIdx >= 0) setPulsingIdx(spotIdx);
+    // Find the card the user selected (spotlight or working color)
+    const spotCard = spotlightColorKey !== null
+      ? cards.find((c) => colorKey(c.rampColor.color, c.fgOklch) === spotlightColorKey)
+      : null;
+    const selectedCard = spotCard || cards.find((c) => c.rampIdx === effectiveWorkingIndex);
+
+    if (selectedCard) {
+      const bg = selectedCard.rampColor.color;
+      const fg = selectedCard.fgOklch;
+      const font = selectedCard.font;
+
+      // Capture the exact card for the hero display
+      setHeroCard({
+        bg,
+        fg,
+        fontName: font?.font_family || "",
+        fontWeight: String(font?.weight || ""),
+        fontPath: font?.file_path,
+      });
+
+      // Set primary color from the selected card
+      s.handleRbPrimaryHex(oklchToHex(bg));
+
+      // Auto-save to collection (returns existing ID if duplicate)
+      const { id: itemId } = collection.addItem({
+        bg,
+        fg,
+        fontName: font?.font_family || "",
+        fontWeight: String(font?.weight || ""),
+        fontCategory: font?.classification?.category || "",
+        sourceMode: s.activeMethod,
+      });
+
+      // Assign as PRIMARY, propose remaining roles from collection
+      if (itemId) {
+        setTimeout(() => {
+          s.setRoleAssignments(() => {
+            const assignments = proposeRoles(collection.items);
+            assignments.primary = itemId;
+            return assignments;
+          });
+        }, 0);
+      }
     }
+
     setBuildSystemOpen(true);
   }
 
   function closeBuildSystem() {
     setBuildSystemOpen(false);
+    setHeroCard(undefined);
   }
 
   // ── Hub mode ──────────────────────────────────────────────────
@@ -101,11 +142,42 @@ export function ColorExplorer({
 
   function handleSendToBuildSystem(item: import("./useCollection").CollectionItem) {
     closeHub();
+    setHeroCard({
+      bg: item.bg,
+      fg: item.fg,
+      fontName: item.fontName,
+      fontWeight: item.fontWeight,
+      fontPath: undefined,
+    });
     s.handleRbPrimaryHex(oklchToHex(item.bg));
+    const assignments = proposeRoles(collection.items);
+    assignments.primary = item.id;
+    s.setRoleAssignments(assignments);
     setBuildSystemOpen(true);
   }
 
-  // Build system roles — derived when panel is open
+  // Resolve role assignments against collection → build overrides
+  const resolvedOverrides = useMemo((): import("./types").RoleOverrides => {
+    const base = { ...s.rbOverrides };
+    const roles: (keyof import("./types").RoleOverrides)[] = ["background", "text", "secondary", "highlight"];
+    for (const role of roles) {
+      const itemId = s.roleAssignments[role];
+      if (itemId) {
+        const item = collection.items.find((i) => i.id === itemId);
+        if (item) base[role] = item.bg;
+        else { /* item deleted — clear assignment */ }
+      }
+    }
+    // Also handle primary from assignment
+    const primaryId = s.roleAssignments.primary;
+    if (primaryId) {
+      const item = collection.items.find((i) => i.id === primaryId);
+      if (item) s.handleRbPrimaryHex(oklchToHex(item.bg));
+    }
+    return base;
+  }, [s.rbOverrides, s.roleAssignments, collection.items]);
+
+  // Brand Kit roles — derived when panel is open
   const bsRoles = useMemo(() => {
     if (!buildSystemOpen) return null;
     return deriveRoles({
@@ -113,9 +185,9 @@ export function ColorExplorer({
       theme: s.rbTheme,
       accentOffset: s.rbAccentOffset,
       accentChromaMult: s.rbAccentChromaMult,
-      overrides: s.rbOverrides,
+      overrides: resolvedOverrides,
     });
-  }, [buildSystemOpen, s.rbPrimary, s.rbTheme, s.rbAccentOffset, s.rbAccentChromaMult, s.rbOverrides]);
+  }, [buildSystemOpen, s.rbPrimary, s.rbTheme, s.rbAccentOffset, s.rbAccentChromaMult, resolvedOverrides]);
 
   // Export System — CSS file download
   const handleExportSystemCSS = useCallback(() => {
@@ -168,8 +240,38 @@ export function ColorExplorer({
     roles.forEach((r) => lines.push(`  --color-${r.key}: ${r.hex};`));
     lines.push("}");
     navigator.clipboard.writeText(lines.join("\n"));
-    setToast("System copied to clipboard");
+    setToast("Copied to clipboard");
   }, [bsRoles]);
+
+  // Export Brand Kit — Copy Prompt for AI tools
+  const handleExportPrompt = useCallback(() => {
+    if (!bsRoles) return;
+    const roleNames: { key: import("./types").RoleName; name: string }[] = [
+      { key: "primary", name: "Primary" },
+      { key: "secondary", name: "Secondary" },
+      { key: "background", name: "Background" },
+      { key: "text", name: "Text" },
+      { key: "highlight", name: "Highlight" },
+    ];
+    const lines: string[] = [];
+    lines.push(`Brand Kit for ${brandName || "Untitled"}\n`);
+    for (const r of roleNames) {
+      const bg = bsRoles[r.key];
+      const item = collection.items.find((i) => i.id === s.roleAssignments[r.key]);
+      const bgHex = oklchToHex(bg);
+      const bgOklch = `oklch(${bg.l.toFixed(2)}, ${bg.c.toFixed(3)}, ${Math.round(bg.h)})`;
+      let line = `${r.name}: bg ${bgHex} (${bgOklch})`;
+      if (item) {
+        const fgHex = oklchToHex(item.fg);
+        line += ` + fg ${fgHex}`;
+        if (item.fontName) line += ` · Font: ${item.fontName} ${item.fontWeight}`;
+      }
+      lines.push(line);
+    }
+    lines.push(`\nGenerated by FontDrop · Display-P3 gamut`);
+    navigator.clipboard.writeText(lines.join("\n"));
+    setToast("Prompt copied");
+  }, [bsRoles, collection.items, s.roleAssignments, brandName]);
 
   // ── Card pulse ──────────────────────────────────────────────────
   const [pulsingIdx, setPulsingIdx] = useState<number | null>(null);
@@ -212,16 +314,7 @@ export function ColorExplorer({
     setSpotlightFontPath(font ? font.file_path : null);
   }
 
-  // ── Starred fonts ────────────────────────────────────────────────
-  const [starredPaths, setStarredPaths] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    const p = new Set<string>();
-    try {
-      (JSON.parse(localStorage.getItem("fontdrop:grid:starred") || "[]") as string[]).forEach((x) => p.add(x));
-      (JSON.parse(localStorage.getItem("fontdrop:explorer:starred") || "[]") as string[]).forEach((x) => p.add(x));
-    } catch { /* */ }
-    setStarredPaths(p);
-  }, []);
+  // ── Starred fonts (passed from App as live prop) ────────────────
   const starredFonts = useMemo(() => fonts.filter((f) => starredPaths.has(f.file_path)), [fonts, starredPaths]);
   const displayFonts = starredFonts.length > 0 ? starredFonts : fonts.slice(0, 12);
   const hasStarred = starredFonts.length > 0;
@@ -631,8 +724,9 @@ export function ColorExplorer({
                   exit={{ opacity: 0 }}
                   transition={{ duration: dur.fast, ease: easeOut }}
                 >
-                  {cards.map((card, cardIndex) => {
-                    const isSpot = spotlightColorKey !== null && colorKey(card.rampColor.color, card.fgOklch) === spotlightColorKey;
+                  {(() => { let spotClaimed = false; return cards.map((card, cardIndex) => { // eslint-disable-line
+                    const isSpot = !spotClaimed && spotlightColorKey !== null && colorKey(card.rampColor.color, card.fgOklch) === spotlightColorKey;
+                    if (isSpot) spotClaimed = true;
                     // Apply flip for Macro Knob and Hue Lock
                     const isMK = s.activeMethod === "Macro Knob";
                     const isHL = s.activeMethod === "Hue Lock";
@@ -649,19 +743,6 @@ export function ColorExplorer({
                       renderFgColor = oklchToCss(flipped.fg);
                       renderFgOklch = flipped.fg;
                     }
-                    // Neutral meta color for secondary text (Macro Knob + Word Picker)
-                    const isWP = s.activeMethod === "Word Picker";
-                    let metaColor: string | undefined;
-                    if (isMK) {
-                      const mkRc = card.rampColor as MKRampColor;
-                      metaColor = isFlipped ? getNeutralMeta(renderBg) : mkRc.mkMeta;
-                    } else if (isWP) {
-                      const wpRc = card.rampColor as WPRampColor;
-                      metaColor = wpRc.wpMeta;
-                    } else if (s.activeMethod === "Hue Lock") {
-                      const hlRc = card.rampColor as HLRampColor;
-                      metaColor = hlRc.hlMeta;
-                    }
                     return (
                       <motion.div
                         key={card.isLogoCard ? "__logo__" : card.font!.file_path}
@@ -670,27 +751,29 @@ export function ColorExplorer({
                         transition={{ duration: dur.fast, ease: easeOut, delay: cardIndex * 0.02 }}
                       >
                         <ColorCard
-                          font={card.font} bgColor={renderBg} fgColor={renderFgColor}
+                          font={card.font}
+                          bgColor={renderBg}
+                          fgColor={renderFgColor}
                           fgOklch={renderFgOklch}
-                          badge={card.rampColor.badge} badgeColor={card.badgeColor}
+                          contrastLevel={s.contrastLevel}
+                          cardIndex={cardIndex}
                           isWorking={card.rampIdx === effectiveWorkingIndex}
                           isPulsing={card.rampIdx === pulsingIdx}
                           isSpotlight={isSpot}
-                          dimmed={card.dimmed} brandName={brandName || undefined}
-                          logoSvg={logoSvg} isLogoCard={card.isLogoCard}
-                          contrastLevel={s.contrastLevel}
-                          cardIndex={cardIndex}
+                          dimmed={card.dimmed}
+                          brandName={brandName || undefined}
+                          logoSvg={logoSvg}
+                          isLogoCard={card.isLogoCard}
                           pinnedFont={isSpot ? pinnedFont : undefined}
                           starredFonts={isSpot ? starredFonts : undefined}
                           onPinFont={isSpot ? handlePinFont : undefined}
-                          onClick={() => handleCardClick(card.rampIdx)}
                           onDoubleClick={() => handleDoubleClick(cardIndex)}
                           onFlip={canFlip ? () => handleFlip(cardIndex) : undefined}
-                          metaColor={metaColor}
                           isSaved={collection.isSaved(renderBg, renderFgOklch)}
                           onSave={() => {
+                            handleCardClick(card.rampIdx);
                             const renderFont = card.font;
-                            return collection.addItem({
+                            const { status } = collection.addItem({
                               bg: renderBg,
                               fg: renderFgOklch,
                               fontName: renderFont?.font_family || "",
@@ -698,12 +781,13 @@ export function ColorExplorer({
                               fontCategory: renderFont?.classification?.category || "",
                               sourceMode: s.activeMethod,
                             });
+                            return status;
                           }}
                           onUnsave={() => collection.removeByColorKey(renderBg, renderFgOklch)}
                         />
                       </motion.div>
                     );
-                  })}
+                  }); })()}
                 </motion.div>
               </AnimatePresence>
             )}
@@ -721,9 +805,15 @@ export function ColorExplorer({
           theme={s.rbTheme}
           onThemeChange={s.setRbTheme}
           previewFont={pinnedFont || starredFonts[0] || null}
+          brandName={brandName}
           collectionItems={collection.items}
+          roleAssignments={s.roleAssignments}
+          onRoleAssign={(role, itemId) => s.setRoleAssignments((prev) => ({ ...prev, [role]: itemId }))}
+          onRoleUnassign={(role) => s.setRoleAssignments((prev) => ({ ...prev, [role]: null }))}
           onExportCSS={handleExportSystemCSS}
           onExportJSON={handleExportSystemJSON}
+          onExportPrompt={handleExportPrompt}
+          heroCard={heroCard}
         />
       )}
 

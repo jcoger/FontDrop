@@ -62,6 +62,7 @@ export const LS_KEYS = {
     theme:           "fontdrop-ce-brandkit-theme",
     accentOffset:    "fontdrop-ce-brandkit-accentOffset",
     accentChromaMult:"fontdrop-ce-brandkit-accentChromaMult",
+    roleAssignments: "fontdrop-brandkit-roles",
   },
 
   macroKnob: {

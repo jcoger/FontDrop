@@ -10,8 +10,8 @@ import {
 } from "./rbLogic";
 
 // Re-export generation functions for use in index.tsx
-export { deriveRoles, rolePairings } from "./rbLogic";
-export type { RoleName, RoleOverrides, DerivedRoles, RoleBuilderParams } from "./rbLogic";
+export { deriveRoles, rolePairings, proposeRoles } from "./rbLogic";
+export type { RoleName, RoleOverrides, RoleAssignments, DerivedRoles, RoleBuilderParams } from "./rbLogic";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 

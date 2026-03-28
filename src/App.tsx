@@ -283,9 +283,8 @@ export default function App() {
   const explorerContainerRef = useRef<HTMLDivElement>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
-  // Independent starred state per mode
-  const gridStarred = useStarred("fontdrop:grid:starred");
-  const explorerStarred = useStarred("fontdrop:explorer:starred");
+  // Unified starred state across all modes
+  const starred = useStarred();
 
   // Inject ALL font faces
   useEffect(() => {
@@ -336,8 +335,7 @@ export default function App() {
       if (e.key === "s" || e.key === "S") {
         const fp = hoveredFilePath.current;
         if (!fp) return;
-        if (mode === "grid") gridStarred.toggle(fp);
-        else explorerStarred.toggle(fp);
+        starred.toggle(fp);
         return;
       }
       if (e.metaKey && !e.shiftKey && (e.key === "e" || e.key === "E")) {
@@ -410,27 +408,27 @@ export default function App() {
 
   // Logo Grid filters
   const gridFonts = useMemo(() => {
-    let result = gridStarred.showStarred
-      ? searchedFonts.filter((f) => gridStarred.starred.has(f.file_path))
+    let result = starred.showStarred
+      ? searchedFonts.filter((f) => starred.starred.has(f.file_path))
       : searchedFonts;
     if (categoryFilter) result = result.filter((f) => f.classification.category === categoryFilter);
     if (styleFilters.has("italic")) result = result.filter((f) => f.classification.style === "italic");
     if (styleFilters.has("condensed")) result = result.filter((f) => f.classification.width === "condensed");
     if (styleFilters.has("extended")) result = result.filter((f) => f.classification.width === "extended");
     return result;
-  }, [searchedFonts, gridStarred.showStarred, gridStarred.starred, categoryFilter, styleFilters]);
+  }, [searchedFonts, starred.showStarred, starred.starred, categoryFilter, styleFilters]);
 
   // Type Explorer filter — same category/style filters as grid
   const explorerFonts = useMemo(() => {
-    let result = explorerStarred.showStarred
-      ? searchedFonts.filter((f) => explorerStarred.starred.has(f.file_path))
+    let result = starred.showStarred
+      ? searchedFonts.filter((f) => starred.starred.has(f.file_path))
       : searchedFonts;
     if (categoryFilter) result = result.filter((f) => f.classification.category === categoryFilter);
     if (styleFilters.has("italic")) result = result.filter((f) => f.classification.style === "italic");
     if (styleFilters.has("condensed")) result = result.filter((f) => f.classification.width === "condensed");
     if (styleFilters.has("extended")) result = result.filter((f) => f.classification.width === "extended");
     return result;
-  }, [searchedFonts, explorerStarred.showStarred, explorerStarred.starred, categoryFilter, styleFilters]);
+  }, [searchedFonts, starred.showStarred, starred.starred, categoryFilter, styleFilters]);
 
   // Category counts from searchedFonts (pre-category-filter)
   const categoryCounts = useMemo(
@@ -453,7 +451,7 @@ export default function App() {
   );
 
   const hasGridFilters =
-    gridStarred.showStarred || categoryFilter !== null || styleFilters.size > 0;
+    starred.showStarred || categoryFilter !== null || styleFilters.size > 0;
 
   // ── Export handlers ──────────────────────────────────────────────────────
 
@@ -799,9 +797,9 @@ Letter spacing: ${track}`;
         {!loading && !error && (
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <StarFilterToggle
-              count={mode === "grid" ? gridStarred.starred.size : explorerStarred.starred.size}
-              showStarred={mode === "grid" ? gridStarred.showStarred : explorerStarred.showStarred}
-              onChange={mode === "grid" ? gridStarred.setShowStarred : explorerStarred.setShowStarred}
+              count={starred.starred.size}
+              showStarred={starred.showStarred}
+              onChange={starred.setShowStarred}
             />
             <Menu.Root direction="bottom" anchor="end">
               <Menu.Container
@@ -847,6 +845,7 @@ Letter spacing: ${track}`;
       {mode === "color" ? (
         <ColorExplorer
           fonts={baseFonts}
+          starred={starred.starred}
           logoSvg={logoSvg}
           brandName={ceBrandName}
           colCount={ceColCount}
@@ -881,7 +880,7 @@ Letter spacing: ${track}`;
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
             </svg>
             <span className="text-fg-3 text-sm">
-              {gridStarred.showStarred
+              {starred.showStarred
                 ? "No starred fonts — hover to star"
                 : searchLower
                 ? `No fonts match "${search}"`
@@ -889,7 +888,7 @@ Letter spacing: ${track}`;
             </span>
           </div>
         )}
-        {!loading && !error && mode === "explorer" && explorerStarred.showStarred && explorerFonts.length === 0 && (
+        {!loading && !error && mode === "explorer" && starred.showStarred && explorerFonts.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-fg-3">
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
@@ -908,8 +907,8 @@ Letter spacing: ${track}`;
                 logoSvg={logoSvg}
                 logoScale={logoScale}
                 controls={controls}
-                starred={gridStarred.starred}
-                onToggleStar={gridStarred.toggle}
+                starred={starred.starred}
+                onToggleStar={starred.toggle}
                 onExclude={exclusions.excludeFont}
                 onHover={setHoveredFont}
                 onSelect={handleSelectFont}
@@ -925,8 +924,8 @@ Letter spacing: ${track}`;
                 logoSvg={logoSvg}
                 logoScale={logoScale}
                 controls={controls}
-                starred={gridStarred.starred}
-                onToggleStar={gridStarred.toggle}
+                starred={starred.starred}
+                onToggleStar={starred.toggle}
                 onExclude={exclusions.excludeFont}
                 onHover={setHoveredFont}
                 onSelect={handleSelectFont}
@@ -945,8 +944,8 @@ Letter spacing: ${track}`;
           <TypeExplorer
             fonts={explorerFonts}
             controls={controls}
-            starred={explorerStarred.starred}
-            onToggleStar={explorerStarred.toggle}
+            starred={starred.starred}
+            onToggleStar={starred.toggle}
             onExclude={exclusions.excludeFont}
             onHover={setHoveredFont}
             onSelect={handleSelectFont}
@@ -981,8 +980,8 @@ Letter spacing: ${track}`;
         logoSvg={logoSvg}
         logoScale={logoScale}
         controls={controls}
-        starred={mode === "grid" ? gridStarred.starred : explorerStarred.starred}
-        onToggleStar={mode === "grid" ? gridStarred.toggle : explorerStarred.toggle}
+        starred={starred.starred}
+        onToggleStar={starred.toggle}
         onExclude={exclusions.excludeFont}
         onClose={() => setQuickViewState(null)}
         onNavigate={handleQuickViewNavigate}

@@ -76,6 +76,9 @@ export interface ContrastRampColor extends RampColor {
 
 export type RoleName = "primary" | "background" | "text" | "secondary" | "highlight";
 
+/** Maps each role to a CollectionItem.id (or null for derived). */
+export type RoleAssignments = Record<RoleName, string | null>;
+
 export type RoleOverrides = {
   background: OklchColor | null;
   text: OklchColor | null;

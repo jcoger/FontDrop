@@ -48,9 +48,13 @@ export function useCollection() {
   /** Set of color keys for fast dedup lookup */
   const savedKeys = new Set(items.map((item) => collectionColorKey(item.bg, item.fg)));
 
-  const addItem = useCallback((item: Omit<CollectionItem, "id" | "savedAt">): "added" | "duplicate" => {
+  const addItem = useCallback((item: Omit<CollectionItem, "id" | "savedAt">): { status: "added" | "duplicate"; id: string } => {
     const key = collectionColorKey(item.bg, item.fg);
-    if (savedKeys.has(key)) return "duplicate";
+    // If duplicate, find and return existing ID
+    if (savedKeys.has(key)) {
+      const existing = items.find((i) => collectionColorKey(i.bg, i.fg) === key);
+      return { status: "duplicate", id: existing?.id || "" };
+    }
 
     const newItem: CollectionItem = {
       ...item,
@@ -63,8 +67,8 @@ export function useCollection() {
       saveCollection(next);
       return next;
     });
-    return "added";
-  }, [savedKeys]);
+    return { status: "added", id: newItem.id };
+  }, [savedKeys, items]);
 
   const removeByColorKey = useCallback((bg: OklchColor, fg: OklchColor) => {
     const key = collectionColorKey(bg, fg);

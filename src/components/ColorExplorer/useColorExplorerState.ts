@@ -13,6 +13,7 @@ import type {
   Threshold,
   RoleName,
   RoleOverrides,
+  RoleAssignments,
   ExtractedCluster,
 } from "./types";
 import type { WPTagName } from "./methods/wpLogic";
@@ -104,6 +105,7 @@ export function useColorExplorerState() {
   const [rbAccentOffset, setRbAccentOffset] = usePersisted(LS_KEYS.roleBuilder.accentOffset, 150);
   const [rbAccentChromaMult, setRbAccentChromaMult] = usePersisted(LS_KEYS.roleBuilder.accentChromaMult, 0.8);
   const [rbOverrides, setRbOverrides] = useState<RoleOverrides>({ background: null, text: null, secondary: null, highlight: null });
+  const [roleAssignments, setRoleAssignments] = usePersisted<RoleAssignments>(LS_KEYS.roleBuilder.roleAssignments, { primary: null, secondary: null, background: null, text: null, highlight: null });
   function handleRbPrimaryHex(hex: string) {
     setRbPrimaryHex(hex);
     setRbPrimary(hexToOklch(hex));
@@ -270,6 +272,7 @@ export function useColorExplorerState() {
     rbAccentOffset, setRbAccentOffset,
     rbAccentChromaMult, setRbAccentChromaMult,
     rbOverrides, handleRbOverride, handleRbOverrideReset,
+    roleAssignments, setRoleAssignments,
     // Macro Knob
     mkKnob, setMkKnob,
     mkHue, setMkHue,

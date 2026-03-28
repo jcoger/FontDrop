@@ -10,11 +10,13 @@ import type {
   RampColor,
   RoleName,
   RoleOverrides,
+  RoleAssignments,
   DerivedRoles,
   RoleBuilderParams,
 } from "../types";
+import type { CollectionItem } from "../useCollection";
 
-export type { RoleName, RoleOverrides, DerivedRoles, RoleBuilderParams };
+export type { RoleName, RoleOverrides, RoleAssignments, DerivedRoles, RoleBuilderParams };
 
 // ── Binary-search helpers ─────────────────────────────────────────────
 
@@ -142,5 +144,58 @@ export const NODE_ORDER: { key: RoleName; label: string }[] = [
   { key: "text",       label: "Text" },
   { key: "highlight",  label: "Highlight" },
 ];
+
+// ── Collection-driven role proposal ───────────────────────────────────
+
+const EMPTY_ASSIGNMENTS: RoleAssignments = { primary: null, secondary: null, background: null, text: null, highlight: null };
+
+export function proposeRoles(items: CollectionItem[]): RoleAssignments {
+  if (items.length < 2) {
+    if (items.length === 1) return { ...EMPTY_ASSIGNMENTS, primary: items[0].id };
+    return { ...EMPTY_ASSIGNMENTS };
+  }
+
+  const assigned = new Set<string>();
+  const result: RoleAssignments = { ...EMPTY_ASSIGNMENTS };
+
+  function pickBest(scoreFn: (item: CollectionItem) => number): CollectionItem | null {
+    let best: CollectionItem | null = null;
+    let bestScore = -Infinity;
+    for (const item of items) {
+      if (assigned.has(item.id)) continue;
+      const score = scoreFn(item);
+      if (score > bestScore) { bestScore = score; best = item; }
+    }
+    return best;
+  }
+
+  // PRIMARY: most vivid (highest absolute chroma)
+  const primary = pickBest((item) => item.bg.c);
+  if (primary) { result.primary = primary.id; assigned.add(primary.id); }
+
+  // SECONDARY: closest to primary hue + 180°
+  if (primary) {
+    const targetH = (primary.bg.h + 180) % 360;
+    const secondary = pickBest((item) => {
+      const d = Math.abs(item.bg.h - targetH);
+      return -(Math.min(d, 360 - d)); // negative distance = higher score for closer
+    });
+    if (secondary) { result.secondary = secondary.id; assigned.add(secondary.id); }
+  }
+
+  // BACKGROUND: lightest bg
+  const bg = pickBest((item) => item.bg.l);
+  if (bg) { result.background = bg.id; assigned.add(bg.id); }
+
+  // TEXT: darkest bg
+  const text = pickBest((item) => -item.bg.l);
+  if (text) { result.text = text.id; assigned.add(text.id); }
+
+  // HIGHLIGHT: highest chroma among remaining
+  const highlight = pickBest((item) => item.bg.c);
+  if (highlight) { result.highlight = highlight.id; assigned.add(highlight.id); }
+
+  return result;
+}
 
 export { hexToOklch };
