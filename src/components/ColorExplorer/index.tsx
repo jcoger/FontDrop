@@ -122,42 +122,42 @@ export function ColorExplorer({
     if (!bsRoles) return;
     const roleExports = [
       { key: "primary", name: "Primary", bg: bsRoles.primary },
-      { key: "accent", name: "Accent", bg: bsRoles.accent },
-      { key: "surface", name: "Surface", bg: bsRoles.surface },
-      { key: "on-surface", name: "On-Surface", bg: bsRoles.onSurface },
-      { key: "error", name: "Error", bg: bsRoles.error },
+      { key: "secondary", name: "Secondary", bg: bsRoles.secondary },
+      { key: "background", name: "Background", bg: bsRoles.background },
+      { key: "text", name: "Text", bg: bsRoles.text },
+      { key: "highlight", name: "Highlight", bg: bsRoles.highlight },
     ];
-    downloadFile(`fontdrop-system-${todayStr()}.css`, exportSystemCSS(roleExports), "text/css");
+    downloadFile(`fontdrop-brand-kit-${todayStr()}.css`, exportSystemCSS(roleExports), "text/css");
     setToast("CSS downloaded");
   }, [bsRoles]);
 
-  // Export System — JSON file download
+  // Export Brand Kit — JSON file download
   const handleExportSystemJSON = useCallback(() => {
     if (!bsRoles) return;
     const roleExports = [
       { key: "primary", name: "Primary", bg: bsRoles.primary },
-      { key: "accent", name: "Accent", bg: bsRoles.accent },
-      { key: "surface", name: "Surface", bg: bsRoles.surface },
-      { key: "on-surface", name: "On-Surface", bg: bsRoles.onSurface },
-      { key: "error", name: "Error", bg: bsRoles.error },
+      { key: "secondary", name: "Secondary", bg: bsRoles.secondary },
+      { key: "background", name: "Background", bg: bsRoles.background },
+      { key: "text", name: "Text", bg: bsRoles.text },
+      { key: "highlight", name: "Highlight", bg: bsRoles.highlight },
     ];
-    downloadFile(`fontdrop-system-${todayStr()}.json`, exportSystemJSON(roleExports));
+    downloadFile(`fontdrop-brand-kit-${todayStr()}.json`, exportSystemJSON(roleExports));
     setToast("JSON downloaded");
   }, [bsRoles]);
 
-  // Legacy clipboard export (still used by the export ref)
+  // Clipboard export (used by the export ref)
   const handleExportSystem = useCallback(() => {
     if (!bsRoles) return;
     const roles = [
       { name: "Primary", key: "primary", hex: bsRoles.primaryHex, color: bsRoles.primary },
-      { name: "Accent", key: "accent", hex: bsRoles.accentHex, color: bsRoles.accent },
-      { name: "Surface", key: "surface", hex: bsRoles.surfaceHex, color: bsRoles.surface },
-      { name: "On-Surface", key: "on-surface", hex: bsRoles.onSurfaceHex, color: bsRoles.onSurface },
-      { name: "Error", key: "error", hex: bsRoles.errorHex, color: bsRoles.error },
+      { name: "Secondary", key: "secondary", hex: bsRoles.secondaryHex, color: bsRoles.secondary },
+      { name: "Background", key: "background", hex: bsRoles.backgroundHex, color: bsRoles.background },
+      { name: "Text", key: "text", hex: bsRoles.textHex, color: bsRoles.text },
+      { name: "Highlight", key: "highlight", hex: bsRoles.highlightHex, color: bsRoles.highlight },
     ];
     const lines: string[] = [];
-    lines.push(`Design System — ${bsRoles.primaryHex}`);
-    lines.push("FontDrop Role Builder\n");
+    lines.push(`Brand Kit — ${bsRoles.primaryHex}`);
+    lines.push("FontDrop Brand Kit\n");
     lines.push("Roles:");
     roles.forEach((r) => {
       const { l, c, h } = r.color;
@@ -351,7 +351,7 @@ export function ColorExplorer({
         const bgC = s.csFgLock ? csrc.color : s.csPrimary;
         const fgC = s.csFgLock ? primaryCss : testCss;
         const fgO = s.csFgLock ? s.csPrimary : csrc.color;
-        const bc: Record<string, string> = { AAA: "#4ade80", AA: "#facc15", "AA-large": "#fb923c", FAIL: "rgba(239,68,68,0.45)" };
+        const bc: Record<string, string> = { AAA: "var(--c-success)", AA: "var(--c-warning)", "AA-large": "var(--c-caution)", FAIL: "var(--c-error)" };
         return { font, rampColor: { ...rc, color: bgC }, rampIdx, fgColor: fgC, fgOklch: fgO, dimmed: !(csrc as ContrastRampColor).passes, badgeColor: bc[(csrc as ContrastRampColor).badge.split(" ")[0]] || fgC, isLogoCard: isLogo };
       }
       if (isTc) {
@@ -523,7 +523,7 @@ export function ColorExplorer({
         />
       )}
 
-      <div className="flex flex-1 overflow-hidden" style={{ opacity: buildSystemOpen || hubOpen ? 0 : 1, transition: "opacity 200ms ease", display: buildSystemOpen || hubOpen ? "none" : undefined }}>
+      <div className="flex flex-1 overflow-hidden" style={{ opacity: buildSystemOpen || hubOpen ? 0 : 1, transition: `opacity var(--dur-normal) var(--ease-out)`, display: buildSystemOpen || hubOpen ? "none" : undefined }}>
         {/* Sidebar */}
         <MethodSidebar>
           {s.activeMethod === "Macro Knob" ? (
@@ -603,11 +603,11 @@ export function ColorExplorer({
           <AlbersPanel open={s.albersOpen} onClose={s.closeAlbers} workingColor={workingColor} canvasColor={CANVAS_COLOR} />
 
           {/* Card grid */}
-          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-8 bg-[#0A0A0A]"
+          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-8 bg-surface-0"
 >
             {cards.length === 0 && !hasStarred ? (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-neutral-600">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-fg-3">
                   <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
                 </svg>
                 <span className="max-w-xs" style={{ fontSize: "var(--text-ui)", color: "var(--c-text-3)" }}>
@@ -751,7 +751,7 @@ export function ColorExplorer({
       )}
 
       {/* Bottom bar */}
-      <BottomBar label={hubOpen ? "Collection" : buildSystemOpen ? "Role Builder" : s.activeMethod}>
+      <BottomBar label={hubOpen ? "Collection" : buildSystemOpen ? "Brand Kit" : s.activeMethod}>
         {buildSystemOpen ? (
           <RBBottomControls accentOffset={s.rbAccentOffset} onAccentOffsetChange={s.setRbAccentOffset}
             accentChromaMult={s.rbAccentChromaMult} onAccentChromaMultChange={s.setRbAccentChromaMult} />
@@ -766,7 +766,7 @@ export function ColorExplorer({
         ) : s.activeMethod === "Hue Lock" ? (
           <HLBottomControls hue={s.hue} shadeCount={sortedRamp.length} contrastRange={hlContrastRange(sortedRamp as HLRampColor[])} contrastLevel={s.contrastLevel} />
         ) : (
-          <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+          <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
             <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>—</span>
           </div>
         )}
@@ -774,7 +774,7 @@ export function ColorExplorer({
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-neutral-800 text-white text-xs font-medium px-4 py-2 rounded-md shadow-lg pointer-events-none select-none animate-[fadeIn_150ms_ease]">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-surface-4 text-fg text-xs font-medium px-4 py-2 rounded-md shadow-lg pointer-events-none select-none animate-[fadeIn_150ms_ease]">
           {toast}
         </div>
       )}

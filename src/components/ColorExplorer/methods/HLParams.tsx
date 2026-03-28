@@ -124,11 +124,11 @@ export function HLParams({
         <div className="mt-2">
           <input
             type="text"
-            className="w-full bg-neutral-900 border rounded px-2.5 py-1.5 font-mono text-center outline-none transition-colors"
+            className="w-full bg-surface-1 border rounded px-2.5 py-1.5 font-mono text-center outline-none transition-colors"
             style={{
               fontSize: "var(--text-body)",
               color: "var(--c-text-2)",
-              borderColor: hexError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.08)",
+              borderColor: hexError ? "var(--c-error)" : "var(--border-subtle)",
             }}
             placeholder={currentHex}
             value={hexInput}
@@ -155,10 +155,10 @@ export function HLParams({
         <div className="font-mono uppercase mb-1" style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}>
           Chroma
         </div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["max", "fixed"] as const).map((m) => (
             <button key={m} className="flex-1 px-3 py-1 font-medium transition-colors capitalize cursor-pointer"
-              style={{ fontSize: "var(--text-body)", backgroundColor: chromaMode === m ? "#404040" : "transparent", color: chromaMode === m ? "var(--c-text)" : "var(--c-text-2)" }}
+              style={{ fontSize: "var(--text-body)", backgroundColor: chromaMode === m ? "var(--surface-active)" : "transparent", color: chromaMode === m ? "var(--c-text)" : "var(--c-text-2)" }}
               onClick={() => onChromaModeChange(m)}>{m}</button>
           ))}
         </div>
@@ -186,9 +186,9 @@ export function HLParams({
                 style={{
                   fontSize: "var(--text-micro)",
                   letterSpacing: "var(--track-caps)",
-                  backgroundColor: isActive ? "rgba(255,255,255,0.18)" : "transparent",
+                  backgroundColor: isActive ? "var(--overlay-w-20)" : "transparent",
                   color: isActive ? "var(--c-text)" : "var(--c-text-4)",
-                  border: `1px solid ${isActive ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.06)"}`,
+                  border: `1px solid ${isActive ? "var(--border-strong)" : "var(--border-subtle)"}`,
                 }}
                 onClick={() => {
                   onFgPresetChange(p.id);
@@ -242,12 +242,12 @@ export function HLParams({
             {variety === "tight" ? `Tight · ${Math.max(4, Math.ceil(activeFontCount / 2))}` : variety === "wide" ? `Wide · ${Math.min(24, activeFontCount * 2)}` : `Auto · ${activeFontCount}`}
           </span>
         </div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["tight", "auto", "wide"] as const).map((v) => {
             const active = variety === v;
             return (
               <button key={v} className="flex-1 px-2 py-1 font-mono uppercase cursor-pointer transition-colors"
-                style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", backgroundColor: active ? "#404040" : "transparent", color: active ? "var(--c-text)" : "var(--c-text-3)" }}
+                style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", backgroundColor: active ? "var(--surface-active)" : "transparent", color: active ? "var(--c-text)" : "var(--c-text-3)" }}
                 onClick={() => onVarietyChange(v)}>{v}</button>
             );
           })}
@@ -269,19 +269,19 @@ interface HLBottomControlsProps {
 export function HLBottomControls({ hue, shadeCount, contrastRange, contrastLevel }: HLBottomControlsProps) {
   const levelLabel = contrastLevel === "clash" ? "CLASH ⚡" : contrastLevel === "accessible" ? "ACCESSIBLE" : "DISPLAY";
   return (
-    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-2)" }}>
         {hlHueFamily(hue)}
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-border-default" />
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {shadeCount} shades
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-border-default" />
       <span className="font-mono tabular-nums" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {contrastRange[0].toFixed(1)}–{contrastRange[1].toFixed(1)}
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-border-default" />
       <span className="font-mono uppercase" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {levelLabel}
       </span>

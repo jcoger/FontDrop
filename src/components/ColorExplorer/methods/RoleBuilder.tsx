@@ -96,8 +96,8 @@ export function RBParams({
           <HexColorPicker color={primaryHex} onChange={handlePickerPrimary} style={{ width: "100%" }} />
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded border border-neutral-700 shrink-0" style={{ backgroundColor: primaryHex }} />
-          <input className="flex-1 bg-neutral-800 font-mono rounded px-2 py-1.5 outline-none placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 uppercase"
+          <div className="w-7 h-7 rounded border border-border-strong shrink-0" style={{ backgroundColor: primaryHex }} />
+          <input className="flex-1 bg-surface-4 font-mono rounded px-2 py-1.5 outline-none placeholder:text-fg-3 focus:ring-1 focus:ring-border-strong uppercase"
             style={{ fontSize: "var(--text-body)", color: "var(--c-text)" }}
             value={hexInput} onChange={(e) => setHexInput(e.target.value)}
             onBlur={(e) => commitPrimaryHex(e.target.value)}
@@ -109,10 +109,10 @@ export function RBParams({
       {/* Theme toggle */}
       <div>
         <div className="font-mono uppercase mb-1" style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}>Theme</div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["light", "dark"] as const).map((t) => (
             <button key={t} className="flex-1 px-3 py-1 font-medium transition-colors capitalize cursor-pointer"
-              style={{ fontSize: "var(--text-body)", backgroundColor: theme === t ? "#404040" : "transparent", color: theme === t ? "var(--c-text)" : "var(--c-text-2)" }}
+              style={{ fontSize: "var(--text-body)", backgroundColor: theme === t ? "var(--surface-active)" : "transparent", color: theme === t ? "var(--c-text)" : "var(--c-text-2)" }}
               onClick={() => onThemeChange(t)}>{t}</button>
           ))}
         </div>
@@ -132,7 +132,7 @@ export function RBParams({
             const fg = contrastFg(color);
             const isEditing = editingSlot === key;
             const isPulsing = pulsing === key;
-            const stateColor = state === "LOCKED" ? "var(--c-text-3)" : state === "OVERRIDE" ? "var(--c-accent)" : "#4ade80";
+            const stateColor = state === "LOCKED" ? "var(--c-text-3)" : state === "OVERRIDE" ? "var(--c-accent)" : "var(--c-success)";
 
             const conn = CONNECTORS.find((c) => c.to === key);
             const connLabel = conn && state !== "OVERRIDE" ? conn.label : null;
@@ -142,7 +142,7 @@ export function RBParams({
               <div key={key}>
                 {connLabel && (
                   <div className="flex items-center gap-1.5 mb-0.5 ml-3">
-                    <div className="w-3 border-t" style={{ borderColor: connColor || "var(--c-text-4)", borderStyle: state === "OVERRIDE" ? "dashed" : key === "accent" ? "dashed" : "solid", opacity: 0.4 }} />
+                    <div className="w-3 border-t" style={{ borderColor: connColor || "var(--c-text-4)", borderStyle: state === "OVERRIDE" ? "dashed" : key === "secondary" ? "dashed" : "solid", opacity: 0.4 }} />
                     <span className="font-mono" style={{ fontSize: 7, color: connColor || "var(--c-text-4)", opacity: 0.5 }}>{connLabel}</span>
                   </div>
                 )}
@@ -155,7 +155,7 @@ export function RBParams({
                     color: fg,
                     transform: isPulsing ? "scale(1.03)" : "scale(1)",
                     transition: "transform var(--dur-micro) var(--ease-hover)",
-                    boxShadow: isEditing ? "0 0 0 2px rgba(217,119,54,0.5)" : "0 1px 3px rgba(0,0,0,0.3)",
+                    boxShadow: isEditing ? "0 0 0 2px var(--accent-ring)" : "0 1px 3px rgba(0,0,0,0.3)",
                   }}
                   onClick={() => handleNodeClick(key)}
                 >
@@ -170,7 +170,7 @@ export function RBParams({
                   )}
                   {state === "OVERRIDE" && (
                     <button
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neutral-800 border border-neutral-600 flex items-center justify-center cursor-pointer hover:bg-neutral-700 transition-colors"
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-surface-4 border border-border-strong flex items-center justify-center cursor-pointer hover:bg-surface-active transition-colors"
                       style={{ fontSize: 10, color: "var(--c-text-2)" }}
                       onClick={(e) => { e.stopPropagation(); resetOverride(key); }}
                     >×</button>
@@ -212,23 +212,23 @@ export function RBBottomControls({
   onAccentChromaMultChange,
 }: RBBottomControlsProps) {
   return (
-    <div className="flex items-center gap-6 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+    <div className="flex items-center gap-6 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
       <div className="flex items-center gap-3 w-[200px]">
-        <span className="text-[9px] font-mono text-neutral-500 w-14 shrink-0">HUE Δ</span>
+        <span className="text-[length:var(--text-badge)] font-mono text-fg-4 w-14 shrink-0">HUE Δ</span>
         <input type="range" min={0} max={360} value={accentOffset}
           onChange={(e) => onAccentOffsetChange(+e.target.value)}
           className="w-full" aria-label="Accent hue offset" aria-valuetext={`${accentOffset} degrees`} />
-        <span className="text-[10px] font-mono text-white w-8 text-right shrink-0">{accentOffset}°</span>
+        <span className="text-[length:var(--text-label)] font-mono text-fg w-8 text-right shrink-0">{accentOffset}°</span>
       </div>
 
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-border-default" />
 
       <div className="flex items-center gap-3 w-[180px]">
-        <span className="text-[9px] font-mono text-neutral-500 w-14 shrink-0">C MULT</span>
+        <span className="text-[length:var(--text-badge)] font-mono text-fg-4 w-14 shrink-0">C MULT</span>
         <input type="range" min={0.2} max={1.2} step={0.05} value={accentChromaMult}
           onChange={(e) => onAccentChromaMultChange(+e.target.value)}
           className="w-full" aria-label="Accent chroma multiplier" aria-valuetext={`${accentChromaMult.toFixed(1)} times`} />
-        <span className="text-[10px] font-mono text-white w-8 text-right shrink-0">{accentChromaMult.toFixed(1)}×</span>
+        <span className="text-[length:var(--text-label)] font-mono text-fg w-8 text-right shrink-0">{accentChromaMult.toFixed(1)}×</span>
       </div>
     </div>
   );

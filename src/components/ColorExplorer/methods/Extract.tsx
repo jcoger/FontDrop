@@ -110,12 +110,12 @@ export function EXParams({
           Source Image
         </div>
         {thumbnail ? (
-          <div className={["relative group rounded-lg transition-colors", dragging ? "ring-2 ring-neutral-400" : ""].join(" ")}
+          <div className={["relative group rounded-lg transition-colors", dragging ? "ring-2 ring-border-strong" : ""].join(" ")}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
             onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
           >
-            <img src={thumbnail} className="w-full rounded-lg border border-neutral-700" alt="Source" />
+            <img src={thumbnail} className="w-full rounded-lg border border-border-strong" alt="Source" />
             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-3">
               <button className="font-mono cursor-pointer transition-colors" style={{ fontSize: "var(--text-label)", color: "var(--c-text-2)" }}
                 onClick={() => inputRef.current?.click()}>swap</button>
@@ -126,13 +126,13 @@ export function EXParams({
         ) : (
           <div
             className={["flex flex-col items-center justify-center gap-2 py-8 rounded-lg border border-dashed cursor-pointer transition-colors select-none",
-              dragging ? "border-neutral-400 bg-neutral-800/60" : "border-neutral-700 hover:border-neutral-500"].join(" ")}
+              dragging ? "border-border-strong bg-surface-4/60" : "border-border-strong hover:border-border-strong"].join(" ")}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
             onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
             onClick={() => inputRef.current?.click()}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-600">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-fg-3">
               <rect x="3" y="3" width="18" height="18" rx="2.5" />
               <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
               <polyline points="3 15 8 10 13 15" /><polyline points="13 15 16 12 21 17" />
@@ -152,11 +152,11 @@ export function EXParams({
               Extracted Palette
             </span>
             <div className="flex items-center gap-1">
-              <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+              <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
                 style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
                 onClick={() => onClusterCountChange(Math.max(3, clusterCount - 1))} aria-label="Fewer clusters">-</button>
               <span className="font-mono w-5 text-center tabular-nums" style={{ fontSize: "var(--text-badge)", color: "var(--c-text)" }}>{clusterCount}</span>
-              <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+              <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
                 style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
                 onClick={() => onClusterCountChange(Math.min(8, clusterCount + 1))} aria-label="More clusters">+</button>
             </div>
@@ -187,7 +187,7 @@ export function EXParams({
                     style={{
                       height: barH,
                       backgroundColor: css,
-                      transition: "height 300ms cubic-bezier(0.25,0.46,0.45,0.94)",
+                      transition: "height var(--dur-normal) var(--ease-out)",
                       borderTop: isWorking ? "2px solid white" : "none",
                       boxShadow: isWorking ? "0 -2px 6px rgba(255,255,255,0.2)" : "none",
                     }}
@@ -220,7 +220,7 @@ export function EXParams({
       <div>
         <label className="flex items-center gap-2.5 cursor-pointer">
           <button className="w-8 h-[18px] rounded-full relative transition-colors shrink-0"
-            style={{ backgroundColor: remapEnabled ? "var(--c-accent)" : "#404040" }}
+            style={{ backgroundColor: remapEnabled ? "var(--c-accent)" : "var(--surface-active)" }}
             onClick={() => onRemapChange(!remapEnabled)}>
             <div className="absolute top-[3px] w-3 h-3 rounded-full bg-white shadow transition-transform"
               style={{ transform: remapEnabled ? "translateX(17px)" : "translateX(3px)" }} />
@@ -234,7 +234,7 @@ export function EXParams({
       <div>
         <label className="flex items-center gap-2.5 cursor-pointer">
           <button className="w-8 h-[18px] rounded-full relative transition-colors shrink-0"
-            style={{ backgroundColor: lightnessLock ? "var(--c-accent)" : "#404040" }}
+            style={{ backgroundColor: lightnessLock ? "var(--c-accent)" : "var(--surface-active)" }}
             onClick={() => onLightnessLockChange(!lightnessLock)}>
             <div className="absolute top-[3px] w-3 h-3 rounded-full bg-white shadow transition-transform"
               style={{ transform: lightnessLock ? "translateX(17px)" : "translateX(3px)" }} />
@@ -267,7 +267,7 @@ interface EXBottomControlsProps {
 
 export function EXBottomControls({ clusterCount }: EXBottomControlsProps) {
   return (
-    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {clusterCount} clusters
       </span>

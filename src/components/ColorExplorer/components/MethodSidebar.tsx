@@ -8,7 +8,7 @@ interface MethodSidebarProps {
 
 export function MethodSidebar({ children, flush }: MethodSidebarProps) {
   return (
-    <div className="w-[280px] bg-[#141414] border-r border-neutral-800 flex flex-col shrink-0 overflow-y-auto z-10">
+    <div className="w-[280px] bg-surface-1 border-r border-border-default flex flex-col shrink-0 overflow-y-auto z-10">
       <div className={`${flush ? "pt-0 px-4 pb-4" : "p-4"} flex flex-col flex-1`}>
         <div className="px-1 flex flex-col gap-5">{children}</div>
       </div>

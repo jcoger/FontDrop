@@ -69,12 +69,12 @@ function SegmentedControl<T extends string | number>({
         <button
           key={String(opt)}
           className="relative px-2.5 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap"
-          style={{ color: opt === value ? "#ffffff" : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
+          style={{ color: opt === value ? "var(--c-text)" : "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-out)" }}
           onMouseEnter={(e) => {
-            if (opt !== value) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+            if (opt !== value) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
           }}
           onMouseLeave={(e) => {
-            if (opt !== value) (e.currentTarget as HTMLButtonElement).style.color = "#6b7280";
+            if (opt !== value) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-3)";
           }}
           onClick={() => onChange(opt)}
         >
@@ -82,7 +82,7 @@ function SegmentedControl<T extends string | number>({
             <motion.div
               layoutId={`seg-${id}`}
               initial={false}
-              className="absolute inset-0 bg-neutral-700 rounded-md"
+              className="absolute inset-0 bg-surface-active rounded-md"
               transition={springSnap}
             />
           )}
@@ -112,12 +112,12 @@ function StarFilterToggle({
         <button
           key={String(opt)}
           className="relative px-2.5 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap"
-          style={{ color: showStarred === opt ? (opt ? "#facc15" : "#ffffff") : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
+          style={{ color: showStarred === opt ? (opt ? "var(--c-star)" : "var(--c-text)") : "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-out)" }}
           onMouseEnter={(e) => {
-            if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+            if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
           }}
           onMouseLeave={(e) => {
-            if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "#6b7280";
+            if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-3)";
           }}
           onClick={() => onChange(opt)}
         >
@@ -125,7 +125,7 @@ function StarFilterToggle({
             <motion.div
               layoutId={`star-${id}`}
               initial={false}
-              className="absolute inset-0 bg-neutral-700 rounded-md"
+              className="absolute inset-0 bg-surface-active rounded-md"
               transition={springSnap}
             />
           )}
@@ -164,7 +164,7 @@ function ExclusionManagerContent({
 
   if (!hasAny) {
     return (
-      <div className="px-3 py-4 text-xs text-neutral-600 text-center">
+      <div className="px-3 py-4 text-xs text-fg-3 text-center">
         No hidden fonts
       </div>
     );
@@ -174,14 +174,14 @@ function ExclusionManagerContent({
     <div className="flex flex-col max-h-72 overflow-y-auto">
       {userFonts.length > 0 && (
         <div>
-          <div className="px-3 pt-2.5 pb-1 text-[10px] text-neutral-600 font-mono uppercase tracking-widest sticky top-0 bg-neutral-900">
+          <div className="px-3 pt-2.5 pb-1 text-[length:var(--text-label)] text-fg-3 font-mono uppercase tracking-widest sticky top-0 bg-surface-1">
             Your exclusions
           </div>
           {userFonts.map((f) => (
             <div key={f.file_path} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5">
-              <span className="text-xs text-neutral-400 truncate mr-2">{f.font_family}</span>
+              <span className="text-xs text-fg-2 truncate mr-2">{f.font_family}</span>
               <button
-                className="text-[10px] text-neutral-600 hover:text-neutral-300 cursor-pointer flex-shrink-0 transition-colors"
+                className="text-[length:var(--text-label)] text-fg-3 hover:text-fg-2 cursor-pointer flex-shrink-0 transition-colors"
                 onClick={() => onUnhideUser(f.file_path)}
               >
                 Unhide
@@ -192,14 +192,14 @@ function ExclusionManagerContent({
       )}
       {builtinFonts.length > 0 && (
         <div>
-          <div className="px-3 pt-2.5 pb-1 text-[10px] text-neutral-600 font-mono uppercase tracking-widest sticky top-0 bg-neutral-900">
+          <div className="px-3 pt-2.5 pb-1 text-[length:var(--text-label)] text-fg-3 font-mono uppercase tracking-widest sticky top-0 bg-surface-1">
             Built-in exclusions
           </div>
           {builtinFonts.map((f) => (
             <div key={f.font_family} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5">
-              <span className="text-xs text-neutral-400 truncate mr-2">{f.font_family}</span>
+              <span className="text-xs text-fg-2 truncate mr-2">{f.font_family}</span>
               <button
-                className="text-[10px] text-neutral-600 hover:text-neutral-300 cursor-pointer flex-shrink-0 transition-colors"
+                className="text-[length:var(--text-label)] text-fg-3 hover:text-fg-2 cursor-pointer flex-shrink-0 transition-colors"
                 onClick={() => onUnhideBuiltin(f.font_family)}
               >
                 Unhide
@@ -208,9 +208,9 @@ function ExclusionManagerContent({
           ))}
         </div>
       )}
-      <div className="px-3 py-2 border-t border-neutral-800 mt-1">
+      <div className="px-3 py-2 border-t border-border-default mt-1">
         <button
-          className="w-full text-[11px] text-neutral-600 hover:text-red-400 cursor-pointer transition-colors text-left"
+          className="w-full text-[length:var(--text-body)] text-fg-3 hover:text-red-400 cursor-pointer transition-colors text-left"
           onClick={onResetAll}
         >
           Reset all exclusions
@@ -505,12 +505,12 @@ Letter spacing: ${track}`;
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-screen bg-neutral-950 flex flex-col select-none">
+    <div className="h-screen bg-surface-0 flex flex-col select-none">
 
       {/* ── Row 1: Title + Mode tabs + Search/SVG/Wordmark + View controls + Export ── */}
       {/* Programmatic drag via appWindow.startDragging() on non-interactive areas */}
       <div
-        className="flex-shrink-0 border-b border-neutral-800 bg-neutral-900"
+        className="flex-shrink-0 border-b border-border-default bg-surface-1"
         onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
       >
         {/* Traffic light zone — 28px for macOS overlay title bar */}
@@ -531,11 +531,11 @@ Letter spacing: ${track}`;
             onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
           >
             <span
-              className="text-[13px] font-mono font-bold text-white"
+              className="text-[length:var(--text-title)] font-mono font-bold text-fg"
               onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
             >FontDrop</span>
             <div
-              className="w-px h-4 bg-neutral-800 flex-shrink-0"
+              className="w-px h-4 bg-border-default flex-shrink-0"
               onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
             />
             <SegmentedControl
@@ -566,8 +566,8 @@ Letter spacing: ${track}`;
                 logoScale={logoScale}
               />
               <input
-                className="flex-shrink-0 w-40 bg-neutral-800 text-white text-sm rounded-md px-3 h-9 outline-none
-                           placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 select-text"
+                className="flex-shrink-0 w-40 bg-surface-4 text-fg text-sm rounded-md px-3 h-9 outline-none
+                           placeholder:text-fg-3 focus:ring-1 focus:ring-border-default select-text"
                 value={ceBrandName}
                 onChange={(e) => handleCeBrandNameChange(e.target.value)}
                 placeholder="Brand name…"
@@ -581,14 +581,14 @@ Letter spacing: ${track}`;
               onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
             >
               <div className="relative flex-shrink-0 w-44">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-600 pointer-events-none"
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none"
                   width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
                 <input
                   ref={searchInputRef}
-                  className="w-full bg-neutral-800 text-white text-xs rounded-md pl-8 pr-3 h-9 outline-none
-                             placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-700"
+                  className="w-full bg-surface-4 text-fg text-xs rounded-md pl-8 pr-3 h-9 outline-none
+                             placeholder:text-fg-3 focus:ring-1 focus:ring-border-strong"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search fonts…"
@@ -605,8 +605,8 @@ Letter spacing: ${track}`;
                     logoScale={logoScale}
                   />
                   <input
-                    className="flex-shrink-0 w-40 bg-neutral-800 text-white text-sm rounded-md px-3 h-9 outline-none
-                               placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 select-text"
+                    className="flex-shrink-0 w-40 bg-surface-4 text-fg text-sm rounded-md px-3 h-9 outline-none
+                               placeholder:text-fg-3 focus:ring-1 focus:ring-border-default select-text"
                     value={wordmark}
                     onChange={(e) => setWordmark(e.target.value)}
                     placeholder="Type a word…"
@@ -629,7 +629,7 @@ Letter spacing: ${track}`;
               onChange={setCeColCount}
             />
             <div
-              className="w-px h-4 bg-neutral-800 flex-shrink-0"
+              className="w-px h-4 bg-border-default flex-shrink-0"
               onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
             />
             <Menu.Root direction="bottom" anchor="end">
@@ -638,24 +638,24 @@ Letter spacing: ${track}`;
                 menuWidth={172}
                 menuRadius={10}
                 buttonRadius={6}
-                className="bg-neutral-900 ring-1 ring-neutral-700 shadow-2xl"
+                className="bg-surface-1 ring-1 ring-border-strong shadow-2xl"
               >
                 <Menu.Trigger>
                   <div className="flex items-center justify-center gap-1.5 w-full h-full px-2.5">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-fg-2">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    <span className="text-[11px] text-neutral-400 font-medium leading-none">Export</span>
+                    <span className="text-[length:var(--text-body)] text-fg-2 font-medium leading-none">Export</span>
                   </div>
                 </Menu.Trigger>
                 <Menu.Content className="p-1.5 flex flex-col gap-0.5">
                   <Menu.Item
                     onSelect={() => ceExportRef.current?.()}
-                    className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                    className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-fg hover:bg-white/10 rounded-md cursor-pointer transition-colors"
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-neutral-400">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-fg-2">
                       <rect x="9" y="9" width="13" height="13" rx="2" />
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
@@ -686,7 +686,7 @@ Letter spacing: ${track}`;
                       onChange={(v) => setFamiliesMode(v === "Families")}
                     />
                     <div
-                      className="w-px h-4 bg-neutral-800 flex-shrink-0"
+                      className="w-px h-4 bg-border-default flex-shrink-0"
                       onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
                     />
                   </>
@@ -697,24 +697,24 @@ Letter spacing: ${track}`;
                     menuWidth={172}
                     menuRadius={10}
                     buttonRadius={6}
-                    className="bg-neutral-900 ring-1 ring-neutral-700 shadow-2xl"
+                    className="bg-surface-1 ring-1 ring-border-strong shadow-2xl"
                   >
                     <Menu.Trigger>
                       <div className="flex items-center justify-center gap-1.5 w-full h-full px-2.5">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-400">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-fg-2">
                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                           <polyline points="7 10 12 15 17 10" />
                           <line x1="12" y1="15" x2="12" y2="3" />
                         </svg>
-                        <span className="text-[11px] text-neutral-400 font-medium leading-none">Export</span>
+                        <span className="text-[length:var(--text-body)] text-fg-2 font-medium leading-none">Export</span>
                       </div>
                     </Menu.Trigger>
                     <Menu.Content className="p-1.5 flex flex-col gap-0.5">
                       <Menu.Item
                         onSelect={handleSavePng}
-                        className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                        className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-fg hover:bg-white/10 rounded-md cursor-pointer transition-colors"
                       >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-neutral-400">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-fg-2">
                           <rect x="3" y="3" width="18" height="18" rx="2" />
                           <circle cx="8.5" cy="8.5" r="1.5" />
                           <polyline points="21 15 16 10 5 21" />
@@ -724,9 +724,9 @@ Letter spacing: ${track}`;
                       {mode === "explorer" && (
                         <Menu.Item
                           onSelect={handleCopyFigmaPrompt}
-                          className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-2 text-xs text-fg hover:bg-white/10 rounded-md cursor-pointer transition-colors"
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-neutral-400">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-fg-2">
                             <rect x="9" y="9" width="13" height="13" rx="2" />
                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                           </svg>
@@ -744,7 +744,7 @@ Letter spacing: ${track}`;
       </div>
 
       {/* ── Row 2: Unified filters (hidden in color mode) ── */}
-      {mode !== "color" && <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-neutral-800 bg-neutral-900 overflow-x-auto">
+      {mode !== "color" && <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-border-default bg-surface-1 overflow-x-auto">
         {/* Left: source filter + category pills + style filters (always shown) */}
         {!loading && !error && (
           <>
@@ -754,32 +754,32 @@ Letter spacing: ${track}`;
               onChange={setSourceFilter}
               getLabel={(v) => v.charAt(0).toUpperCase() + v.slice(1)}
             />
-            <div className="w-px h-4 bg-neutral-800 mx-0.5 flex-shrink-0" />
+            <div className="w-px h-4 bg-border-default mx-0.5 flex-shrink-0" />
             <CategoryFilterBar
               categories={CATEGORIES}
               value={categoryFilter}
               onChange={setCategoryFilter}
               counts={categoryCounts}
             />
-            <div className="w-px h-4 bg-neutral-800 mx-0.5 flex-shrink-0" />
+            <div className="w-px h-4 bg-border-default mx-0.5 flex-shrink-0" />
             {(["italic", "condensed", "extended"] as const).map((filter) => {
               const isActive = styleFilters.has(filter);
               return (
                 <button
                   key={filter}
-                  className="relative px-2.5 py-1 text-[11px] font-medium cursor-pointer capitalize flex-shrink-0 whitespace-nowrap"
-                  style={{ color: isActive ? "#ffffff" : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
+                  className="relative px-2.5 py-1 text-[length:var(--text-body)] font-medium cursor-pointer capitalize flex-shrink-0 whitespace-nowrap"
+                  style={{ color: isActive ? "var(--c-text)" : "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-out)" }}
                   onMouseEnter={(e) => {
-                    if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+                    if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.color = isActive ? "#ffffff" : "#6b7280";
+                    (e.currentTarget as HTMLButtonElement).style.color = isActive ? "var(--c-text)" : "var(--c-text-3)";
                   }}
                   onClick={() => toggleStyleFilter(filter)}
                 >
                   {isActive && (
                     <motion.div
-                      className="absolute inset-0 bg-neutral-700 rounded-md"
+                      className="absolute inset-0 bg-surface-active rounded-md"
                       layoutId={`style-${filter}`}
                       initial={false}
                       transition={springSnap}
@@ -809,11 +809,11 @@ Letter spacing: ${track}`;
                 menuWidth={260}
                 menuRadius={10}
                 buttonRadius={6}
-                className="bg-neutral-900 ring-1 ring-neutral-700 shadow-2xl"
+                className="bg-surface-1 ring-1 ring-border-strong shadow-2xl"
               >
                 <Menu.Trigger>
                   <div className="flex items-center justify-center gap-1.5 w-full h-full px-2.5">
-                    <span className="text-[11px] text-neutral-500 font-medium leading-none">
+                    <span className="text-[length:var(--text-body)] text-fg-4 font-medium leading-none">
                       Excluded{exclusions.excludedCount > 0 ? ` (${exclusions.excludedCount})` : ""}
                     </span>
                   </div>
@@ -829,7 +829,7 @@ Letter spacing: ${track}`;
                 </Menu.Content>
               </Menu.Container>
             </Menu.Root>
-            <span className="text-neutral-600 text-xs font-mono tabular-nums whitespace-nowrap flex-shrink-0 text-right" style={{ minWidth: "6.5rem" }}>
+            <span className="text-fg-3 text-xs font-mono tabular-nums whitespace-nowrap flex-shrink-0 text-right" style={{ minWidth: "6.5rem" }}>
               {mode === "grid"
                 ? familiesMode
                   ? `${gridFamilies.length.toLocaleString()} families`
@@ -839,7 +839,7 @@ Letter spacing: ${track}`;
           </div>
         )}
 
-        {loading && <span className="text-neutral-600 text-xs font-mono flex-shrink-0">scanning…</span>}
+        {loading && <span className="text-fg-3 text-xs font-mono flex-shrink-0">scanning…</span>}
         {error && <span className="text-red-500 text-xs font-mono flex-shrink-0">error</span>}
       </div>}
 
@@ -867,7 +867,7 @@ Letter spacing: ${track}`;
         {/* Loading / error / empty */}
         {loading && (
           <div className="flex-1 flex items-center justify-center">
-            <span className="text-neutral-600 text-sm animate-pulse">Scanning fonts…</span>
+            <span className="text-fg-3 text-sm animate-pulse">Scanning fonts…</span>
           </div>
         )}
         {error && (
@@ -877,10 +877,10 @@ Letter spacing: ${track}`;
         )}
         {!loading && !error && mode === "grid" && (hasGridFilters || searchLower) && gridFonts.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-neutral-600">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-fg-3">
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
             </svg>
-            <span className="text-neutral-600 text-sm">
+            <span className="text-fg-3 text-sm">
               {gridStarred.showStarred
                 ? "No starred fonts — hover to star"
                 : searchLower
@@ -891,10 +891,10 @@ Letter spacing: ${track}`;
         )}
         {!loading && !error && mode === "explorer" && explorerStarred.showStarred && explorerFonts.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-neutral-600">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-fg-3">
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
             </svg>
-            <span className="text-neutral-600 text-sm">No starred fonts — hover a row to star it</span>
+            <span className="text-fg-3 text-sm">No starred fonts — hover a row to star it</span>
           </div>
         )}
 
@@ -936,7 +936,7 @@ Letter spacing: ${track}`;
             )}
             {familiesMode && gridFamilies.length === 0 && gridFonts.length > 0 && (
               <div className="flex-1 flex items-center justify-center">
-                <span className="text-neutral-600 text-sm">No families with multiple variants. Switch to Individual view.</span>
+                <span className="text-fg-3 text-sm">No families with multiple variants. Switch to Individual view.</span>
               </div>
             )}
           </>
@@ -1023,19 +1023,19 @@ function CategoryFilterBar({
         return (
           <button
             key={cat}
-            className="relative px-2.5 py-1 text-[11px] font-medium cursor-pointer flex-shrink-0 whitespace-nowrap"
-            style={{ color: isActive ? "#ffffff" : "#6b7280", transition: "color var(--dur-fast) var(--ease-out)" }}
+            className="relative px-2.5 py-1 text-[length:var(--text-body)] font-medium cursor-pointer flex-shrink-0 whitespace-nowrap"
+            style={{ color: isActive ? "var(--c-text)" : "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-out)" }}
             onMouseEnter={(e) => {
-              if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = "#ffffff";
+              if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = isActive ? "#ffffff" : "#6b7280";
+              (e.currentTarget as HTMLButtonElement).style.color = isActive ? "var(--c-text)" : "var(--c-text-3)";
             }}
             onClick={() => onChange(isAll ? null : (cat as Category))}
           >
             {isActive && (
               <motion.div
-                className="absolute inset-0 bg-neutral-700 rounded-md"
+                className="absolute inset-0 bg-surface-active rounded-md"
                 layoutId={`cat-${id}`}
                 initial={false}
                 transition={springSnap}
@@ -1044,7 +1044,7 @@ function CategoryFilterBar({
             <span className="relative">
               {isAll ? "All" : CATEGORY_LABELS[cat as Category]}
               {!isAll && counts[cat] ? (
-                <span className="ml-1 text-neutral-500 font-mono normal-case opacity-70">
+                <span className="ml-1 text-fg-4 font-mono normal-case opacity-70">
                   {counts[cat].toLocaleString()}
                 </span>
               ) : null}

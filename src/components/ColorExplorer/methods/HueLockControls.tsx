@@ -289,7 +289,7 @@ export function ToneCurve({
         </span>
         <div className="flex items-center gap-1.5">
           <button
-            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
             style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
             onClick={() => onStepsChange(Math.max(3, steps - 1))}
             aria-label="Decrease steps"
@@ -298,7 +298,7 @@ export function ToneCurve({
             {steps}
           </span>
           <button
-            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
             style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
             onClick={() => onStepsChange(Math.min(12, steps + 1))}
             aria-label="Increase steps"
@@ -398,10 +398,10 @@ export function HLParams({
         <div className="font-mono uppercase mb-1" style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}>
           Chroma
         </div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["max", "fixed"] as const).map((m) => (
             <button key={m} className="flex-1 px-3 py-1 font-medium transition-colors capitalize cursor-pointer"
-              style={{ fontSize: "var(--text-body)", backgroundColor: chromaMode === m ? "#404040" : "transparent", color: chromaMode === m ? "var(--c-text)" : "var(--c-text-2)" }}
+              style={{ fontSize: "var(--text-body)", backgroundColor: chromaMode === m ? "var(--surface-active)" : "transparent", color: chromaMode === m ? "var(--c-text)" : "var(--c-text-2)" }}
               onClick={() => onChromaModeChange(m)}>{m}</button>
           ))}
         </div>
@@ -421,7 +421,7 @@ export function HLParams({
       <div>
         <label className="flex items-center gap-2.5 cursor-pointer">
           <button className="w-8 h-[18px] rounded-full relative transition-colors shrink-0"
-            style={{ backgroundColor: accentEnabled ? "var(--c-accent)" : "#404040" }}
+            style={{ backgroundColor: accentEnabled ? "var(--c-accent)" : "var(--surface-active)" }}
             onClick={() => onAccentEnabledChange(!accentEnabled)}>
             <div className="absolute top-[3px] w-3 h-3 rounded-full bg-white shadow transition-transform"
               style={{ transform: accentEnabled ? "translateX(17px)" : "translateX(3px)" }} />

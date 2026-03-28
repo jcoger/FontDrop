@@ -60,7 +60,7 @@ function ColorPickerPanel({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">
+      <span className="text-[length:var(--text-label)] text-fg-4 font-mono uppercase tracking-widest">
         {label}
       </span>
       <div className="compact-picker">
@@ -71,12 +71,12 @@ function ColorPickerPanel({
           className="w-5 h-5 rounded flex-shrink-0"
           style={{
             backgroundColor: color,
-            boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.15)",
+            boxShadow: "inset 0 0 0 1px var(--border-strong)",
           }}
         />
         <input
-          className="flex-1 bg-neutral-800 text-white text-xs font-mono rounded px-2 h-7
-                     outline-none focus:ring-1 focus:ring-neutral-600 uppercase"
+          className="flex-1 bg-surface-4 text-fg text-xs font-mono rounded px-2 h-7
+                     outline-none focus:ring-1 focus:ring-border-strong uppercase"
           value={inputVal.toUpperCase()}
           onChange={handleInputChange}
           onBlur={handleInputBlur}
@@ -95,8 +95,8 @@ export function ColorControls({ bgColor, fgColor, onChangeBg, onChangeFg }: Prop
 
   const btnBase =
     "flex items-center gap-1 h-7 px-2.5 rounded text-[11px] font-mono transition-all cursor-pointer flex-shrink-0";
-  const btnActive = "bg-neutral-700 text-white";
-  const btnInactive = "text-neutral-500 hover:text-neutral-300";
+  const btnActive = "bg-surface-active text-fg";
+  const btnInactive = "text-fg-4 hover:text-fg-2";
 
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
@@ -139,23 +139,23 @@ export function ColorControls({ bgColor, fgColor, onChangeBg, onChangeFg }: Prop
           menuWidth={196}
           menuRadius={10}
           buttonRadius={6}
-          className="bg-neutral-900 ring-1 ring-neutral-700 shadow-2xl"
+          className="bg-surface-1 ring-1 ring-border-strong shadow-2xl"
         >
           <Menu.Trigger>
             <div
               className={[
                 "flex items-center justify-center gap-1.5 w-full h-full px-2 rounded text-[11px] font-mono cursor-pointer transition-all",
-                isCustom ? "bg-neutral-700 text-white" : "text-neutral-500 hover:text-neutral-300",
+                isCustom ? "bg-surface-active text-fg" : "text-fg-4 hover:text-fg-2",
               ].join(" ")}
             >
               <div className="flex flex-shrink-0">
                 <div
                   className="w-2.5 h-2.5 rounded-l-sm"
-                  style={{ backgroundColor: bgColor, boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.15)" }}
+                  style={{ backgroundColor: bgColor, boxShadow: "inset 0 0 0 1px var(--border-strong)" }}
                 />
                 <div
                   className="w-2.5 h-2.5 rounded-r-sm"
-                  style={{ backgroundColor: fgColor, boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.15)" }}
+                  style={{ backgroundColor: fgColor, boxShadow: "inset 0 0 0 1px var(--border-strong)" }}
                 />
               </div>
               Custom

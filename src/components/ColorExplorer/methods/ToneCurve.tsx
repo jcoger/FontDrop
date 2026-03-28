@@ -108,7 +108,7 @@ export function ToneCurve({ midY, onMidYChange, steps, onStepsChange }: ToneCurv
         </span>
         <div className="flex items-center gap-1.5">
           <button
-            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
             style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
             onClick={() => onStepsChange(Math.max(3, steps - 1))}
             aria-label="Decrease steps"
@@ -117,7 +117,7 @@ export function ToneCurve({ midY, onMidYChange, steps, onStepsChange }: ToneCurv
             {steps}
           </span>
           <button
-            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+            className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
             style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
             onClick={() => onStepsChange(Math.min(12, steps + 1))}
             aria-label="Increase steps"

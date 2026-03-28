@@ -18,33 +18,33 @@ export type { RoleName, RoleOverrides, DerivedRoles, RoleBuilderParams };
 
 // ── Binary-search helpers ─────────────────────────────────────────────
 
-/** Find the lightest L that still passes AA contrast against surface. */
-function findOnSurfaceL(primaryH: number, surface: OklchColor, isLight: boolean): number {
+/** Find L for text that passes AA contrast against background. */
+function findTextL(primaryH: number, background: OklchColor, isLight: boolean): number {
   const P = 0.002;
   if (isLight) {
-    let lo = 0, hi = surface.l;
+    let lo = 0, hi = background.l;
     while (hi - lo > P) {
       const mid = (lo + hi) / 2;
       const t: OklchColor = { mode: "oklch", l: mid, c: 0.02, h: primaryH };
-      if (contrastRatio(t, surface) >= 4.5) lo = mid; else hi = mid;
+      if (contrastRatio(t, background) >= 4.5) lo = mid; else hi = mid;
     }
     return lo;
   }
-  let lo = surface.l, hi = 1;
+  let lo = background.l, hi = 1;
   while (hi - lo > P) {
     const mid = (lo + hi) / 2;
     const t: OklchColor = { mode: "oklch", l: mid, c: 0.02, h: primaryH };
-    if (contrastRatio(t, surface) >= 4.5) hi = mid; else lo = mid;
+    if (contrastRatio(t, background) >= 4.5) hi = mid; else lo = mid;
   }
   return hi;
 }
 
-/** Find error L that passes AA against surface. */
-function findErrorL(startL: number, surface: OklchColor, isLight: boolean): number {
+/** Find highlight L that passes AA against background. */
+function findHighlightL(startL: number, background: OklchColor, isLight: boolean): number {
   const H = 25;
   const mc = getMaxChroma(startL, H);
   const test: OklchColor = { mode: "oklch", l: startL, c: mc, h: H };
-  if (contrastRatio(test, surface) >= 4.5) return startL;
+  if (contrastRatio(test, background) >= 4.5) return startL;
 
   const P = 0.002;
   if (isLight) {
@@ -52,7 +52,7 @@ function findErrorL(startL: number, surface: OklchColor, isLight: boolean): numb
     while (hi - lo > P) {
       const mid = (lo + hi) / 2;
       const t: OklchColor = { mode: "oklch", l: mid, c: getMaxChroma(mid, H), h: H };
-      if (contrastRatio(t, surface) >= 4.5) lo = mid; else hi = mid;
+      if (contrastRatio(t, background) >= 4.5) lo = mid; else hi = mid;
     }
     return lo;
   }
@@ -60,7 +60,7 @@ function findErrorL(startL: number, surface: OklchColor, isLight: boolean): numb
   while (hi - lo > P) {
     const mid = (lo + hi) / 2;
     const t: OklchColor = { mode: "oklch", l: mid, c: getMaxChroma(mid, H), h: H };
-    if (contrastRatio(t, surface) >= 4.5) hi = mid; else lo = mid;
+    if (contrastRatio(t, background) >= 4.5) hi = mid; else lo = mid;
   }
   return hi;
 }
@@ -71,52 +71,51 @@ export function deriveRoles(params: RoleBuilderParams): DerivedRoles {
   const { primary, theme, accentOffset, accentChromaMult, overrides } = params;
   const isLight = theme === "light";
 
-  const surface: OklchColor = overrides.surface || {
+  const background: OklchColor = overrides.background || {
     mode: "oklch",
     l: isLight ? 0.95 : 0.15,
     c: 0.01,
     h: primary.h,
   };
 
-  const onSurface: OklchColor = overrides.onSurface || {
+  const text: OklchColor = overrides.text || {
     mode: "oklch",
-    l: findOnSurfaceL(primary.h, surface, isLight),
+    l: findTextL(primary.h, background, isLight),
     c: 0.02,
     h: primary.h,
   };
 
-  const accentH = ((primary.h + accentOffset) % 360 + 360) % 360;
-  const accentC = Math.min(primary.c * accentChromaMult, getMaxChroma(primary.l, accentH));
-  const accent: OklchColor = overrides.accent || {
+  const secondaryH = ((primary.h + accentOffset) % 360 + 360) % 360;
+  const secondaryC = Math.min(primary.c * accentChromaMult, getMaxChroma(primary.l, secondaryH));
+  const secondary: OklchColor = overrides.secondary || {
     mode: "oklch",
     l: primary.l,
-    c: accentC,
-    h: accentH,
+    c: secondaryC,
+    h: secondaryH,
   };
 
-  const errorH = 25;
-  const errorL = findErrorL(primary.l, surface, isLight);
-  const errorC = getMaxChroma(errorL, errorH);
-  const error: OklchColor = overrides.error || { mode: "oklch", l: errorL, c: errorC, h: errorH };
+  const highlightH = 25;
+  const highlightL = findHighlightL(primary.l, background, isLight);
+  const highlightC = getMaxChroma(highlightL, highlightH);
+  const highlight: OklchColor = overrides.highlight || { mode: "oklch", l: highlightL, c: highlightC, h: highlightH };
 
-  // Hex values computed once here — no need for rgbCssToHex hacks in UI
   return {
-    primary,      primaryHex:   oklchToHex(primary),
-    surface,      surfaceHex:   oklchToHex(surface),
-    onSurface,    onSurfaceHex: oklchToHex(onSurface),
-    accent,       accentHex:    oklchToHex(accent),
-    error,        errorHex:     oklchToHex(error),
+    primary,        primaryHex:    oklchToHex(primary),
+    background,     backgroundHex: oklchToHex(background),
+    text,           textHex:       oklchToHex(text),
+    secondary,      secondaryHex:  oklchToHex(secondary),
+    highlight,      highlightHex:  oklchToHex(highlight),
   };
 }
 
 // ── Ramp pairings ─────────────────────────────────────────────────────
 
 const PAIRINGS: { bg: RoleName; fg: RoleName; badge: string }[] = [
-  { bg: "surface",  fg: "primary",   badge: "PRIMARY" },
-  { bg: "surface",  fg: "accent",    badge: "ACCENT" },
-  { bg: "primary",  fg: "onSurface", badge: "ON-SURFACE" },
-  { bg: "accent",   fg: "onSurface", badge: "ON-SURFACE" },
-  { bg: "surface",  fg: "error",     badge: "ERROR" },
+  { bg: "background", fg: "primary",   badge: "PRIMARY" },
+  { bg: "background", fg: "secondary", badge: "SECONDARY" },
+  { bg: "primary",    fg: "text",      badge: "TEXT" },
+  { bg: "secondary",  fg: "text",      badge: "TEXT" },
+  { bg: "background", fg: "highlight", badge: "HIGHLIGHT" },
 ];
 
 export function rolePairings(roles: DerivedRoles): RampColor[] {
@@ -129,22 +128,19 @@ export function rolePairings(roles: DerivedRoles): RampColor[] {
 
 // ── Patch bay constants ───────────────────────────────────────────────
 
-// Connector wires shown in the patch bay: [from-role → to-role, label]
 export const CONNECTORS: { from: RoleName; to: RoleName; label: string }[] = [
-  { from: "primary", to: "accent",    label: "H +offset" },
-  { from: "primary", to: "surface",   label: "L adjust" },
-  { from: "surface", to: "onSurface", label: "AA search" },
-  { from: "surface", to: "error",     label: "H=25°" },
+  { from: "primary",    to: "secondary",  label: "H +offset" },
+  { from: "primary",    to: "background", label: "L adjust" },
+  { from: "background", to: "text",       label: "AA search" },
+  { from: "background", to: "highlight",  label: "H=25°" },
 ];
 
-// Display order for nodes in the patch bay
 export const NODE_ORDER: { key: RoleName; label: string }[] = [
-  { key: "primary",   label: "Primary" },
-  { key: "accent",    label: "Accent" },
-  { key: "surface",   label: "Surface" },
-  { key: "onSurface", label: "On-Surface" },
-  { key: "error",     label: "Error" },
+  { key: "primary",    label: "Primary" },
+  { key: "secondary",  label: "Secondary" },
+  { key: "background", label: "Background" },
+  { key: "text",       label: "Text" },
+  { key: "highlight",  label: "Highlight" },
 ];
 
-// Re-export hexToOklch for convenience in the UI file
 export { hexToOklch };

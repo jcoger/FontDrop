@@ -20,7 +20,7 @@ interface SliderProps {
 function Slider({ label, min, max, step, value, display, onChange }: SliderProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest w-7 leading-none">
+      <span className="text-[length:var(--text-label)] text-fg-3 font-mono uppercase tracking-widest w-7 leading-none">
         {label}
       </span>
       <input
@@ -32,7 +32,7 @@ function Slider({ label, min, max, step, value, display, onChange }: SliderProps
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="w-20"
       />
-      <span className="text-[11px] text-neutral-500 font-mono tabular-nums w-9 text-right leading-none">
+      <span className="text-[length:var(--text-body)] text-fg-4 font-mono tabular-nums w-9 text-right leading-none">
         {display}
       </span>
     </div>
@@ -48,7 +48,7 @@ export function ControlsBar({ controls, onChange, onShowShortcuts }: Props) {
         : controls.letterSpacing.toFixed(2);
 
   return (
-    <div className="flex-shrink-0 flex items-center gap-4 px-4 h-12 border-t border-neutral-800 bg-neutral-950">
+    <div className="flex-shrink-0 flex items-center gap-4 px-4 h-12 border-t border-border-default bg-surface-0">
       {/* Typography sliders */}
       <Slider
         label="size"
@@ -60,7 +60,7 @@ export function ControlsBar({ controls, onChange, onShowShortcuts }: Props) {
         onChange={(v) => onChange({ fontSize: v })}
       />
 
-      <div className="w-px h-4 bg-neutral-800 flex-shrink-0" />
+      <div className="w-px h-4 bg-surface-4 flex-shrink-0" />
 
       <Slider
         label="track"
@@ -72,7 +72,7 @@ export function ControlsBar({ controls, onChange, onShowShortcuts }: Props) {
         onChange={(v) => onChange({ letterSpacing: parseFloat(v.toFixed(3)) })}
       />
 
-      <div className="w-px h-4 bg-neutral-800 flex-shrink-0" />
+      <div className="w-px h-4 bg-surface-4 flex-shrink-0" />
 
       <Slider
         label="wt"
@@ -98,10 +98,10 @@ export function ControlsBar({ controls, onChange, onShowShortcuts }: Props) {
       {/* Keyboard shortcuts ? button */}
       {onShowShortcuts && (
         <>
-          <div className="w-px h-4 bg-neutral-800 flex-shrink-0" />
+          <div className="w-px h-4 bg-surface-4 flex-shrink-0" />
           <button
-            className="w-6 h-6 rounded-full border border-neutral-700 hover:border-neutral-500
-                       flex items-center justify-center text-neutral-600 hover:text-neutral-300
+            className="w-6 h-6 rounded-full border border-border-strong hover:border-fg-4
+                       flex items-center justify-center text-fg-3 hover:text-fg-2
                        text-xs font-mono transition-colors cursor-pointer flex-shrink-0"
             onClick={onShowShortcuts}
             aria-label="Keyboard shortcuts"

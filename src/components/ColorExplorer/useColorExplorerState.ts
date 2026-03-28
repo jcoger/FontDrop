@@ -82,13 +82,28 @@ export function useColorExplorerState() {
     setCsPrimary(hexToOklch(hex));
   }
 
-  // ── Role Builder ─────────────────────────────────────────────────
+  // ── Brand Kit (was Role Builder) ─────────────────────────────────
+  // Migrate old localStorage keys on first load
+  useEffect(() => {
+    const oldKeys = [
+      ["fontdrop-ce-rb-primary", LS_KEYS.roleBuilder.primary],
+      ["fontdrop-ce-rb-primaryHex", LS_KEYS.roleBuilder.primaryHex],
+      ["fontdrop-ce-rb-theme", LS_KEYS.roleBuilder.theme],
+      ["fontdrop-ce-rb-accentOffset", LS_KEYS.roleBuilder.accentOffset],
+      ["fontdrop-ce-rb-accentChromaMult", LS_KEYS.roleBuilder.accentChromaMult],
+    ];
+    for (const [oldKey, newKey] of oldKeys) {
+      if (localStorage.getItem(oldKey) !== null && localStorage.getItem(newKey) === null) {
+        localStorage.setItem(newKey, localStorage.getItem(oldKey)!);
+      }
+    }
+  }, []);
   const [rbPrimary, setRbPrimary] = usePersisted<OklchColor>(LS_KEYS.roleBuilder.primary, { mode: "oklch", l: 0.45, c: 0.2, h: 264 });
   const [rbPrimaryHex, setRbPrimaryHex] = usePersisted(LS_KEYS.roleBuilder.primaryHex, "#4338ca");
   const [rbTheme, setRbTheme] = usePersisted<RoleTheme>(LS_KEYS.roleBuilder.theme, "light");
   const [rbAccentOffset, setRbAccentOffset] = usePersisted(LS_KEYS.roleBuilder.accentOffset, 150);
   const [rbAccentChromaMult, setRbAccentChromaMult] = usePersisted(LS_KEYS.roleBuilder.accentChromaMult, 0.8);
-  const [rbOverrides, setRbOverrides] = useState<RoleOverrides>({ surface: null, onSurface: null, accent: null, error: null });
+  const [rbOverrides, setRbOverrides] = useState<RoleOverrides>({ background: null, text: null, secondary: null, highlight: null });
   function handleRbPrimaryHex(hex: string) {
     setRbPrimaryHex(hex);
     setRbPrimary(hexToOklch(hex));

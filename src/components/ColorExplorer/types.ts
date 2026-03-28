@@ -72,28 +72,28 @@ export interface ContrastRampColor extends RampColor {
   ratio: number;
 }
 
-// ── Role Builder ──────────────────────────────────────────────────────
+// ── Brand Kit roles ───────────────────────────────────────────────────
 
-export type RoleName = "primary" | "surface" | "onSurface" | "accent" | "error";
+export type RoleName = "primary" | "background" | "text" | "secondary" | "highlight";
 
 export type RoleOverrides = {
-  surface: OklchColor | null;
-  onSurface: OklchColor | null;
-  accent: OklchColor | null;
-  error: OklchColor | null;
+  background: OklchColor | null;
+  text: OklchColor | null;
+  secondary: OklchColor | null;
+  highlight: OklchColor | null;
 };
 
 export interface DerivedRoles {
   primary: OklchColor;
   primaryHex: string;
-  surface: OklchColor;
-  surfaceHex: string;
-  onSurface: OklchColor;
-  onSurfaceHex: string;
-  accent: OklchColor;
-  accentHex: string;
-  error: OklchColor;
-  errorHex: string;
+  background: OklchColor;
+  backgroundHex: string;
+  text: OklchColor;
+  textHex: string;
+  secondary: OklchColor;
+  secondaryHex: string;
+  highlight: OklchColor;
+  highlightHex: string;
 }
 
 export interface RoleBuilderParams {

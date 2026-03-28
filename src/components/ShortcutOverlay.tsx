@@ -38,14 +38,14 @@ export function ShortcutOverlay({ onClose }: Props) {
 
       {/* Panel */}
       <div
-        className="relative bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl
+        className="relative bg-surface-1 border border-border-default rounded-xl shadow-2xl
                    w-80 p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-white">Keyboard shortcuts</h2>
+          <h2 className="text-sm font-medium text-fg">Keyboard shortcuts</h2>
           <button
-            className="text-neutral-600 hover:text-neutral-300 transition-colors cursor-pointer"
+            className="text-fg-3 hover:text-fg-2 transition-colors cursor-pointer"
             onClick={onClose}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -58,14 +58,14 @@ export function ShortcutOverlay({ onClose }: Props) {
         <div className="flex flex-col gap-2.5">
           {SHORTCUTS.map((s) => (
             <div key={s.description} className="flex items-center justify-between gap-4">
-              <span className="text-xs text-neutral-500">{s.description}</span>
+              <span className="text-xs text-fg-4">{s.description}</span>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {s.keys.map((k) => (
                   <kbd
                     key={k}
                     className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5
-                               bg-neutral-800 border border-neutral-700 rounded text-[11px]
-                               text-neutral-300 font-mono leading-none"
+                               bg-surface-4 border border-border-strong rounded text-[length:var(--text-body)]
+                               text-fg-2 font-mono leading-none"
                   >
                     {k}
                   </kbd>

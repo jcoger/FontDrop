@@ -74,7 +74,7 @@ function TypeRow({
   return (
     <div
       style={{ ...style, backgroundColor: bgColor }}
-      className="group flex items-stretch border-b border-neutral-800/60 cursor-pointer"
+      className="group flex items-stretch border-b border-border-default/60 cursor-pointer"
       onMouseEnter={() => onHover(font.file_path)}
       onMouseLeave={() => onHover(null)}
       onClick={(e) => {
@@ -86,11 +86,11 @@ function TypeRow({
     >
       {/* Font name column — X button appears on hover */}
       <div
-        className="flex-shrink-0 flex items-center px-3 gap-1.5 border-r border-neutral-800/60 overflow-hidden"
+        className="flex-shrink-0 flex items-center px-3 gap-1.5 border-r border-border-default/60 overflow-hidden"
         style={{ width: FONT_COL_W }}
       >
         <button
-          className="opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-red-400
+          className="opacity-0 group-hover:opacity-100 text-fg-3 hover:text-red-400
                      transition-all cursor-pointer flex-shrink-0"
           onClick={(e) => { e.stopPropagation(); onExclude(font.file_path); }}
           aria-label="Hide font"
@@ -100,13 +100,13 @@ function TypeRow({
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
-        <span className="text-[11px] text-neutral-600 font-mono leading-none truncate min-w-0">
+        <span className="text-[length:var(--text-body)] text-fg-3 font-mono leading-none truncate min-w-0">
           {font.font_family}
         </span>
       </div>
 
       {/* Four editable text columns — fixed proportional widths */}
-      <div className="flex flex-1 min-w-0 divide-x divide-neutral-800/60 overflow-hidden">
+      <div className="flex flex-1 min-w-0 divide-x divide-border-default/60 overflow-hidden">
         {([0, 1, 2, 3] as const).map((i) => (
           <div
             key={i}
@@ -134,15 +134,15 @@ function TypeRow({
 
       {/* Star column */}
       <div
-        className="flex-shrink-0 flex items-center justify-center border-l border-neutral-800/60"
+        className="flex-shrink-0 flex items-center justify-center border-l border-border-default/60"
         style={{ width: STAR_COL_W }}
       >
         <button
           className={[
             "transition-all cursor-pointer",
             isStarred
-              ? "opacity-100 text-yellow-400"
-              : "opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-yellow-400",
+              ? "opacity-100 text-star"
+              : "opacity-0 group-hover:opacity-100 text-fg-3 hover:text-star",
           ].join(" ")}
           onClick={(e) => { e.stopPropagation(); onToggleStar(font.file_path); }}
           aria-label={isStarred ? "Remove from starred" : "Add to starred"}
@@ -226,17 +226,17 @@ export function TypeExplorer({
   return (
     <div ref={containerRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Sticky column header */}
-      <div className="flex-shrink-0 flex items-stretch border-b border-neutral-700 h-9">
+      <div className="flex-shrink-0 flex items-stretch border-b border-border-strong h-9">
         <div
-          className="flex-shrink-0 flex items-center px-4 border-r border-neutral-700"
+          className="flex-shrink-0 flex items-center px-4 border-r border-border-strong"
           style={{ width: FONT_COL_W }}
         >
-          <span className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest">
+          <span className="text-[length:var(--text-label)] text-fg-3 font-mono uppercase tracking-widest">
             font
           </span>
         </div>
 
-        <div className="flex flex-1 min-w-0 divide-x divide-neutral-700 overflow-hidden">
+        <div className="flex flex-1 min-w-0 divide-x divide-border-strong overflow-hidden">
           {([0, 1, 2, 3] as const).map((i) => (
             <div
               key={i}
@@ -244,9 +244,9 @@ export function TypeExplorer({
               style={{ flex: `${COL_FLEX[i]} 1 0`, minWidth: 0 }}
             >
               <input
-                className="flex-1 min-w-0 bg-transparent text-neutral-500 text-[10px]
+                className="flex-1 min-w-0 bg-transparent text-fg-4 text-[length:var(--text-label)]
                            font-mono uppercase tracking-widest outline-none
-                           hover:text-neutral-400 focus:text-neutral-300 transition-colors"
+                           hover:text-fg-2 focus:text-fg transition-colors"
                 value={headers[i]}
                 onChange={(e) => setHeader(i, e.target.value)}
                 spellCheck={false}
@@ -254,17 +254,17 @@ export function TypeExplorer({
               {/* Per-column size controls */}
               <div className="flex items-center gap-0.5 flex-shrink-0">
                 <button
-                  className="text-neutral-700 hover:text-neutral-400 cursor-pointer
+                  className="text-fg-4 hover:text-fg-2 cursor-pointer
                              w-4 h-4 flex items-center justify-center text-xs leading-none"
                   onClick={() => adjustColSize(i, -2)}
                 >
                   −
                 </button>
-                <span className="text-[9px] text-neutral-600 font-mono tabular-nums w-5 text-center">
+                <span className="text-[length:var(--text-badge)] text-fg-3 font-mono tabular-nums w-5 text-center">
                   {colSizes[i]}
                 </span>
                 <button
-                  className="text-neutral-700 hover:text-neutral-400 cursor-pointer
+                  className="text-fg-4 hover:text-fg-2 cursor-pointer
                              w-4 h-4 flex items-center justify-center text-xs leading-none"
                   onClick={() => adjustColSize(i, 2)}
                 >
@@ -277,10 +277,10 @@ export function TypeExplorer({
 
         {/* Star column header */}
         <div
-          className="flex-shrink-0 flex items-center justify-center border-l border-neutral-700"
+          className="flex-shrink-0 flex items-center justify-center border-l border-border-strong"
           style={{ width: STAR_COL_W }}
         >
-          <span className="text-[10px] text-neutral-700">★</span>
+          <span className="text-[length:var(--text-label)] text-fg-4">★</span>
         </div>
       </div>
 

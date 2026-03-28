@@ -266,7 +266,7 @@ export function QuickView({
                     "flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer",
                     isStarred ? "opacity-100" : "opacity-40 hover:opacity-80",
                   ].join(" ")}
-                  style={{ color: isStarred ? "#facc15" : controls.fgColor }}
+                  style={{ color: isStarred ? "var(--c-star)" : controls.fgColor }}
                   onClick={() => onToggleStar(font.file_path)}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill={isStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round">

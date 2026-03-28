@@ -244,7 +244,7 @@ export function TCParams({
   return (
     <>
       {/* ── STICKY: XY Pad + Strip ────────────────────────── */}
-      <div className="sticky -top-4 -mx-1 px-1 pt-4 pb-3 z-10 bg-[#141414]">
+      <div className="sticky -top-4 -mx-1 px-1 pt-4 pb-3 z-10 bg-surface-1">
         <div className="relative" style={{ paddingBottom: "100%" }}>
           <div ref={padRef}
             className="absolute inset-0 rounded-lg overflow-hidden cursor-crosshair select-none"
@@ -333,8 +333,8 @@ export function TCParams({
 
       <RangeSlider label="Brightness Range" value={`${Math.round(lRange[0] * 100)}–${Math.round(lRange[1] * 100)}`}>
         <div className="relative h-3 flex items-center">
-          <div className="absolute inset-x-0 h-[2px] bg-neutral-800 rounded-full" />
-          <div className="absolute h-[2px] bg-neutral-500/50 rounded-full"
+          <div className="absolute inset-x-0 h-[2px] bg-surface-4 rounded-full" />
+          <div className="absolute h-[2px] bg-surface-active/50 rounded-full"
             style={{ left: `${lRange[0] * 100}%`, right: `${(1 - lRange[1]) * 100}%` }} />
           <input type="range" min={0.1} max={1} step={0.01} value={lRange[0]}
             onChange={(e) => onLRangeChange([Math.min(+e.target.value, lRange[1] - 0.05), lRange[1]])}
@@ -380,12 +380,12 @@ export function TCParams({
             {variety === "tight" ? `Tight · ${Math.max(4, Math.ceil(activeFontCount / 2))}` : variety === "wide" ? `Wide · ${Math.min(24, activeFontCount * 2)}` : `Auto · ${activeFontCount}`}
           </span>
         </div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["tight", "auto", "wide"] as const).map((v) => {
             const active = variety === v;
             return (
               <button key={v} className="flex-1 px-2 py-1 font-mono uppercase cursor-pointer transition-colors"
-                style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", backgroundColor: active ? "#404040" : "transparent", color: active ? "var(--c-text)" : "var(--c-text-3)" }}
+                style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", backgroundColor: active ? "var(--surface-active)" : "transparent", color: active ? "var(--c-text)" : "var(--c-text-3)" }}
                 onClick={() => onVarietyChange(v)}>{v}</button>
             );
           })}
@@ -408,15 +408,15 @@ export function TCBottomControls({ lRange, accentWeight, count, hueOffset }: TCB
   const n2 = Math.max(1, Math.round(count * accentWeight));
   const n1 = Math.max(1, count - n2);
   return (
-    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         L {Math.round(lRange[0] * 100)}–{Math.round(lRange[1] * 100)}
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-surface-4/80" />
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         Δ{hueOffset}°
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-surface-4/80" />
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {n1}:{n2}
       </span>

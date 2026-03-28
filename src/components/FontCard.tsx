@@ -67,7 +67,7 @@ export const FontCard = memo(function FontCard({
   return (
     <div
       className="relative group rounded-lg p-4 h-full flex flex-col gap-2 overflow-hidden cursor-pointer
-                 outline outline-1 outline-transparent hover:outline-neutral-700 transition-all"
+                 outline outline-1 outline-transparent hover:outline-border-strong transition-all"
       style={{ backgroundColor: bgColor }}
       onMouseEnter={() => onHover?.(font.file_path)}
       onMouseLeave={() => onHover?.(null)}
@@ -78,7 +78,7 @@ export const FontCard = memo(function FontCard({
       {/* X (exclude) button — top-left, hover-only */}
       <button
         className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100
-                   text-neutral-600 hover:text-red-400 transition-all cursor-pointer"
+                   text-fg-3 hover:text-red-400 transition-all cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           onExclude();
@@ -93,8 +93,8 @@ export const FontCard = memo(function FontCard({
         className={[
           "absolute top-2 right-2 z-10 transition-all cursor-pointer",
           starred
-            ? "opacity-100 text-yellow-400"
-            : "opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-yellow-400",
+            ? "opacity-100 text-star"
+            : "opacity-0 group-hover:opacity-100 text-fg-4 hover:text-star",
         ].join(" ")}
         onClick={(e) => {
           e.stopPropagation();

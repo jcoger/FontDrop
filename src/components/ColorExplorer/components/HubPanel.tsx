@@ -60,7 +60,7 @@ export function HubPanel({
   if (items.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-600">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-fg-3">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
         </svg>
         <span style={{ fontSize: "var(--text-ui)", color: "var(--c-text-3)" }}>
@@ -84,7 +84,7 @@ export function HubPanel({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-800 bg-[#161616] shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-surface-2 shrink-0">
         <div className="flex items-center gap-3">
           <button
             className="font-mono cursor-pointer"
@@ -144,7 +144,7 @@ export function HubPanel({
                   <div className="absolute top-2 left-2">
                     <span
                       className="font-mono uppercase px-1.5 py-0.5 rounded backdrop-blur-sm"
-                      style={{ fontSize: 6, letterSpacing: "var(--track-caps)", color: metaCss, background: "rgba(0,0,0,0.1)" }}
+                      style={{ fontSize: "var(--text-micro)", letterSpacing: "var(--track-caps)", color: metaCss, background: "rgba(0,0,0,0.1)" }}
                     >
                       {item.sourceMode}
                     </span>
@@ -185,7 +185,7 @@ export function HubPanel({
         </div>
 
         {/* Right: detail panel */}
-        <div className="w-[320px] border-l border-neutral-800 bg-[#141414] shrink-0 overflow-y-auto">
+        <div className="w-[320px] border-l border-border-default bg-surface-1 shrink-0 overflow-y-auto">
           {selected ? (
             <div className="flex flex-col h-full">
               {/* Large preview */}
@@ -217,7 +217,7 @@ export function HubPanel({
                 <div>
                   <div className="font-mono uppercase mb-1" style={{ fontSize: "var(--text-micro)", letterSpacing: "0.12em", color: "var(--c-text-4)" }}>Background</div>
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded border border-neutral-700" style={{ backgroundColor: oklchToCss(selected.bg) }} />
+                    <div className="w-5 h-5 rounded border border-border-strong" style={{ backgroundColor: oklchToCss(selected.bg) }} />
                     <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-2)" }}>
                       {oklchToHex(selected.bg)}
                     </span>
@@ -231,7 +231,7 @@ export function HubPanel({
                 <div>
                   <div className="font-mono uppercase mb-1" style={{ fontSize: "var(--text-micro)", letterSpacing: "0.12em", color: "var(--c-text-4)" }}>Foreground</div>
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded border border-neutral-700" style={{ backgroundColor: oklchToCss(selected.fg) }} />
+                    <div className="w-5 h-5 rounded border border-border-strong" style={{ backgroundColor: oklchToCss(selected.fg) }} />
                     <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-2)" }}>
                       {oklchToHex(selected.fg)}
                     </span>
@@ -260,10 +260,10 @@ export function HubPanel({
                 {/* Send to Build System */}
                 <button
                   className="mt-auto px-4 py-2 rounded font-semibold cursor-pointer transition-colors"
-                  style={{ fontSize: "var(--text-body)", backgroundColor: "#ffffff", color: "#000000" }}
+                  style={{ fontSize: "var(--text-body)", backgroundColor: "var(--c-text)", color: "var(--surface-0)" }}
                   onClick={() => onSendToBuildSystem(selected)}
                 >
-                  Send to Build System →
+                  Send to Brand Kit →
                 </button>
               </div>
             </div>
@@ -279,7 +279,7 @@ export function HubPanel({
 
       {/* Undo toast */}
       {undoItem && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-neutral-800 text-white text-xs font-medium px-4 py-2 rounded-md shadow-lg flex items-center gap-3">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-surface-4 text-fg text-xs font-medium px-4 py-2 rounded-md shadow-lg flex items-center gap-3">
           Card removed
           <button
             className="font-mono uppercase cursor-pointer"

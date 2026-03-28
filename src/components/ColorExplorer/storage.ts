@@ -57,11 +57,11 @@ export const LS_KEYS = {
   },
 
   roleBuilder: {
-    primary:         "fontdrop-ce-rb-primary",
-    primaryHex:      "fontdrop-ce-rb-primaryHex",
-    theme:           "fontdrop-ce-rb-theme",
-    accentOffset:    "fontdrop-ce-rb-accentOffset",
-    accentChromaMult:"fontdrop-ce-rb-accentChromaMult",
+    primary:         "fontdrop-ce-brandkit-primary",
+    primaryHex:      "fontdrop-ce-brandkit-primaryHex",
+    theme:           "fontdrop-ce-brandkit-theme",
+    accentOffset:    "fontdrop-ce-brandkit-accentOffset",
+    accentChromaMult:"fontdrop-ce-brandkit-accentChromaMult",
   },
 
   macroKnob: {

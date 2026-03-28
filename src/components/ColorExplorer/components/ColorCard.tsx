@@ -257,7 +257,7 @@ export function ColorCard({
           {/* Font picker dropdown */}
           {showFontPicker && starredFonts && starredFonts.length > 0 && (
             <div
-              className="absolute bottom-full right-0 mb-1 w-48 max-h-40 overflow-y-auto rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl z-30"
+              className="absolute bottom-full right-0 mb-1 w-48 max-h-40 overflow-y-auto rounded-lg border border-border-strong bg-surface-1 shadow-xl z-30"
               style={{ scrollbarWidth: "thin" }}
               onClick={(e) => e.stopPropagation()}
             >

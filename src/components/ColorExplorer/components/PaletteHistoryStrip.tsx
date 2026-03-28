@@ -74,7 +74,7 @@ export function PaletteHistoryStrip({
   return (
     <div className="shrink-0">
       {/* Toggle bar */}
-      <div className="flex items-center justify-end px-4 h-6 border-t border-neutral-800 bg-[#161616]">
+      <div className="flex items-center justify-end px-4 h-6 border-t border-border-default bg-surface-2">
         <button
           className="flex items-center gap-1 font-mono uppercase cursor-pointer"
           style={{ fontSize: "var(--text-micro)", letterSpacing: "var(--track-caps)", color: "var(--c-text-4)", transition: "color var(--dur-fast) var(--ease-hover)" }}
@@ -99,7 +99,7 @@ export function PaletteHistoryStrip({
       <AnimatePresence>
         {open && entries.length > 0 && (
           <motion.div
-            className="border-t border-neutral-800 bg-[#161616] overflow-hidden"
+            className="border-t border-border-default bg-surface-2 overflow-hidden"
             initial={{ height: 0 }}
             animate={{ height: 48 }}
             exit={{ height: 0 }}

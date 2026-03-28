@@ -56,20 +56,20 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         {/* SVG thumbnail — always white in toolbar (dark bg) */}
         <div
           className="h-8 flex-shrink-0 flex items-center justify-center overflow-hidden"
-          style={{ width: 36, color: "white" }}
+          style={{ width: 36, color: "var(--c-text)" }}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
 
         {/* Scale: − / % / + */}
         <button
-          className="text-neutral-500 hover:text-white w-5 h-5 flex items-center justify-center text-sm font-mono leading-none cursor-pointer"
+          className="text-fg-4 hover:text-fg w-5 h-5 flex items-center justify-center text-sm font-mono leading-none cursor-pointer"
           style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => stepScale(-0.1)}
         >
           −
         </button>
         <button
-          className="text-neutral-500 hover:text-white text-[10px] font-mono tabular-nums cursor-pointer min-w-[30px] text-center leading-none"
+          className="text-fg-4 hover:text-fg text-[10px] font-mono tabular-nums cursor-pointer min-w-[30px] text-center leading-none"
           style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => onScaleChange?.(1.0)}
           title="Reset to 100%"
@@ -77,7 +77,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
           {Math.round(logoScale * 100)}%
         </button>
         <button
-          className="text-neutral-500 hover:text-white w-5 h-5 flex items-center justify-center text-sm font-mono leading-none cursor-pointer"
+          className="text-fg-4 hover:text-fg w-5 h-5 flex items-center justify-center text-sm font-mono leading-none cursor-pointer"
           style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => stepScale(0.1)}
         >
@@ -85,11 +85,11 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         </button>
 
         {/* Separator */}
-        <div className="w-px h-4 bg-neutral-800 mx-1 flex-shrink-0" />
+        <div className="w-px h-4 bg-surface-4 mx-1 flex-shrink-0" />
 
         {/* Swap */}
         <button
-          className="text-neutral-500 hover:text-white text-[10px] font-mono cursor-pointer px-1"
+          className="text-fg-4 hover:text-fg text-[10px] font-mono cursor-pointer px-1"
           style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={() => inputRef.current?.click()}
         >
@@ -98,7 +98,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
 
         {/* Clear */}
         <button
-          className="text-neutral-500 hover:text-white text-[11px] font-mono cursor-pointer px-0.5"
+          className="text-fg-4 hover:text-fg text-[11px] font-mono cursor-pointer px-0.5"
           style={{ transition: "color var(--dur-fast) var(--ease-out)" }}
           onClick={onClear}
         >
@@ -123,8 +123,8 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         "flex items-center justify-center gap-1.5 h-9 w-24 rounded-md",
         "border border-dashed cursor-pointer flex-shrink-0 transition-colors select-none",
         dragging
-          ? "border-neutral-400 bg-neutral-800/60"
-          : "border-neutral-700 hover:border-neutral-500",
+          ? "border-fg-2 bg-surface-4/60"
+          : "border-border-strong hover:border-fg-4",
       ].join(" ")}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -148,7 +148,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         strokeWidth="1.75"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="text-neutral-600 flex-shrink-0"
+        className="text-fg-3 flex-shrink-0"
       >
         <rect x="3" y="3" width="18" height="18" rx="2.5" />
         <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
@@ -156,7 +156,7 @@ export function LogoDrop({ svg, onLoad, onClear, onScaleChange, logoScale = 1.0 
         <polyline points="13 15 16 12 21 17" />
       </svg>
 
-      <span className="text-[11px] text-neutral-600 font-mono">SVG</span>
+      <span className="text-[length:var(--text-body)] text-fg-3 font-mono">SVG</span>
     </div>
   );
 }

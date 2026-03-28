@@ -29,10 +29,10 @@ const SWATCHES: SwatchDef[] = [
 ];
 
 const LEVEL_COLORS: Record<string, string> = {
-  AAA: "#4ade80",
-  AA: "#facc15",
-  "AA-large": "#fb923c",
-  FAIL: "rgba(239, 68, 68, 0.45)",
+  AAA: "var(--c-success)",
+  AA: "var(--c-warning)",
+  "AA-large": "var(--c-caution)",
+  FAIL: "var(--c-error)",
 };
 
 // ── Component ─────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export function AlbersRow({ workingColor, canvasColor, expanded }: AlbersRowProp
 
   return (
     <div
-      className="shrink-0 overflow-hidden border-b border-neutral-800/60"
+      className="shrink-0 overflow-hidden border-b border-border-default/60"
       style={{ maxHeight: expanded ? 120 : 0, transition: "max-height var(--dur-normal) var(--ease-out)" }}
     >
       <div className="flex h-[108px] min-w-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>

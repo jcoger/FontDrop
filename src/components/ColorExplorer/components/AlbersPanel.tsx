@@ -31,10 +31,10 @@ const SWATCHES: SwatchDef[] = [
 ];
 
 const LEVEL_COLORS: Record<string, string> = {
-  AAA: "#4ade80",
-  AA: "#facc15",
-  "AA-large": "#fb923c",
-  FAIL: "rgba(239, 68, 68, 0.45)",
+  AAA: "var(--c-success)",
+  AA: "var(--c-warning)",
+  "AA-large": "var(--c-caution)",
+  FAIL: "var(--c-error)",
 };
 
 // ── Component ─────────────────────────────────────────────────────────
@@ -100,14 +100,14 @@ export function AlbersPanel({ open, onClose, workingColor, canvasColor }: Albers
       {open && (
         <motion.div
           ref={panelRef}
-          className="absolute top-0 right-0 bottom-0 w-[280px] bg-[#141414] border-l border-neutral-800 z-30 flex flex-col overflow-hidden"
+          className="absolute top-0 right-0 bottom-0 w-[280px] bg-surface-1 border-l border-border-default z-30 flex flex-col overflow-hidden"
           initial={{ x: 280 }}
           animate={{ x: 0 }}
           exit={{ x: 280 }}
           transition={springSnap}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 h-10 border-b border-neutral-800 shrink-0">
+          <div className="flex items-center justify-between px-4 h-10 border-b border-border-default shrink-0">
             <span
               className="font-mono uppercase"
               style={{ fontSize: "var(--text-label)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}
@@ -134,7 +134,7 @@ export function AlbersPanel({ open, onClose, workingColor, canvasColor }: Albers
                 className="flex-1 px-2 py-1 rounded-md font-medium capitalize cursor-pointer transition-colors"
                 style={{
                   fontSize: "var(--text-body)",
-                  backgroundColor: tab === t ? "#404040" : "transparent",
+                  backgroundColor: tab === t ? "var(--surface-active)" : "transparent",
                   color: tab === t ? "var(--c-text)" : "var(--c-text-2)",
                 }}
                 onClick={() => setTab(t)}
@@ -200,7 +200,7 @@ export function AlbersPanel({ open, onClose, workingColor, canvasColor }: Albers
                 className="flex items-center justify-center rounded-lg"
                 style={{
                   aspectRatio: "190/140",
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: "var(--surface-3)",
                   boxShadow: "inset 0 1px 4px rgba(0,0,0,0.4)",
                 }}
               >

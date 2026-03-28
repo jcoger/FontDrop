@@ -85,14 +85,14 @@ function FamilyRowItem({
   const rep = family.representative;
 
   if (isSelected) {
-    return <div className="h-full border-b border-neutral-800/60" style={{ backgroundColor: bgColor, opacity: 0 }} />;
+    return <div className="h-full border-b border-border-default/60" style={{ backgroundColor: bgColor, opacity: 0 }} />;
   }
 
   const logoH = Math.max(Math.round(fontSize * logoScale), 16);
 
   return (
     <div
-      className="relative group flex items-center gap-3 px-4 h-full border-b border-neutral-800/60 cursor-pointer
+      className="relative group flex items-center gap-3 px-4 h-full border-b border-border-default/60 cursor-pointer
                  hover:bg-white/[0.02] transition-colors"
       style={{ backgroundColor: bgColor }}
       onMouseEnter={() => onHover(rep.file_path)}
@@ -104,7 +104,7 @@ function FamilyRowItem({
     >
       {/* X (exclude) button */}
       <button
-        className="opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-red-400
+        className="opacity-0 group-hover:opacity-100 text-fg-3 hover:text-red-400
                    transition-all cursor-pointer flex-shrink-0"
         onClick={(e) => { e.stopPropagation(); onExclude(); }}
         aria-label="Hide font family"
@@ -146,7 +146,7 @@ function FamilyRowItem({
           {family.name}
         </span>
         <button
-          className="text-[10px] text-neutral-600 hover:text-neutral-400 cursor-pointer transition-colors font-mono"
+          className="text-[length:var(--text-label)] text-fg-3 hover:text-fg-2 cursor-pointer transition-colors font-mono"
           onClick={(e) => { e.stopPropagation(); onToggle(); }}
         >
           {family.fonts.length} variants
@@ -155,7 +155,7 @@ function FamilyRowItem({
 
       {/* Expand chevron */}
       <button
-        className="flex-shrink-0 text-neutral-700 hover:text-neutral-400 cursor-pointer transition-colors"
+        className="flex-shrink-0 text-fg-4 hover:text-fg-2 cursor-pointer transition-colors"
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
         aria-label={isExpanded ? "Collapse variants" : "Expand variants"}
       >
@@ -167,8 +167,8 @@ function FamilyRowItem({
         className={[
           "flex-shrink-0 transition-all cursor-pointer",
           starred
-            ? "opacity-100 text-yellow-400"
-            : "opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-yellow-400",
+            ? "opacity-100 text-star"
+            : "opacity-0 group-hover:opacity-100 text-fg-4 hover:text-star",
         ].join(" ")}
         onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
         aria-label={starred ? "Remove from starred" : "Add to starred"}
@@ -207,7 +207,7 @@ function VariantRowItem({
   const { fontSize, letterSpacing, bgColor, fgColor } = controls;
 
   if (isSelected) {
-    return <div className="h-full border-b border-neutral-800/40" style={{ backgroundColor: bgColor, opacity: 0 }} />;
+    return <div className="h-full border-b border-border-default/40" style={{ backgroundColor: bgColor, opacity: 0 }} />;
   }
 
   const label = [
@@ -222,7 +222,7 @@ function VariantRowItem({
 
   return (
     <div
-      className="group flex items-center gap-3 pl-10 pr-4 h-full border-b border-neutral-800/40 cursor-pointer
+      className="group flex items-center gap-3 pl-10 pr-4 h-full border-b border-border-default/40 cursor-pointer
                  hover:bg-white/[0.02] transition-colors"
       style={{ backgroundColor: bgColor }}
       onMouseEnter={() => onHover(font.file_path)}
@@ -234,7 +234,7 @@ function VariantRowItem({
     >
       {/* X button */}
       <button
-        className="opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-red-400
+        className="opacity-0 group-hover:opacity-100 text-fg-3 hover:text-red-400
                    transition-all cursor-pointer flex-shrink-0"
         onClick={(e) => { e.stopPropagation(); onExclude(); }}
         aria-label="Hide variant"
@@ -260,7 +260,7 @@ function VariantRowItem({
         {wordmark}
       </p>
 
-      <span className="text-[10px] text-neutral-600 font-mono flex-shrink-0">
+      <span className="text-[length:var(--text-label)] text-fg-3 font-mono flex-shrink-0">
         {label || "Regular"}
       </span>
 
@@ -268,8 +268,8 @@ function VariantRowItem({
         className={[
           "flex-shrink-0 transition-all cursor-pointer",
           starred
-            ? "opacity-100 text-yellow-400"
-            : "opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-yellow-400",
+            ? "opacity-100 text-star"
+            : "opacity-0 group-hover:opacity-100 text-fg-4 hover:text-star",
         ].join(" ")}
         onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
         aria-label={starred ? "Remove from starred" : "Add to starred"}

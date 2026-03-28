@@ -21,7 +21,7 @@ export function MethodBar({
   const layoutId = useId();
 
   return (
-    <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-neutral-800 bg-neutral-900 overflow-x-auto">
+    <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-border-default bg-surface-1 overflow-x-auto">
       {VISIBLE_METHODS.map((method) => {
         const isActive = method === activeMethod;
         return (
@@ -35,7 +35,7 @@ export function MethodBar({
           >
             {isActive && (
               <motion.div
-                className="absolute inset-0 bg-neutral-700 rounded-md"
+                className="absolute inset-0 bg-surface-active rounded-md"
                 layoutId={`method-${layoutId}`}
                 initial={false}
                 transition={springSnap}

@@ -90,11 +90,11 @@ export function WPParams({
                   letterSpacing: "var(--track-caps)",
                   backgroundColor: isActive
                     ? isBlendActive
-                      ? "rgba(255,255,255,0.12)"
-                      : "rgba(255,255,255,0.18)"
+                      ? "var(--overlay-w-12)"
+                      : "var(--overlay-w-20)"
                     : "transparent",
                   color: isActive ? "var(--c-text)" : "var(--c-text-4)",
-                  border: `1px solid ${isActive ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.06)"}`,
+                  border: `1px solid ${isActive ? "var(--border-strong)" : "var(--border-subtle)"}`,
                   opacity: isBlendActive ? 0.85 : 1,
                 }}
                 onClick={() => handleTagClick(tag)}
@@ -146,7 +146,7 @@ export function WPParams({
             {driftLabel}
           </span>
           <span
-            className="font-mono tabular-nums px-1.5 py-0.5 rounded bg-neutral-800"
+            className="font-mono tabular-nums px-1.5 py-0.5 rounded bg-surface-4"
             style={{ fontSize: "var(--text-badge)", color: "var(--c-text)" }}
           >
             {drift}
@@ -176,12 +176,12 @@ export function WPParams({
             {variety === "tight" ? `Tight · ${Math.max(4, Math.ceil(activeFontCount / 2))}` : variety === "wide" ? `Wide · ${Math.min(24, activeFontCount * 2)}` : `Auto · ${activeFontCount}`}
           </span>
         </div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["tight", "auto", "wide"] as const).map((v) => {
             const active = variety === v;
             return (
               <button key={v} className="flex-1 px-2 py-1 font-mono uppercase cursor-pointer transition-colors"
-                style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", backgroundColor: active ? "#404040" : "transparent", color: active ? "var(--c-text)" : "var(--c-text-3)" }}
+                style={{ fontSize: "var(--text-badge)", letterSpacing: "var(--track-caps)", backgroundColor: active ? "var(--surface-active)" : "transparent", color: active ? "var(--c-text)" : "var(--c-text-3)" }}
                 onClick={() => onVarietyChange(v)}>{v}</button>
             );
           })}
@@ -198,7 +198,7 @@ export function WPParams({
             className="w-3.5 h-3.5 rounded border flex items-center justify-center"
             style={{
               borderColor: accent ? "var(--c-text-2)" : "var(--c-text-4)",
-              backgroundColor: accent ? "rgba(255,255,255,0.12)" : "transparent",
+              backgroundColor: accent ? "var(--overlay-w-12)" : "transparent",
             }}
           >
             {accent && (
@@ -242,15 +242,15 @@ export function WPBottomControls({ activeTags, drift, count }: WPBottomControlsP
       : `${activeTags[0]} + ${activeTags[1]}`;
 
   return (
-    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {label}
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-surface-4/80" />
       <span className="font-mono tabular-nums" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         Drift {drift}
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-surface-4/80" />
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         {count} colors
       </span>

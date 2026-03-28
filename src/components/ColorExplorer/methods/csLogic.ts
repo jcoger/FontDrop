@@ -39,7 +39,7 @@ export function generateContrastSafe(params: ContrastSafeParams): ContrastRampCo
         const ratio = contrastRatio(testColor, primary);
         const level = contrastLevel(ratio);
         const passes = ratio >= thresholdRatio;
-        const levelColors: Record<string, string> = { AAA: "#4ade80", AA: "#facc15", "AA-large": "#fb923c", FAIL: "rgba(239,68,68,0.45)" };
+        const levelColors: Record<string, string> = { AAA: "var(--c-success)", AA: "var(--c-warning)", "AA-large": "var(--c-caution)", FAIL: "var(--c-error)" };
         results.push({ color: testColor, badge: `${level} ${ratio.toFixed(1)}:1`, passes, ratio, badgeColor: levelColors[level] } as ContrastRampColor & { badgeColor: string });
       }
     }

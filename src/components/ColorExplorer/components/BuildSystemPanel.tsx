@@ -11,20 +11,20 @@ import type { CollectionItem } from "../useCollection";
 // ── Role descriptions ─────────────────────────────────────────────────
 
 const ROLE_SUBS: Record<RoleName, string> = {
-  primary: "Core brand action",
-  accent: "Highlights & alerts",
-  surface: "Cards, sheets, menus",
-  onSurface: "Text & icons on surface",
-  error: "Destructive actions",
+  primary: "Core brand color",
+  secondary: "Supporting accent color",
+  background: "Page and card backgrounds",
+  text: "Body text and labels",
+  highlight: "Alerts and emphasis",
 };
 
 // ── Pairing preview definitions ───────────────────────────────────────
 
 const PAIRINGS: { bg: RoleName; fg: RoleName; label: string }[] = [
-  { bg: "surface", fg: "primary", label: "SURFACE / PRIMARY" },
-  { bg: "surface", fg: "accent", label: "SURFACE / ACCENT" },
-  { bg: "primary", fg: "onSurface", label: "PRIMARY / ON-SURFACE" },
-  { bg: "surface", fg: "error", label: "SURFACE / ERROR" },
+  { bg: "background", fg: "primary", label: "BG / PRIMARY" },
+  { bg: "background", fg: "secondary", label: "BG / SECONDARY" },
+  { bg: "primary", fg: "text", label: "PRIMARY / TEXT" },
+  { bg: "background", fg: "highlight", label: "BG / HIGHLIGHT" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export function BuildSystemPanel({
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* ── Left: Role list ──────────────────────────────── */}
-      <div className="w-[280px] bg-[#141414] border-r border-neutral-800 flex flex-col shrink-0 overflow-y-auto">
+      <div className="w-[280px] bg-surface-1 border-r border-border-default flex flex-col shrink-0 overflow-y-auto">
         <div className="p-4 flex flex-col flex-1">
           <div className="font-mono uppercase mb-4 px-1"
             style={{ fontSize: "var(--text-label)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}>
@@ -100,7 +100,7 @@ export function BuildSystemPanel({
               const colorCss = oklchToCss(color);
               const fg = contrastFg(color);
               const isEditing = editingSlot === key;
-              const stateColor = state === "LOCKED" ? "var(--c-text-3)" : state === "OVERRIDE" ? "var(--c-accent)" : "#4ade80";
+              const stateColor = state === "LOCKED" ? "var(--c-text-3)" : state === "OVERRIDE" ? "var(--c-accent)" : "var(--c-success)";
 
               return (
                 <div key={key}>
@@ -109,7 +109,7 @@ export function BuildSystemPanel({
                     style={{
                       backgroundColor: colorCss,
                       color: fg,
-                      boxShadow: isEditing ? "0 0 0 2px rgba(217,119,54,0.5)" : "0 1px 3px rgba(0,0,0,0.3)",
+                      boxShadow: isEditing ? `0 0 0 2px var(--accent-ring)` : "0 1px 3px rgba(0,0,0,0.3)",
                     }}
                     onClick={() => handleNodeClick(key)}
                   >
@@ -121,8 +121,8 @@ export function BuildSystemPanel({
                       </span>
                       {state === "OVERRIDE" && (
                         <button
-                          className="w-4 h-4 rounded-full bg-neutral-800/60 flex items-center justify-center cursor-pointer hover:bg-neutral-700 transition-colors"
-                          style={{ fontSize: 10, color: "var(--c-text-2)" }}
+                          className="w-4 h-4 rounded-full bg-surface-4/60 flex items-center justify-center cursor-pointer hover:bg-surface-active transition-colors"
+                          style={{ fontSize: "var(--text-label)", color: "var(--c-text-2)" }}
                           onClick={(e) => { e.stopPropagation(); onOverrideReset(key); setEditingSlot(null); }}
                         >×</button>
                       )}
@@ -155,7 +155,7 @@ export function BuildSystemPanel({
                               {collectionItems.map((item) => (
                                 <button
                                   key={item.id}
-                                  className="w-7 h-7 rounded border border-neutral-700 cursor-pointer transition-transform hover:scale-110"
+                                  className="w-7 h-7 rounded border border-border-strong cursor-pointer transition-transform hover:scale-110"
                                   style={{ backgroundColor: oklchToCss(item.bg) }}
                                   title={item.fontName}
                                   onClick={(e) => {
@@ -182,10 +182,10 @@ export function BuildSystemPanel({
               System Preview Controls
             </div>
             {/* Theme toggle */}
-            <div className="flex rounded-md overflow-hidden border border-neutral-700">
+            <div className="flex rounded-md overflow-hidden border border-border-strong">
               {(["light", "dark"] as const).map((t) => (
                 <button key={t} className="flex-1 px-3 py-1 font-medium transition-colors capitalize cursor-pointer"
-                  style={{ fontSize: "var(--text-body)", backgroundColor: theme === t ? "#404040" : "transparent", color: theme === t ? "var(--c-text)" : "var(--c-text-2)" }}
+                  style={{ fontSize: "var(--text-body)", backgroundColor: theme === t ? "var(--surface-active)" : "transparent", color: theme === t ? "var(--c-text)" : "var(--c-text-2)" }}
                   onClick={() => onThemeChange(t)}>{t}</button>
               ))}
             </div>
@@ -199,14 +199,14 @@ export function BuildSystemPanel({
               </div>
               {onExportCSS && (
                 <button className="w-full text-left px-3 py-1.5 rounded font-mono cursor-pointer transition-colors hover:bg-white/5"
-                  style={{ fontSize: "var(--text-body)", color: "var(--c-text-2)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  style={{ fontSize: "var(--text-body)", color: "var(--c-text-2)", border: "1px solid var(--border-subtle)" }}
                   onClick={onExportCSS}>
                   CSS File
                 </button>
               )}
               {onExportJSON && (
                 <button className="w-full text-left px-3 py-1.5 rounded font-mono cursor-pointer transition-colors hover:bg-white/5"
-                  style={{ fontSize: "var(--text-body)", color: "var(--c-text-2)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  style={{ fontSize: "var(--text-body)", color: "var(--c-text-2)", border: "1px solid var(--border-subtle)" }}
                   onClick={onExportJSON}>
                   JSON File
                 </button>
@@ -217,7 +217,7 @@ export function BuildSystemPanel({
       </div>
 
       {/* ── Right: Pairing previews ──────────────────────── */}
-      <div className="flex-1 min-w-0 overflow-y-auto p-8 bg-[#0A0A0A]">
+      <div className="flex-1 min-w-0 overflow-y-auto p-8 bg-surface-0">
         <div className="font-mono uppercase mb-4"
           style={{ fontSize: "var(--text-label)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}>
           Pairing Previews
@@ -245,7 +245,7 @@ export function BuildSystemPanel({
                     {label}
                   </div>
                   <div className="px-2 py-0.5 rounded font-mono backdrop-blur-sm border"
-                    style={{ fontSize: "var(--text-badge)", background: "rgba(0,0,0,0.15)", borderColor: "rgba(0,0,0,0.05)", color: pass ? "#4ade80" : "rgba(239,68,68,0.45)" }}>
+                    style={{ fontSize: "var(--text-badge)", background: "rgba(0,0,0,0.15)", borderColor: "rgba(0,0,0,0.05)", color: pass ? "var(--c-success)" : "var(--c-error)" }}>
                     {ratio.toFixed(1)}:1
                   </div>
                 </div>

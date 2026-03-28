@@ -65,8 +65,8 @@ export function CSParams({
           <HexColorPicker color={primaryHex} onChange={handlePickerChange} style={{ width: "100%" }} />
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded border border-neutral-700 shrink-0" style={{ backgroundColor: primaryHex }} />
-          <input className="flex-1 bg-neutral-800 text-white font-mono rounded px-2 py-1.5 outline-none placeholder:text-neutral-600 focus:ring-1 focus:ring-neutral-600 uppercase"
+          <div className="w-7 h-7 rounded border border-border-strong shrink-0" style={{ backgroundColor: primaryHex }} />
+          <input className="flex-1 bg-surface-4 text-fg font-mono rounded px-2 py-1.5 outline-none placeholder:text-fg-3 focus:ring-1 focus:ring-border-strong uppercase"
             style={{ fontSize: "var(--text-body)" }}
             value={hexInput} onChange={(e) => setHexInput(e.target.value)}
             onBlur={(e) => commitHex(e.target.value)}
@@ -78,10 +78,10 @@ export function CSParams({
       {/* Threshold toggle */}
       <div>
         <div className="font-mono uppercase mb-2" style={{ fontSize: "var(--text-label)", letterSpacing: "var(--track-caps)", color: "var(--c-text-2)" }}>Threshold</div>
-        <div className="flex rounded-md overflow-hidden border border-neutral-700">
+        <div className="flex rounded-md overflow-hidden border border-border-strong">
           {(["AA", "AAA"] as const).map((t) => (
             <button key={t} className="flex-1 px-3 py-1.5 font-medium transition-colors cursor-pointer"
-              style={{ fontSize: "var(--text-body)", backgroundColor: threshold === t ? "#404040" : "transparent", color: threshold === t ? "var(--c-text)" : "var(--c-text-2)" }}
+              style={{ fontSize: "var(--text-body)", backgroundColor: threshold === t ? "var(--surface-active)" : "transparent", color: threshold === t ? "var(--c-text)" : "var(--c-text-2)" }}
               onClick={() => onThresholdChange(t)}>{t}</button>
           ))}
         </div>
@@ -99,21 +99,21 @@ export function CSParams({
 
       {/* Hue zoom + density */}
       <div className="flex items-center gap-3">
-        <div className="flex rounded-md overflow-hidden border border-neutral-700 flex-1">
+        <div className="flex rounded-md overflow-hidden border border-border-strong flex-1">
           {(["full", "neighborhood"] as const).map((m) => (
             <button key={m} className="flex-1 px-2 py-1 font-medium transition-colors capitalize cursor-pointer"
-              style={{ fontSize: "var(--text-badge)", backgroundColor: hueMode === m ? "#404040" : "transparent", color: hueMode === m ? "var(--c-text)" : "var(--c-text-2)" }}
+              style={{ fontSize: "var(--text-badge)", backgroundColor: hueMode === m ? "var(--surface-active)" : "transparent", color: hueMode === m ? "var(--c-text)" : "var(--c-text-2)" }}
               onClick={() => onHueModeChange(m)}>
               {m === "full" ? "Full" : "Near"}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-1">
-          <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+          <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
             style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
             onClick={() => onDensityChange(Math.max(8, density - 2))} aria-label="Decrease density">-</button>
           <span className="font-mono w-5 text-center tabular-nums" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-2)" }}>{density}</span>
-          <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-neutral-700 hover:border-neutral-500 transition-colors"
+          <button className="w-5 h-5 rounded flex items-center justify-center font-mono cursor-pointer border border-border-strong hover:border-border-strong transition-colors"
             style={{ fontSize: "var(--text-ui)", color: "var(--c-text-2)" }}
             onClick={() => onDensityChange(Math.min(32, density + 2))} aria-label="Increase density">+</button>
         </div>
@@ -123,7 +123,7 @@ export function CSParams({
       <div>
         <label className="flex items-center gap-2.5 cursor-pointer">
           <button className="w-8 h-[18px] rounded-full relative transition-colors shrink-0"
-            style={{ backgroundColor: fgLock ? "var(--c-accent)" : "#404040" }}
+            style={{ backgroundColor: fgLock ? "var(--c-accent)" : "var(--surface-active)" }}
             onClick={() => onFgLockChange(!fgLock)}>
             <div className="absolute top-[3px] w-3 h-3 rounded-full bg-white shadow transition-transform"
               style={{ transform: fgLock ? "translateX(17px)" : "translateX(3px)" }} />
@@ -147,11 +147,11 @@ interface CSBottomControlsProps {
 
 export function CSBottomControls({ lRange, cRange }: CSBottomControlsProps) {
   return (
-    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
+    <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-border-default shadow-inner">
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         L {Math.round(lRange[0] * 100)}–{Math.round(lRange[1] * 100)}
       </span>
-      <div className="w-px h-3.5 bg-neutral-800/80" />
+      <div className="w-px h-3.5 bg-border-default" />
       <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
         C {cRange[0].toFixed(2)}–{cRange[1].toFixed(2)}
       </span>
