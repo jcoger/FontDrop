@@ -1,28 +1,42 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { dur, easeOut } from "../../lib/motion";
 import type { FontInfo } from "../../hooks/useFonts";
 import { oklchToCss, oklchToHex, contrastRatio, hexToOklch } from "../../utils/oklch";
 import type { OklchColor } from "../../utils/oklch";
 
 import { useColorExplorerState } from "./useColorExplorerState";
-import type { RampColor, ContrastRampColor } from "./types";
+import { useCollection } from "./useCollection";
+import type { RampColor, ContrastRampColor, ColorVariety } from "./types";
 
 // Generation functions
-import { generateHueLock, sampleToneCurve } from "./methods/hueLock";
+import { sampleToneCurve } from "./methods/hueLock";
 import { applyExtractTransforms, buildExtractRamp } from "./methods/extractColors";
 
 // Method UI — sidebar params + re-exported generation functions
-import { HLParams } from "./methods/HLParams";
-import { TCParams, TCBottomControls, generateTemperatureCorridor } from "./methods/TemperatureCorridor";
-import { CSParams, CSBottomControls, generateContrastSafe } from "./methods/ContrastSafe";
-import { RBParams, RBBottomControls, deriveRoles, rolePairings } from "./methods/RoleBuilder";
+import { HLParams, HLBottomControls, generateHueMode, hlFlipCard, hlContrastRange } from "./methods/HLParams";
+import type { HLRampColor } from "./methods/HLParams";
+import { TCParams, TCBottomControls, generateDualCorridor } from "./methods/TemperatureCorridor";
+import { generateContrastSafe } from "./methods/ContrastSafe";
+import { RBBottomControls, deriveRoles, rolePairings } from "./methods/RoleBuilder";
 import { EXParams, EXBottomControls } from "./methods/Extract";
+import { WPParams, WPBottomControls, generateWordPicker } from "./methods/WordPicker";
+import type { WPRampColor } from "./methods/WordPicker";
+import { MKParams, MKBottomControls, generateMacroKnob, flipCard, getNeutralMeta } from "./methods/MacroKnob";
+import type { MKRampColor } from "./methods/MacroKnob";
 
 // Shared components
 import { ColorCard } from "./components/ColorCard";
-import { AlbersRow } from "./components/AlbersRow";
+import { AlbersPanel } from "./components/AlbersPanel";
 import { MethodSidebar } from "./components/MethodSidebar";
 import { BottomBar } from "./components/BottomBar";
 import { MethodBar } from "./components/MethodBar";
+import { HudBar } from "./components/HudBar";
+import { BuildSystemPanel } from "./components/BuildSystemPanel";
+import { PaletteHistoryStrip } from "./components/PaletteHistoryStrip";
+import type { HistoryEntry } from "./components/PaletteHistoryStrip";
+import { HubPanel } from "./components/HubPanel";
+import { exportSystemCSS, exportSystemJSON, downloadFile, todayStr } from "./exportUtils";
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -50,6 +64,7 @@ export function ColorExplorer({
   onSwitchToGrid,
 }: ColorExplorerProps) {
   const s = useColorExplorerState();
+  const collection = useCollection();
 
   // ── Toast ───────────────────────────────────────────────────────
   const [toast, setToast] = useState<string | null>(null);
@@ -59,6 +74,103 @@ export function ColorExplorer({
     return () => clearTimeout(t);
   }, [toast]);
 
+  // ── Build System mode ───────────────────────────────────────────
+  const [buildSystemOpen, setBuildSystemOpen] = useState(false);
+
+  function openBuildSystem() {
+    // Auto-populate primary from working color
+    const hex = oklchToHex(workingColor);
+    s.handleRbPrimaryHex(hex);
+    // Pulse spotlight card (find by color key)
+    if (spotlightColorKey !== null) {
+      const spotIdx = cards.findIndex((c) => colorKey(c.rampColor.color, c.fgOklch) === spotlightColorKey);
+      if (spotIdx >= 0) setPulsingIdx(spotIdx);
+    }
+    setBuildSystemOpen(true);
+  }
+
+  function closeBuildSystem() {
+    setBuildSystemOpen(false);
+  }
+
+  // ── Hub mode ──────────────────────────────────────────────────
+  const [hubOpen, setHubOpen] = useState(false);
+
+  function openHub() { setHubOpen(true); setBuildSystemOpen(false); }
+  function closeHub() { setHubOpen(false); }
+
+  function handleSendToBuildSystem(item: import("./useCollection").CollectionItem) {
+    closeHub();
+    s.handleRbPrimaryHex(oklchToHex(item.bg));
+    setBuildSystemOpen(true);
+  }
+
+  // Build system roles — derived when panel is open
+  const bsRoles = useMemo(() => {
+    if (!buildSystemOpen) return null;
+    return deriveRoles({
+      primary: s.rbPrimary,
+      theme: s.rbTheme,
+      accentOffset: s.rbAccentOffset,
+      accentChromaMult: s.rbAccentChromaMult,
+      overrides: s.rbOverrides,
+    });
+  }, [buildSystemOpen, s.rbPrimary, s.rbTheme, s.rbAccentOffset, s.rbAccentChromaMult, s.rbOverrides]);
+
+  // Export System — CSS file download
+  const handleExportSystemCSS = useCallback(() => {
+    if (!bsRoles) return;
+    const roleExports = [
+      { key: "primary", name: "Primary", bg: bsRoles.primary },
+      { key: "accent", name: "Accent", bg: bsRoles.accent },
+      { key: "surface", name: "Surface", bg: bsRoles.surface },
+      { key: "on-surface", name: "On-Surface", bg: bsRoles.onSurface },
+      { key: "error", name: "Error", bg: bsRoles.error },
+    ];
+    downloadFile(`fontdrop-system-${todayStr()}.css`, exportSystemCSS(roleExports), "text/css");
+    setToast("CSS downloaded");
+  }, [bsRoles]);
+
+  // Export System — JSON file download
+  const handleExportSystemJSON = useCallback(() => {
+    if (!bsRoles) return;
+    const roleExports = [
+      { key: "primary", name: "Primary", bg: bsRoles.primary },
+      { key: "accent", name: "Accent", bg: bsRoles.accent },
+      { key: "surface", name: "Surface", bg: bsRoles.surface },
+      { key: "on-surface", name: "On-Surface", bg: bsRoles.onSurface },
+      { key: "error", name: "Error", bg: bsRoles.error },
+    ];
+    downloadFile(`fontdrop-system-${todayStr()}.json`, exportSystemJSON(roleExports));
+    setToast("JSON downloaded");
+  }, [bsRoles]);
+
+  // Legacy clipboard export (still used by the export ref)
+  const handleExportSystem = useCallback(() => {
+    if (!bsRoles) return;
+    const roles = [
+      { name: "Primary", key: "primary", hex: bsRoles.primaryHex, color: bsRoles.primary },
+      { name: "Accent", key: "accent", hex: bsRoles.accentHex, color: bsRoles.accent },
+      { name: "Surface", key: "surface", hex: bsRoles.surfaceHex, color: bsRoles.surface },
+      { name: "On-Surface", key: "on-surface", hex: bsRoles.onSurfaceHex, color: bsRoles.onSurface },
+      { name: "Error", key: "error", hex: bsRoles.errorHex, color: bsRoles.error },
+    ];
+    const lines: string[] = [];
+    lines.push(`Design System — ${bsRoles.primaryHex}`);
+    lines.push("FontDrop Role Builder\n");
+    lines.push("Roles:");
+    roles.forEach((r) => {
+      const { l, c, h } = r.color;
+      lines.push(`  ${r.name}: ${r.hex}  oklch(${l.toFixed(2)}, ${c.toFixed(3)}, ${Math.round(h)})`);
+    });
+    lines.push("\nCSS Custom Properties:");
+    lines.push(":root {");
+    roles.forEach((r) => lines.push(`  --color-${r.key}: ${r.hex};`));
+    lines.push("}");
+    navigator.clipboard.writeText(lines.join("\n"));
+    setToast("System copied to clipboard");
+  }, [bsRoles]);
+
   // ── Card pulse ──────────────────────────────────────────────────
   const [pulsingIdx, setPulsingIdx] = useState<number | null>(null);
   useEffect(() => {
@@ -66,6 +178,39 @@ export function ColorExplorer({
     const t = setTimeout(() => setPulsingIdx(null), 150);
     return () => clearTimeout(t);
   }, [pulsingIdx]);
+
+  // ── Spotlight (color-identity based) ────────────────────────────
+  function colorKey(bg: OklchColor, fg: OklchColor): string {
+    return `${bg.l.toFixed(2)}.${bg.c.toFixed(2)}.${Math.round(bg.h)}|${fg.l.toFixed(2)}.${fg.c.toFixed(2)}.${Math.round(fg.h)}`;
+  }
+
+  const [spotlightColorKey, setSpotlightColorKey] = useState<string | null>(() =>
+    localStorage.getItem("fontdrop-spotlight-key"),
+  );
+  const [spotlightFontPath, setSpotlightFontPath] = useState<string | null>(() =>
+    localStorage.getItem("fontdrop-spotlight-font"),
+  );
+  useEffect(() => {
+    if (spotlightColorKey) localStorage.setItem("fontdrop-spotlight-key", spotlightColorKey);
+    else localStorage.removeItem("fontdrop-spotlight-key");
+  }, [spotlightColorKey]);
+  useEffect(() => {
+    if (spotlightFontPath) localStorage.setItem("fontdrop-spotlight-font", spotlightFontPath);
+    else localStorage.removeItem("fontdrop-spotlight-font");
+  }, [spotlightFontPath]);
+  // Clear spotlight on mode switch
+  useEffect(() => { setSpotlightColorKey(null); }, [s.activeMethod]);
+
+  function handleDoubleClick(cardIndex: number) {
+    if (cardIndex >= cards.length) return;
+    const card = cards[cardIndex];
+    const key = colorKey(card.rampColor.color, card.fgOklch);
+    setSpotlightColorKey((prev) => prev === key ? null : key);
+  }
+
+  function handlePinFont(font: FontInfo | null) {
+    setSpotlightFontPath(font ? font.file_path : null);
+  }
 
   // ── Starred fonts ────────────────────────────────────────────────
   const [starredPaths, setStarredPaths] = useState<Set<string>>(new Set());
@@ -81,6 +226,20 @@ export function ColorExplorer({
   const displayFonts = starredFonts.length > 0 ? starredFonts : fonts.slice(0, 12);
   const hasStarred = starredFonts.length > 0;
 
+  // ── Active font count: ground truth for card grid size ─────────
+  // Cards = displayFonts.length + (logoSvg ? 1 : 0).
+  // Color generation should match this to avoid silent waste or modulo repeats.
+  const activeFontCount = displayFonts.length + (logoSvg ? 1 : 0);
+
+  /** Resolve a ColorVariety setting to an actual generation count. */
+  function resolveVariety(variety: ColorVariety): number {
+    switch (variety) {
+      case "tight": return Math.max(4, Math.ceil(activeFontCount / 2));
+      case "auto":  return activeFontCount;
+      case "wide":  return Math.min(24, activeFontCount * 2);
+    }
+  }
+
   // ── Role Builder derived roles ───────────────────────────────────
   const rbRoles = useMemo(() => {
     if (s.activeMethod !== "Role Builder") return null;
@@ -95,22 +254,49 @@ export function ColorExplorer({
 
   // ── Ramp generation ──────────────────────────────────────────────
   const ramp = useMemo((): RampColor[] => {
+    if (s.activeMethod === "Macro Knob")
+      return generateMacroKnob(s.mkKnob, s.mkHue, activeFontCount, s.mkSpread, s.mkVariMode, s.mkRelMode, s.contrastLevel);
+    if (s.activeMethod === "Word Picker")
+      return generateWordPicker(s.wpTags as [] | [any] | [any, any], s.wpDrift, resolveVariety(s.wpVariety), s.wpAccent, s.contrastLevel);
     if (s.activeMethod === "Extract")
       return buildExtractRamp(applyExtractTransforms(s.exRawClusters, s.exRemapEnabled, s.exLightnessLock, s.exLockedL));
     if (s.activeMethod === "Role Builder" && rbRoles)
       return rolePairings(rbRoles);
-    if (s.activeMethod === "Temperature Corridor")
-      return generateTemperatureCorridor({ hCenter: s.tcHCenter, tempWidth: s.tempWidth, chromaMin: s.tcChromaMin, chromaMax: s.tcChromaMax, lRange: s.lRange, count: s.tcCount });
+    if (s.activeMethod === "Temperature Corridor") {
+      const tcGenCount = resolveVariety(s.tcVariety);
+      const accentCeil = Math.max(0, Math.min(1, s.tcChromaCeiling2 + s.tcAccentChromaOffset / 100));
+      const h2 = ((s.tcHCenter + s.tcHueOffset) % 360 + 360) % 360;
+      return generateDualCorridor({
+        node1: { hCenter: s.tcHCenter, tempWidth: s.tcHueWidth, chromaMin: s.tcChromaFloor, chromaMax: s.tcChromaCeiling, lRange: s.lRange, count: tcGenCount, useRelativeChroma: true, lMidBias: s.tcLMidBias },
+        node2: { hCenter: h2, tempWidth: s.tcHueWidth, chromaMin: s.tcChromaFloor, chromaMax: accentCeil, lRange: s.lRange, count: tcGenCount, useRelativeChroma: true, lMidBias: s.tcLMidBias },
+        accentWeight: s.tcAccentWeight,
+      });
+    }
     if (s.activeMethod === "Contrast Safe")
       return generateContrastSafe({ primary: s.csPrimary, lRange: s.csLRange, cRange: s.csCRange, hueMode: s.csHueMode, threshold: s.csThreshold, density: s.csDensity, fgLock: s.csFgLock });
-    const lValues = sampleToneCurve(s.steps, s.curveMidY);
-    return generateHueLock({ hue: s.hue, steps: s.steps, chromaMode: s.chromaMode, fixedChroma: s.fixedChroma, accentEnabled: s.accentEnabled, accentHue: s.accentHue, accentL: s.accentL, lValues });
-  }, [s.activeMethod, s.hue, s.steps, s.chromaMode, s.fixedChroma, s.accentEnabled, s.accentHue, s.accentL, s.curveMidY, s.tcHCenter, s.tempWidth, s.tcChromaMin, s.tcChromaMax, s.lRange, s.tcCount, s.csPrimary, s.csLRange, s.csCRange, s.csHueMode, s.csThreshold, s.csDensity, s.csFgLock, rbRoles, s.exRawClusters, s.exRemapEnabled, s.exLightnessLock, s.exLockedL]);
+    const hlCount = resolveVariety(s.hlVariety);
+    const lValues = sampleToneCurve(hlCount, s.curveMidY);
+    return generateHueMode({ hue: s.hue, steps: hlCount, chromaMode: s.chromaMode, fixedChroma: s.fixedChroma, lValues, fgPreset: s.hlFgPreset, fgLOverride: s.hlFgLOverride, fgCOverride: s.hlFgCOverride, contrastLevel: s.contrastLevel, isClash: s.contrastLevel === "clash" });
+  }, [s.activeMethod, s.hue, s.steps, s.chromaMode, s.fixedChroma, s.accentEnabled, s.accentHue, s.accentL, s.curveMidY, s.hlFgPreset, s.hlFgLOverride, s.hlFgCOverride, s.hlVariety, s.tcHCenter, s.tcHueWidth, s.tcChromaFloor, s.tcChromaCeiling, s.lRange, s.tcCount, s.tcLMidBias, s.tcHueOffset, s.tcChromaCeiling2, s.tcAccentWeight, s.tcAccentChromaOffset, s.csPrimary, s.csLRange, s.csCRange, s.csHueMode, s.csThreshold, s.csDensity, s.csFgLock, rbRoles, s.exRawClusters, s.exRemapEnabled, s.exLightnessLock, s.exLockedL, s.wpTags, s.wpDrift, s.wpCount, s.wpVariety, s.wpAccent, s.mkKnob, s.mkHue, s.mkSpread, s.mkVariMode, s.mkRelMode, s.contrastLevel, s.tcVariety, activeFontCount]);
 
   const sortedRamp = useMemo(
     () => s.activeMethod === "Role Builder" ? ramp : [...ramp].sort((a, b) => a.color.l - b.color.l),
     [ramp, s.activeMethod],
   );
+
+  // ── Card flip state (Macro Knob only, not persisted) ────────────
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
+  // Only reset flips when switching methods, not on every knob turn
+  useEffect(() => { setFlippedCards(new Set()); }, [s.activeMethod]);
+
+  function handleFlip(cardIndex: number) {
+    setFlippedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardIndex)) next.delete(cardIndex);
+      else next.add(cardIndex);
+      return next;
+    });
+  }
 
   const effectiveWorkingIndex =
     s.workingColorIndex !== null && s.workingColorIndex < sortedRamp.length
@@ -118,6 +304,14 @@ export function ColorExplorer({
       : Math.floor(sortedRamp.length / 2);
   const workingColor: OklchColor = sortedRamp[effectiveWorkingIndex]?.color || { mode: "oklch", l: 0.5, c: 0.1, h: 270 };
   useEffect(() => { s.setWorkingColorIndex(null); }, [sortedRamp.length]);
+
+  // Spotlight is color-key based — no position boundary check needed
+
+  // Resolve pinned font
+  const pinnedFont = useMemo(() => {
+    if (!spotlightFontPath) return null;
+    return fonts.find((f) => f.file_path === spotlightFontPath) || null;
+  }, [spotlightFontPath, fonts]);
 
   // ── Foreground logic ─────────────────────────────────────────────
   function hlForeground(bg: OklchColor, palette: RampColor[]): string {
@@ -132,23 +326,67 @@ export function ColorExplorer({
   // ── Cards ────────────────────────────────────────────────────────
   const primaryCss = useMemo(() => oklchToCss(s.csPrimary), [s.csPrimary]);
 
-  interface CardEntry { font: FontInfo | null; rampColor: RampColor; rampIdx: number; fgColor: string; dimmed: boolean; badgeColor: string | undefined; isLogoCard: boolean; }
+  interface CardEntry { font: FontInfo | null; rampColor: RampColor; rampIdx: number; fgColor: string; fgOklch: OklchColor; dimmed: boolean; badgeColor: string | undefined; isLogoCard: boolean; }
 
   const cards = useMemo((): CardEntry[] => {
     if (sortedRamp.length === 0) return [];
     const isCs = s.activeMethod === "Contrast Safe";
-    const isTc = s.activeMethod === "Temperature Corridor";
+    const isTc = s.activeMethod === "Temperature Corridor" || s.activeMethod === "Word Picker" || s.activeMethod === "Macro Knob";
     const isRb = s.activeMethod === "Role Builder";
+
+    // Find the OklchColor that produced a given CSS string from the ramp
+    function fgOklchFor(css: string, palette: RampColor[]): OklchColor {
+      for (const rc of palette) { if (oklchToCss(rc.color) === css) return rc.color; }
+      return { mode: "oklch", l: css === tcDarkest ? 0 : 1, c: 0, h: 0 };
+    }
+
     function build(font: FontInfo | null, i: number, isLogo: boolean): CardEntry {
       const rampIdx = i % sortedRamp.length, rc = sortedRamp[rampIdx];
-      if (isRb && rc.fgCss) return { font, rampColor: rc, rampIdx, fgColor: rc.fgCss, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+      if (isRb && rc.fgCss) {
+        const fgO = fgOklchFor(rc.fgCss, sortedRamp);
+        return { font, rampColor: rc, rampIdx, fgColor: rc.fgCss, fgOklch: fgO, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+      }
       if (isCs) {
         const csrc = rc as ContrastRampColor, testCss = oklchToCss(csrc.color);
-        const bgC = s.csFgLock ? csrc.color : s.csPrimary, fgC = s.csFgLock ? primaryCss : testCss;
+        const bgC = s.csFgLock ? csrc.color : s.csPrimary;
+        const fgC = s.csFgLock ? primaryCss : testCss;
+        const fgO = s.csFgLock ? s.csPrimary : csrc.color;
         const bc: Record<string, string> = { AAA: "#4ade80", AA: "#facc15", "AA-large": "#fb923c", FAIL: "rgba(239,68,68,0.45)" };
-        return { font, rampColor: { ...rc, color: bgC }, rampIdx, fgColor: fgC, dimmed: !(csrc as ContrastRampColor).passes, badgeColor: bc[(csrc as ContrastRampColor).badge.split(" ")[0]] || fgC, isLogoCard: isLogo };
+        return { font, rampColor: { ...rc, color: bgC }, rampIdx, fgColor: fgC, fgOklch: fgO, dimmed: !(csrc as ContrastRampColor).passes, badgeColor: bc[(csrc as ContrastRampColor).badge.split(" ")[0]] || fgC, isLogoCard: isLogo };
       }
-      return { font, rampColor: rc, rampIdx, fgColor: isTc ? tcForeground(rc.color) : hlForeground(rc.color, sortedRamp), dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+      if (isTc) {
+        // Macro Knob: use mkFg from generation
+        if (s.activeMethod === "Macro Knob") {
+          const mkRc = rc as MKRampColor;
+          if (mkRc.mkFg) {
+            const fgCss = oklchToCss(mkRc.mkFg);
+            return { font, rampColor: rc, rampIdx, fgColor: fgCss, fgOklch: mkRc.mkFg, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+          }
+        }
+        // Word Picker: use wpFg from generation
+        if (s.activeMethod === "Word Picker") {
+          const wpRc = rc as WPRampColor;
+          if (wpRc.wpFg) {
+            const fgCss = oklchToCss(wpRc.wpFg);
+            return { font, rampColor: rc, rampIdx, fgColor: fgCss, fgOklch: wpRc.wpFg, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+          }
+        }
+        const fgCss = tcForeground(rc.color);
+        const fgO = fgCss === tcDarkest && sortedRamp.length ? sortedRamp[0].color : sortedRamp.length ? sortedRamp[sortedRamp.length - 1].color : rc.color;
+        return { font, rampColor: rc, rampIdx, fgColor: fgCss, fgOklch: fgO, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+      }
+      // Hue Lock: use hlFg from generation
+      if (s.activeMethod === "Hue Lock") {
+        const hlRc = rc as HLRampColor;
+        if (hlRc.hlFg) {
+          const fgCss = oklchToCss(hlRc.hlFg);
+          return { font, rampColor: rc, rampIdx, fgColor: fgCss, fgOklch: hlRc.hlFg, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
+        }
+      }
+      // Extract default: hlForeground picks highest-contrast ramp color
+      const fgCss = hlForeground(rc.color, sortedRamp);
+      const fgO = fgOklchFor(fgCss, sortedRamp);
+      return { font, rampColor: rc, rampIdx, fgColor: fgCss, fgOklch: fgO, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
     }
     const r: CardEntry[] = [];
     if (logoSvg) r.push(build(null, 0, true));
@@ -156,7 +394,7 @@ export function ColorExplorer({
     for (let i = 0; i < displayFonts.length; i++) r.push(build(displayFonts[i], i + off, false));
     return r;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayFonts, sortedRamp, s.activeMethod, tcDarkest, tcLightest, s.csPrimary, primaryCss, s.csFgLock, logoSvg]);
+  }, [displayFonts, sortedRamp, s.activeMethod, tcDarkest, tcLightest, s.csPrimary, primaryCss, s.csFgLock, logoSvg, s.contrastLevel]);
 
   // ── Export Palette ───────────────────────────────────────────────
   const handleExport = useCallback(() => {
@@ -186,10 +424,12 @@ export function ColorExplorer({
     setToast("Palette copied to clipboard");
   }, [sortedRamp, s.activeMethod]);
 
+  // Export ref switches between palette export and system export
+  const activeExport = buildSystemOpen ? handleExportSystem : handleExport;
   useEffect(() => {
-    if (exportRef) exportRef.current = handleExport;
+    if (exportRef) exportRef.current = activeExport;
     return () => { if (exportRef) exportRef.current = null; };
-  }, [exportRef, handleExport]);
+  }, [exportRef, activeExport]);
 
   // ── Arrow-key hue nudge ──────────────────────────────────────────
   useEffect(() => {
@@ -205,65 +445,138 @@ export function ColorExplorer({
     return () => window.removeEventListener("keydown", onKey);
   }, [s.activeMethod]);
 
-  // ── Method crossfade ─────────────────────────────────────────────
-  const prevMethodRef = useRef(s.activeMethod);
-  const [gridOpacity, setGridOpacity] = useState(1);
-  useEffect(() => {
-    if (prevMethodRef.current !== s.activeMethod) {
-      prevMethodRef.current = s.activeMethod;
-      setGridOpacity(0);
-      const t = requestAnimationFrame(() => setGridOpacity(1));
-      return () => cancelAnimationFrame(t);
-    }
-  }, [s.activeMethod]);
+  // Method crossfade handled by AnimatePresence on the card grid
 
   function handleCardClick(rampIdx: number) {
     s.setWorkingColorIndex(rampIdx);
     setPulsingIdx(rampIdx);
   }
 
+  // ── Working card info for HUD (spotlight preferred) ─────────────
+  const workingCard = useMemo(() => {
+    if (cards.length === 0) return null;
+    // Prefer spotlight card (by color key) for the HUD readout
+    const spotCard = spotlightColorKey !== null
+      ? cards.find((c) => colorKey(c.rampColor.color, c.fgOklch) === spotlightColorKey)
+      : null;
+    const card = spotCard || cards.find((c) => c.rampIdx === effectiveWorkingIndex);
+    if (!card) return null;
+    const renderFont = (spotCard && pinnedFont) ? pinnedFont : card.font;
+    return {
+      badge: card.rampColor.badge,
+      fontName: card.isLogoCard ? "Logo" : renderFont?.font_family || "",
+      bgColor: card.rampColor.color,
+      fgColor: card.fgColor,
+    };
+  }, [cards, effectiveWorkingIndex, spotlightColorKey, pinnedFont]);
+
+  // ── History: params snapshot + restore ──────────────────────────
+  const currentParams = useMemo((): Record<string, unknown> => {
+    switch (s.activeMethod) {
+      case "Hue Lock": return { hue: s.hue, steps: s.steps, curveMidY: s.curveMidY, chromaMode: s.chromaMode, fixedChroma: s.fixedChroma, hlFgPreset: s.hlFgPreset, hlVariety: s.hlVariety };
+      case "Macro Knob": return { mkKnob: s.mkKnob, mkHue: s.mkHue, mkRelMode: s.mkRelMode, mkSpread: s.mkSpread, mkVariMode: s.mkVariMode };
+      case "Word Picker": return { wpTags: s.wpTags, wpDrift: s.wpDrift, wpVariety: s.wpVariety, wpAccent: s.wpAccent };
+      case "Temperature Corridor": return { tcHCenter: s.tcHCenter, tcHueWidth: s.tcHueWidth, tcChromaFloor: s.tcChromaFloor, tcChromaCeiling: s.tcChromaCeiling, lRange: s.lRange, tcCount: s.tcCount, tcVariety: s.tcVariety, tcLMidBias: s.tcLMidBias, tcHueOffset: s.tcHueOffset, tcAccentWeight: s.tcAccentWeight };
+      default: return {};
+    }
+  }, [s.activeMethod, s.hue, s.steps, s.curveMidY, s.chromaMode, s.fixedChroma, s.hlFgPreset, s.hlVariety, s.mkKnob, s.mkHue, s.mkRelMode, s.mkSpread, s.mkVariMode, s.wpTags, s.wpDrift, s.wpVariety, s.wpAccent, s.tcHCenter, s.tcHueWidth, s.tcChromaFloor, s.tcChromaCeiling, s.lRange, s.tcCount, s.tcVariety, s.tcLMidBias, s.tcHueOffset, s.tcAccentWeight]);
+
+  const restoreMap: Record<string, (v: any) => void> = useMemo(() => ({
+    hue: s.setHue, steps: s.setSteps, curveMidY: s.setCurveMidY, chromaMode: s.setChromaMode, fixedChroma: s.setFixedChroma, hlFgPreset: s.setHlFgPreset, hlVariety: s.setHlVariety,
+    mkKnob: s.setMkKnob, mkHue: s.setMkHue, mkRelMode: s.setMkRelMode, mkSpread: s.setMkSpread, mkVariMode: s.setMkVariMode,
+    wpTags: s.setWpTags, wpDrift: s.setWpDrift, wpVariety: s.setWpVariety, wpAccent: s.setWpAccent,
+    tcHCenter: s.setTcHCenter, tcHueWidth: s.setTcHueWidth, tcChromaFloor: s.setTcChromaFloor, tcChromaCeiling: s.setTcChromaCeiling, lRange: s.setLRange, tcCount: s.setTcCount, tcVariety: s.setTcVariety, tcLMidBias: s.setTcLMidBias, tcHueOffset: s.setTcHueOffset, tcAccentWeight: s.setTcAccentWeight,
+  }), []);
+
+  function handleHistoryRestore(entry: HistoryEntry) {
+    s.switchMethod(entry.method);
+    if (entry.params) {
+      for (const [key, value] of Object.entries(entry.params)) {
+        const setter = restoreMap[key];
+        if (setter) setter(value);
+      }
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-      <MethodBar
+      <HudBar
+        workingCard={workingCard}
+        cardPairs={cards.map((c) => ({ bg: c.rampColor.color, fg: c.fgOklch }))}
+        contrastLevel={s.contrastLevel}
+        onContrastLevelChange={s.setContrastLevel}
         activeMethod={s.activeMethod}
-        onMethodChange={s.switchMethod}
-        displayFontCount={displayFonts.length}
-        hasStarred={hasStarred}
-        albersExpanded={s.albersExpanded}
-        onToggleAlbers={s.toggleAlbers}
+        buildSystemOpen={buildSystemOpen}
+        onBuildSystem={openBuildSystem}
+        onBackToExplore={closeBuildSystem}
+        collectionCount={collection.count}
+        onCollectionClick={openHub}
       />
+      {!buildSystemOpen && (
+        <MethodBar
+          activeMethod={s.activeMethod}
+          onMethodChange={s.switchMethod}
+          albersOpen={s.albersOpen}
+          onToggleAlbers={s.toggleAlbers}
+        />
+      )}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" style={{ opacity: buildSystemOpen || hubOpen ? 0 : 1, transition: "opacity 200ms ease", display: buildSystemOpen || hubOpen ? "none" : undefined }}>
         {/* Sidebar */}
         <MethodSidebar>
-          {s.activeMethod === "Extract" ? (
+          {s.activeMethod === "Macro Knob" ? (
+            <MKParams
+              knob={s.mkKnob}
+              onKnobChange={s.setMkKnob}
+              hue={s.mkHue}
+              onHueChange={s.setMkHue}
+              spread={s.mkSpread}
+              onSpreadChange={s.setMkSpread}
+              variMode={s.mkVariMode}
+              onVariModeChange={s.setMkVariMode}
+              activeFontCount={activeFontCount}
+              relMode={s.mkRelMode}
+              onRelModeChange={s.setMkRelMode}
+              contrastLevel={s.contrastLevel}
+            />
+          ) : s.activeMethod === "Word Picker" ? (
+            <WPParams
+              activeTags={s.wpTags}
+              onTagsChange={s.setWpTags}
+              drift={s.wpDrift}
+              onDriftChange={s.setWpDrift}
+              count={s.wpCount}
+              onCountChange={s.setWpCount}
+              variety={s.wpVariety}
+              onVarietyChange={s.setWpVariety}
+              activeFontCount={activeFontCount}
+              accent={s.wpAccent}
+              onAccentChange={s.setWpAccent}
+            />
+          ) : s.activeMethod === "Extract" ? (
             <EXParams thumbnail={s.exThumbnail} onImageLoad={s.handleExImageLoad} onImageClear={s.handleExImageClear}
               remapEnabled={s.exRemapEnabled} onRemapChange={s.setExRemapEnabled}
               lightnessLock={s.exLightnessLock} onLightnessLockChange={s.setExLightnessLock}
               lockedL={s.exLockedL} onLockedLChange={s.setExLockedL}
               clusters={s.exRawClusters} clusterCount={s.exClusterCount} onClusterCountChange={s.setExClusterCount}
               workingColorIndex={effectiveWorkingIndex} onSetWorkingColor={s.setWorkingColorIndex} />
-          ) : s.activeMethod === "Role Builder" && rbRoles ? (
-            <RBParams primaryHex={s.rbPrimaryHex} onPrimaryHexChange={s.handleRbPrimaryHex}
-              theme={s.rbTheme} onThemeChange={s.setRbTheme} roles={rbRoles}
-              overrides={s.rbOverrides} onOverrideChange={s.handleRbOverride} onOverrideReset={s.handleRbOverrideReset} />
-          ) : s.activeMethod === "Contrast Safe" ? (
-            <CSParams primaryHex={s.csPrimaryHex} onPrimaryHexChange={s.handleCsPrimaryHex}
-              primary={s.csPrimary}
-              threshold={s.csThreshold} onThresholdChange={s.setCsThreshold}
-              hueMode={s.csHueMode} onHueModeChange={s.setCsHueMode}
-              density={s.csDensity} onDensityChange={s.setCsDensity}
-              fgLock={s.csFgLock} onFgLockChange={s.setCsFgLock}
-              lRange={s.csLRange} onLRangeChange={s.setCsLRange}
-              results={sortedRamp as ContrastRampColor[]}
-              onSetWorkingColor={s.setWorkingColorIndex} />
           ) : s.activeMethod === "Temperature Corridor" ? (
             <TCParams hCenter={s.tcHCenter} onHCenterChange={s.setTcHCenter}
-              chromaMin={s.tcChromaMin} onChromaChange={s.handleTcChromaChange}
+              chromaFloor={s.tcChromaFloor} onChromaFloorChange={s.setTcChromaFloor}
+              chromaCeiling={s.tcChromaCeiling} onChromaCeilingChange={s.setTcChromaCeiling}
               tempWidth={s.tempWidth} onTempWidthChange={s.setTempWidth}
-              count={s.tcCount} onCountChange={s.setTcCount} />
+              hueWidth={s.tcHueWidth} onHueWidthChange={s.setTcHueWidth}
+              chromaCeiling2={s.tcChromaCeiling2} onChromaCeiling2Change={s.setTcChromaCeiling2}
+              tempWidth2={s.tempWidth2} onTempWidth2Change={s.setTempWidth2}
+              hueOffset={s.tcHueOffset} onHueOffsetChange={s.setTcHueOffset}
+              accentChromaOffset={s.tcAccentChromaOffset} onAccentChromaOffsetChange={s.setTcAccentChromaOffset}
+              count={s.tcCount} onCountChange={s.setTcCount}
+              variety={s.tcVariety} onVarietyChange={s.setTcVariety} activeFontCount={activeFontCount}
+              lRange={s.lRange} onLRangeChange={s.setLRange}
+              lMidBias={s.tcLMidBias} onLMidBiasChange={s.setTcLMidBias}
+              accentWeight={s.tcAccentWeight} onAccentWeightChange={s.setTcAccentWeight} />
           ) : (
             <HLParams
               hue={s.hue} onHueChange={s.setHue}
@@ -274,17 +587,24 @@ export function ColorExplorer({
               accentEnabled={s.accentEnabled} onAccentEnabledChange={s.setAccentEnabled}
               accentHue={s.accentHue} onAccentHueChange={s.setAccentHue}
               accentL={s.accentL} onAccentLChange={s.setAccentL}
+              fgPreset={s.hlFgPreset} onFgPresetChange={s.setHlFgPreset}
+              fgLOverride={s.hlFgLOverride} onFgLOverrideChange={s.setHlFgLOverride}
+              fgCOverride={s.hlFgCOverride} onFgCOverrideChange={s.setHlFgCOverride}
+              variety={s.hlVariety} onVarietyChange={s.setHlVariety}
+              activeFontCount={activeFontCount}
+              contrastLevel={s.contrastLevel}
             />
           )}
         </MethodSidebar>
 
         {/* Main panel */}
         <div className="flex-1 min-w-0 flex flex-col relative">
-          <AlbersRow workingColor={workingColor} canvasColor={CANVAS_COLOR} expanded={s.albersExpanded} />
+          {/* Albers flyout panel */}
+          <AlbersPanel open={s.albersOpen} onClose={s.closeAlbers} workingColor={workingColor} canvasColor={CANVAS_COLOR} />
 
           {/* Card grid */}
           <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-8 bg-[#0A0A0A]"
-            style={{ opacity: gridOpacity, transition: "opacity var(--dur-fast) var(--ease-hover)" }}>
+>
             {cards.length === 0 && !hasStarred ? (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-neutral-600">
@@ -301,45 +621,153 @@ export function ColorExplorer({
                 )}
               </div>
             ) : (
-              <div className="grid gap-6 pb-12 min-w-0" style={{ gridTemplateColumns: colCount === 1 ? "1fr" : `repeat(${colCount}, minmax(0, 1fr))` }}>
-                {cards.map((card) => (
-                  <ColorCard
-                    key={card.isLogoCard ? "__logo__" : card.font!.file_path}
-                    font={card.font} bgColor={card.rampColor.color} fgColor={card.fgColor}
-                    badge={card.rampColor.badge} badgeColor={card.badgeColor}
-                    isWorking={card.rampIdx === effectiveWorkingIndex}
-                    isPulsing={card.rampIdx === pulsingIdx}
-                    dimmed={card.dimmed} brandName={brandName || undefined}
-                    logoSvg={logoSvg} isLogoCard={card.isLogoCard}
-                    onClick={() => handleCardClick(card.rampIdx)}
-                  />
-                ))}
-              </div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={s.activeMethod}
+                  className="grid gap-6 pb-12 min-w-0"
+                  style={{ gridTemplateColumns: colCount === 1 ? "1fr" : `repeat(${colCount}, minmax(0, 1fr))` }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: dur.fast, ease: easeOut }}
+                >
+                  {cards.map((card, cardIndex) => {
+                    const isSpot = spotlightColorKey !== null && colorKey(card.rampColor.color, card.fgOklch) === spotlightColorKey;
+                    // Apply flip for Macro Knob and Hue Lock
+                    const isMK = s.activeMethod === "Macro Knob";
+                    const isHL = s.activeMethod === "Hue Lock";
+                    const canFlip = isMK || isHL;
+                    const isFlipped = canFlip && flippedCards.has(cardIndex);
+                    let renderBg = card.rampColor.color;
+                    let renderFgColor = card.fgColor;
+                    let renderFgOklch = card.fgOklch;
+                    if (isFlipped) {
+                      const flipped = isHL
+                        ? hlFlipCard(card.rampColor.color, card.fgOklch, s.contrastLevel)
+                        : flipCard(card.rampColor.color, card.fgOklch, s.contrastLevel);
+                      renderBg = flipped.bg;
+                      renderFgColor = oklchToCss(flipped.fg);
+                      renderFgOklch = flipped.fg;
+                    }
+                    // Neutral meta color for secondary text (Macro Knob + Word Picker)
+                    const isWP = s.activeMethod === "Word Picker";
+                    let metaColor: string | undefined;
+                    if (isMK) {
+                      const mkRc = card.rampColor as MKRampColor;
+                      metaColor = isFlipped ? getNeutralMeta(renderBg) : mkRc.mkMeta;
+                    } else if (isWP) {
+                      const wpRc = card.rampColor as WPRampColor;
+                      metaColor = wpRc.wpMeta;
+                    } else if (s.activeMethod === "Hue Lock") {
+                      const hlRc = card.rampColor as HLRampColor;
+                      metaColor = hlRc.hlMeta;
+                    }
+                    return (
+                      <motion.div
+                        key={card.isLogoCard ? "__logo__" : card.font!.file_path}
+                        initial={{ opacity: 0, scale: 0.97 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: dur.fast, ease: easeOut, delay: cardIndex * 0.02 }}
+                      >
+                        <ColorCard
+                          font={card.font} bgColor={renderBg} fgColor={renderFgColor}
+                          fgOklch={renderFgOklch}
+                          badge={card.rampColor.badge} badgeColor={card.badgeColor}
+                          isWorking={card.rampIdx === effectiveWorkingIndex}
+                          isPulsing={card.rampIdx === pulsingIdx}
+                          isSpotlight={isSpot}
+                          dimmed={card.dimmed} brandName={brandName || undefined}
+                          logoSvg={logoSvg} isLogoCard={card.isLogoCard}
+                          contrastLevel={s.contrastLevel}
+                          cardIndex={cardIndex}
+                          pinnedFont={isSpot ? pinnedFont : undefined}
+                          starredFonts={isSpot ? starredFonts : undefined}
+                          onPinFont={isSpot ? handlePinFont : undefined}
+                          onClick={() => handleCardClick(card.rampIdx)}
+                          onDoubleClick={() => handleDoubleClick(cardIndex)}
+                          onFlip={canFlip ? () => handleFlip(cardIndex) : undefined}
+                          metaColor={metaColor}
+                          isSaved={collection.isSaved(renderBg, renderFgOklch)}
+                          onSave={() => {
+                            const renderFont = card.font;
+                            return collection.addItem({
+                              bg: renderBg,
+                              fg: renderFgOklch,
+                              fontName: renderFont?.font_family || "",
+                              fontWeight: String(renderFont?.weight || ""),
+                              fontCategory: renderFont?.classification?.category || "",
+                              sourceMode: s.activeMethod,
+                            });
+                          }}
+                          onUnsave={() => collection.removeByColorKey(renderBg, renderFgOklch)}
+                        />
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              </AnimatePresence>
             )}
           </div>
         </div>
       </div>
 
+      {/* Build System panel */}
+      {buildSystemOpen && bsRoles && (
+        <BuildSystemPanel
+          roles={bsRoles}
+          overrides={s.rbOverrides}
+          onOverrideChange={s.handleRbOverride}
+          onOverrideReset={s.handleRbOverrideReset}
+          theme={s.rbTheme}
+          onThemeChange={s.setRbTheme}
+          previewFont={pinnedFont || starredFonts[0] || null}
+          collectionItems={collection.items}
+          onExportCSS={handleExportSystemCSS}
+          onExportJSON={handleExportSystemJSON}
+        />
+      )}
+
+      {/* Hub panel */}
+      {hubOpen && (
+        <HubPanel
+          items={collection.items}
+          brandName={brandName}
+          onRemove={collection.removeById}
+          onRestore={collection.restoreItem}
+          onClearAll={collection.clear}
+          onSendToBuildSystem={handleSendToBuildSystem}
+          onClose={closeHub}
+        />
+      )}
+
+      {/* Palette history strip */}
+      {!buildSystemOpen && !hubOpen && (
+        <PaletteHistoryStrip
+          currentColors={sortedRamp.slice(0, 5).map((rc) => rc.color)}
+          currentMethod={s.activeMethod}
+          currentParams={currentParams}
+          onRestore={handleHistoryRestore}
+        />
+      )}
+
       {/* Bottom bar */}
-      <BottomBar label={s.activeMethod}>
-        {s.activeMethod === "Extract" ? (
-          <EXBottomControls clusterCount={s.exClusterCount} />
-        ) : s.activeMethod === "Role Builder" ? (
+      <BottomBar label={hubOpen ? "Collection" : buildSystemOpen ? "Role Builder" : s.activeMethod}>
+        {buildSystemOpen ? (
           <RBBottomControls accentOffset={s.rbAccentOffset} onAccentOffsetChange={s.setRbAccentOffset}
             accentChromaMult={s.rbAccentChromaMult} onAccentChromaMultChange={s.setRbAccentChromaMult} />
-        ) : s.activeMethod === "Contrast Safe" ? (
-          <CSBottomControls lRange={s.csLRange} cRange={s.csCRange} />
+        ) : s.activeMethod === "Macro Knob" ? (
+          <MKBottomControls knob={s.mkKnob} hue={s.mkHue} spread={s.mkSpread} contrastLevel={s.contrastLevel} colorCount={activeFontCount} />
+        ) : s.activeMethod === "Word Picker" ? (
+          <WPBottomControls activeTags={s.wpTags} drift={s.wpDrift} count={s.wpCount} />
+        ) : s.activeMethod === "Extract" ? (
+          <EXBottomControls clusterCount={s.exClusterCount} />
         ) : s.activeMethod === "Temperature Corridor" ? (
-          <TCBottomControls lRange={s.lRange} onLRangeChange={s.setLRange} />
+          <TCBottomControls lRange={s.lRange} accentWeight={s.tcAccentWeight} count={s.tcCount} hueOffset={s.tcHueOffset} />
+        ) : s.activeMethod === "Hue Lock" ? (
+          <HLBottomControls hue={s.hue} shadeCount={sortedRamp.length} contrastRange={hlContrastRange(sortedRamp as HLRampColor[])} contrastLevel={s.contrastLevel} />
         ) : (
           <div className="flex items-center gap-4 bg-black/40 px-5 py-2 rounded-full border border-neutral-800/80 shadow-inner">
-            <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>H {s.hue}°</span>
-            <div className="w-px h-3.5 bg-neutral-800/80" />
-            <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>{s.steps} steps</span>
-            <div className="w-px h-3.5 bg-neutral-800/80" />
-            <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>
-              {s.chromaMode === "fixed" ? `C ${s.fixedChroma.toFixed(2)}` : "Max C"}
-            </span>
+            <span className="font-mono" style={{ fontSize: "var(--text-badge)", color: "var(--c-text-3)" }}>—</span>
           </div>
         )}
       </BottomBar>

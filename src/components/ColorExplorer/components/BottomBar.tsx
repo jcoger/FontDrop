@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { supportsP3 } from "../../../utils/oklch";
 
 interface BottomBarProps {
   label: string;
@@ -22,8 +23,17 @@ export function BottomBar({ label, children }: BottomBarProps) {
       {/* Center: method-specific controls */}
       <div className="flex-1 flex justify-center">{children}</div>
 
-      {/* Right: spacer to balance layout */}
-      <div className="w-[260px] shrink-0" />
+      {/* Right: P3 badge when on wide-gamut display */}
+      <div className="w-[260px] shrink-0 flex justify-end">
+        {supportsP3 && (
+          <span
+            className="font-mono uppercase"
+            style={{ fontSize: "var(--text-micro)", letterSpacing: "var(--track-caps)", color: "var(--c-text-4)" }}
+          >
+            Display P3
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,30 +3,26 @@ import { motion } from "framer-motion";
 import { springSnap } from "../../../lib/motion";
 import type { MethodName } from "../types";
 
-const METHODS: MethodName[] = ["Hue Lock", "Temperature Corridor", "Contrast Safe", "Role Builder", "Extract"];
+const VISIBLE_METHODS: MethodName[] = ["Hue Lock", "Temperature Corridor", "Word Picker", "Macro Knob", "Extract"];
 
 interface MethodBarProps {
   activeMethod: MethodName;
   onMethodChange: (m: MethodName) => void;
-  displayFontCount: number;
-  hasStarred: boolean;
-  albersExpanded: boolean;
+  albersOpen: boolean;
   onToggleAlbers: () => void;
 }
 
 export function MethodBar({
   activeMethod,
   onMethodChange,
-  displayFontCount,
-  hasStarred,
-  albersExpanded,
+  albersOpen,
   onToggleAlbers,
 }: MethodBarProps) {
   const layoutId = useId();
 
   return (
     <div className="flex-shrink-0 flex items-center gap-1.5 px-4 h-10 border-b border-neutral-800 bg-neutral-900 overflow-x-auto">
-      {METHODS.map((method) => {
+      {VISIBLE_METHODS.map((method) => {
         const isActive = method === activeMethod;
         return (
           <button
@@ -52,26 +48,26 @@ export function MethodBar({
 
       <div className="flex-1 min-w-0" />
 
-      {/* Right: font count + Albers toggle */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <span className="font-mono tabular-nums whitespace-nowrap" style={{ fontSize: "var(--text-body)", color: "var(--c-text-4)" }}>
-          {displayFontCount} {hasStarred ? "starred" : "fonts"}
-        </span>
-        <button
-          className="flex items-center gap-1.5 font-mono uppercase cursor-pointer"
-          style={{ fontSize: "var(--text-label)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-hover)" }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-2)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-3)"; }}
-          onClick={onToggleAlbers}
-          aria-label={albersExpanded ? "Collapse Albers row" : "Expand Albers row"}
-        >
-          Albers
-          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-            className="transition-transform" style={{ transform: albersExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
-            <path d="M1 1L5 5L9 1" />
-          </svg>
-        </button>
-      </div>
+      {/* Albers toggle */}
+      <button
+        className="flex items-center gap-1.5 font-mono uppercase cursor-pointer flex-shrink-0"
+        style={{
+          fontSize: "var(--text-label)",
+          letterSpacing: "var(--track-caps)",
+          color: albersOpen ? "var(--c-text-2)" : "var(--c-text-3)",
+          transition: "color var(--dur-fast) var(--ease-hover)",
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-2)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = albersOpen ? "var(--c-text-2)" : "var(--c-text-3)"; }}
+        onClick={onToggleAlbers}
+        aria-label={albersOpen ? "Close Albers panel" : "Open Albers panel"}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M15 3v18" />
+        </svg>
+        Albers
+      </button>
     </div>
   );
 }

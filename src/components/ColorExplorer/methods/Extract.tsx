@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { oklchToCss } from "../../../utils/oklch";
 import type { ExtractedCluster } from "../types";
 import { SIDEBAR_SLIDER } from "../components/MethodSidebar";
@@ -53,6 +54,36 @@ export function EXParams({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+
+  // Tauri native drag-drop listener (browser drop events don't fire in Tauri v2)
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    getCurrentWebviewWindow().onDragDropEvent((event) => {
+      if (event.payload.type === "over") {
+        setDragging(true);
+      } else if (event.payload.type === "leave") {
+        setDragging(false);
+      } else if (event.payload.type === "drop") {
+        setDragging(false);
+        const paths = event.payload.paths;
+        if (paths.length > 0) {
+          const filePath = paths[0];
+          const ext = filePath.toLowerCase().split(".").pop() || "";
+          if (["png", "jpg", "jpeg", "webp"].includes(ext)) {
+            // Load via Tauri asset protocol
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => onImageLoad(img, img.src);
+            // Tauri v2: use convertFileSrc or direct file:// protocol
+            import("@tauri-apps/api/core").then(({ convertFileSrc }) => {
+              img.src = convertFileSrc(filePath);
+            });
+          }
+        }
+      }
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, [onImageLoad]);
 
   function handleFile(file: File) {
     const ext = file.name.toLowerCase().split(".").pop() || "";

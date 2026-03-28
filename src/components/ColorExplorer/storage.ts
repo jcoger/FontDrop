@@ -15,15 +15,34 @@ export const LS_KEYS = {
     accentEnabled:"fontdrop-ce-huelock-accentEnabled",
     accentHue:    "fontdrop-ce-huelock-accentHue",
     accentL:      "fontdrop-ce-huelock-accentL",
+    fgPreset:     "fontdrop-ce-hue-fgpreset",
+    fgLOverride:  "fontdrop-ce-hue-fgloverride",
+    fgCOverride:  "fontdrop-ce-hue-fgcoverride",
+    variety:      "fontdrop-ce-hue-variety",
   },
 
   corridor: {
-    hCenter:      "fontdrop-ce-corridor-hCenter",
-    width:        "fontdrop-ce-corridor-width",
-    chromaMin:    "fontdrop-ce-corridor-chromaMin",
-    chromaMax:    "fontdrop-ce-corridor-chromaMax",
-    lRange:       "fontdrop-ce-corridor-lRange",
-    count:        "fontdrop-ce-corridor-count",
+    hCenter:        "fontdrop-ce-corridor-hCenter",
+    width:          "fontdrop-ce-corridor-width",
+    chromaMin:      "fontdrop-ce-corridor-chromaMin",
+    chromaMax:      "fontdrop-ce-corridor-chromaMax",
+    chromaFloor:    "fontdrop-ce-corridor-chromaFloor",
+    chromaCeiling:  "fontdrop-ce-corridor-chromaCeiling",
+    lRange:         "fontdrop-ce-corridor-lRange",
+    count:          "fontdrop-ce-corridor-count",
+    variety:        "fontdrop-ce-corridor-variety",
+    hCenter2:       "fontdrop-ce-corridor-hcenter2",
+    chromaMin2:     "fontdrop-ce-corridor-chromamin2",
+    chromaMax2:     "fontdrop-ce-corridor-chromamax2",
+    chromaFloor2:   "fontdrop-ce-corridor-chromaFloor2",
+    chromaCeiling2: "fontdrop-ce-corridor-chromaCeiling2",
+    width2:         "fontdrop-ce-corridor-width2",
+    accentWeight:   "fontdrop-ce-corridor-accentweight",
+    hueOffset:          "fontdrop-ce-corridor-hueoffset",
+    hueWidth:           "fontdrop-ce-corridor-huewidth",
+    accentChromaOffset: "fontdrop-ce-corridor-accentchromaoffset",
+    lMidBias:           "fontdrop-ce-corridor-lmidbias",
+    lockComplement:     "fontdrop-ce-corridor-lockcomplement",
   },
 
   contrastSafe: {
@@ -45,15 +64,37 @@ export const LS_KEYS = {
     accentChromaMult:"fontdrop-ce-rb-accentChromaMult",
   },
 
+  macroKnob: {
+    knob:          "fontdrop-ce-macroknob-knob",
+    hue:           "fontdrop-ce-macroknob-hue",
+    count:         "fontdrop-ce-macroknob-count",
+    chaos:         "fontdrop-ce-macroknob-chaos",
+    spread:        "fontdrop-ce-macroknob-spread",
+    variMode:      "fontdrop-ce-macroknob-varimode",
+    relMode:       "fontdrop-ce-macroknob-relmode",
+    contrastlock:  "fontdrop-ce-macroknob-contrastlock",
+  },
+
+  wordPicker: {
+    tags:    "fontdrop-ce-wordpicker-tags",
+    drift:   "fontdrop-ce-wordpicker-drift",
+    count:   "fontdrop-ce-wordpicker-count",
+    variety: "fontdrop-ce-wordpicker-variety",
+    accent:  "fontdrop-ce-wordpicker-accent",
+  },
+
   extract: {
     clusterCount:    "fontdrop-ce-ex-clusterCount",
     remap:           "fontdrop-ce-ex-remap",
     lightnessLock:   "fontdrop-ce-ex-lightnessLock",
     lockedL:         "fontdrop-ce-ex-lockedL",
+    cachedClusters:  "fontdrop-ce-ex-cachedClusters",
+    cachedThumb:     "fontdrop-ce-ex-cachedThumb",
   },
 
   ui: {
-    albersExpanded: "fontdrop-albers-expanded",
+    albersOpen:     "fontdrop-albers-open",
+    contrastLevel:  "fontdrop-contrast-level",
   },
 } as const;
 

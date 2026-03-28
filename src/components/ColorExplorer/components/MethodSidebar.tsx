@@ -2,19 +2,15 @@ import type { ReactNode } from "react";
 
 interface MethodSidebarProps {
   children: ReactNode;
+  /** Remove top padding so content sits flush against the method bar */
+  flush?: boolean;
 }
 
-export function MethodSidebar({ children }: MethodSidebarProps) {
+export function MethodSidebar({ children, flush }: MethodSidebarProps) {
   return (
     <div className="w-[280px] bg-[#141414] border-r border-neutral-800 flex flex-col shrink-0 overflow-y-auto z-10">
-      <div className="p-4 flex flex-col flex-1">
-        <div
-          className="font-mono uppercase mb-5 px-1"
-          style={{ fontSize: "var(--text-label)", letterSpacing: "var(--track-caps)", color: "var(--c-text-3)" }}
-        >
-          Parameters
-        </div>
-        <div className="px-1 flex flex-col gap-6">{children}</div>
+      <div className={`${flush ? "pt-0 px-4 pb-4" : "p-4"} flex flex-col flex-1`}>
+        <div className="px-1 flex flex-col gap-5">{children}</div>
       </div>
     </div>
   );

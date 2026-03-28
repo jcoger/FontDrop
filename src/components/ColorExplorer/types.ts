@@ -11,13 +11,17 @@ export interface RampColor {
 
 export type ChromaMode = "max" | "fixed";
 export type RoleTheme = "light" | "dark";
+export type ContrastLevel = "display" | "clash" | "accessible";
+export type ColorVariety = "tight" | "auto" | "wide";
 
 export type MethodName =
   | "Hue Lock"
   | "Temperature Corridor"
   | "Contrast Safe"
   | "Role Builder"
-  | "Extract";
+  | "Extract"
+  | "Word Picker"
+  | "Macro Knob";
 
 // ── Hue Lock ──────────────────────────────────────────────────────────
 
@@ -42,6 +46,10 @@ export interface TempCorridorParams {
   chromaMax: number;
   lRange: [number, number];
   count: number;
+  /** 0-1: fraction of gamut. When true, chromaMin/Max are relative to maxChroma. */
+  useRelativeChroma?: boolean;
+  /** 0-1: lightness midpoint bias. 0.5 = linear. <0.5 biases dark, >0.5 biases light. */
+  lMidBias?: number;
 }
 
 // ── Contrast Safe ─────────────────────────────────────────────────────
