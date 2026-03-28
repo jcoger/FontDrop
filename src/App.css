@@ -2,105 +2,140 @@
 
 /* ── Tailwind theme extensions (maps CSS vars → utility classes) ── */
 @theme {
-  --color-surface-0:      var(--surface-0);
-  --color-surface-1:      var(--surface-1);
-  --color-surface-2:      var(--surface-2);
-  --color-surface-3:      var(--surface-3);
-  --color-surface-4:      var(--surface-4);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
   --color-surface-active: var(--surface-active);
 
-  --color-fg:        var(--c-text);
-  --color-fg-2:      var(--c-text-2);
-  --color-fg-3:      var(--c-text-3);
-  --color-fg-4:      var(--c-text-4);
-  --color-accent:    var(--c-accent);
+  --color-fg: var(--c-text);
+  --color-fg-2: var(--c-text-2);
+  --color-fg-3: var(--c-text-3);
+  --color-fg-4: var(--c-text-4);
+  --color-accent: var(--c-accent);
 
-  --color-success:   var(--c-success);
-  --color-warning:   var(--c-warning);
-  --color-caution:   var(--c-caution);
-  --color-star:      var(--c-star);
+  --color-success: var(--c-success);
+  --color-warning: var(--c-warning);
+  --color-caution: var(--c-caution);
+  --color-star: var(--c-star);
 
-  --color-border-subtle:  var(--border-subtle);
+  --color-border-subtle: var(--border-subtle);
   --color-border-default: var(--border-default);
-  --color-border-strong:  var(--border-strong);
+  --color-border-strong: var(--border-strong);
 }
 
 /* ── Animation tokens ─────────────────────────────────────────── */
 :root {
   /* Easing curves */
-  --ease-out:     cubic-bezier(0.25, 0.46, 0.45, 0.94);   /* entering / exiting  */
-  --ease-in-out:  cubic-bezier(0.45, 0.03, 0.515, 0.955);  /* on-screen movement  */
-  --ease-hover:   cubic-bezier(0.25, 0.1, 0.25, 1);        /* hover / color shift  */
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* entering / exiting  */
+  --ease-in-out: cubic-bezier(0.45, 0.03, 0.515, 0.955);
+  /* on-screen movement  */
+  --ease-hover: cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* hover / color shift  */
 
   /* Duration scale */
-  --dur-micro:   100ms;  /* thumb scale, active press      */
-  --dur-fast:    150ms;  /* hover color, toggles, toasts   */
-  --dur-normal:  200ms;  /* modals, overlays, dropdowns    */
-  --dur-exit:    160ms;  /* exits ≈ 20 % faster than enter */
+  --dur-micro: 100ms;
+  /* thumb scale, active press      */
+  --dur-fast: 150ms;
+  /* hover color, toggles, toasts   */
+  --dur-normal: 200ms;
+  /* modals, overlays, dropdowns    */
+  --dur-exit: 160ms;
+  /* exits ≈ 20 % faster than enter */
 
   /* ── Typography scale ──────────────────────────────────────── */
-  --text-micro:  8px;    /* Albers labels, fine print         */
-  --text-badge:  9px;    /* badges, slider labels             */
-  --text-label:  10px;   /* section headings, values, hints   */
-  --text-body:   11px;   /* method pills, toggle labels       */
-  --text-ui:     12px;   /* card font name, general UI text   */
-  --text-title:  13px;   /* app title, starred icons          */
+  --text-micro: 8px;
+  /* Albers labels, fine print         */
+  --text-badge: 9px;
+  /* badges, slider labels             */
+  --text-label: 10px;
+  /* section headings, values, hints   */
+  --text-body: 11px;
+  /* method pills, toggle labels       */
+  --text-ui: 12px;
+  /* card font name, general UI text   */
+  --text-title: 13px;
+  /* app title, starred icons          */
 
   /* ── Font tracking ─────────────────────────────────────────── */
-  --track-caps:  0.05em; /* all uppercase labels              */
+  --track-caps: 0.05em;
+  /* all uppercase labels              */
 
   /* ── Typography weight ─────────────────────────────────────── */
-  --fw-normal:   400;
-  --fw-medium:   500;
-  --fw-bold:     700;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
 
   /* ── Surfaces (depth: 0 = deepest, 4 = most elevated) ─────── */
-  --surface-0:      #0a0a0a;       /* canvas / preview bg          */
-  --surface-1:      #141414;       /* sidebar, detail panels        */
-  --surface-2:      #161616;       /* top bar, bottom bar           */
-  --surface-3:      #1a1a1a;       /* working area, fallback        */
-  --surface-4:      #2a2a2a;       /* elevated cards                */
-  --surface-active: #404040;       /* pressed / selected state      */
+  --surface-0: #0a0a0a;
+  /* canvas / preview bg          */
+  --surface-1: #141414;
+  /* sidebar, detail panels        */
+  --surface-2: #161616;
+  /* top bar, bottom bar           */
+  --surface-3: #1a1a1a;
+  /* working area, fallback        */
+  --surface-4: #2a2a2a;
+  /* elevated cards                */
+  --surface-active: #404040;
+  /* pressed / selected state      */
 
   /* ── Text colors ──────────────────────────────────────────── */
-  --c-text:      #ffffff;           /* primary text / active       */
-  --c-text-2:    #a1a1aa;           /* secondary text (neutral-400)*/
-  --c-text-3:    #6b7280;           /* tertiary / inactive         */
-  --c-text-4:    #52525b;           /* muted / counts              */
-  --c-accent:    #D97736;           /* brand accent                */
+  --c-text: #ffffff;
+  /* primary text / active       */
+  --c-text-2: #a1a1aa;
+  /* secondary text (neutral-400)*/
+  --c-text-3: #6b7280;
+  /* tertiary / inactive         */
+  --c-text-4: #52525b;
+  /* muted / counts              */
+  --c-accent: #D97736;
+  /* brand accent                */
 
   /* ── Status / semantic ────────────────────────────────────── */
-  --c-success:   #4ade80;           /* AAA pass, positive          */
-  --c-warning:   #facc15;           /* AA level, stars             */
-  --c-caution:   #fb923c;           /* AA-large, caution           */
-  --c-error:     rgba(239,68,68,0.45); /* fail / destructive       */
-  --c-star:      #facc15;           /* starred items                */
+  --c-success: #4ade80;
+  /* AAA pass, positive          */
+  --c-warning: #facc15;
+  /* AA level, stars             */
+  --c-caution: #fb923c;
+  /* AA-large, caution           */
+  --c-error: rgba(239, 68, 68, 0.45);
+  /* fail / destructive       */
+  --c-star: #facc15;
+  /* starred items                */
 
   /* ── Accent overlays ──────────────────────────────────────── */
-  --accent-glow:  rgba(217,119,54,0.20);  /* soft glow / bg tint  */
-  --accent-ring:  rgba(217,119,54,0.50);  /* focus ring / border   */
+  --accent-glow: rgba(217, 119, 54, 0.20);
+  /* soft glow / bg tint  */
+  --accent-ring: rgba(217, 119, 54, 0.50);
+  /* focus ring / border   */
 
   /* ── Overlays (white) ─────────────────────────────────────── */
-  --overlay-w-5:   rgba(255,255,255,0.05);
-  --overlay-w-8:   rgba(255,255,255,0.08);
-  --overlay-w-12:  rgba(255,255,255,0.12);
-  --overlay-w-20:  rgba(255,255,255,0.20);
+  --overlay-w-5: rgba(255, 255, 255, 0.05);
+  --overlay-w-8: rgba(255, 255, 255, 0.08);
+  --overlay-w-12: rgba(255, 255, 255, 0.12);
+  --overlay-w-20: rgba(255, 255, 255, 0.20);
 
   /* ── Overlays (black) ─────────────────────────────────────── */
-  --overlay-b-10:  rgba(0,0,0,0.10);
-  --overlay-b-20:  rgba(0,0,0,0.20);
-  --overlay-b-40:  rgba(0,0,0,0.40);
-  --overlay-b-80:  rgba(0,0,0,0.80);
+  --overlay-b-10: rgba(0, 0, 0, 0.10);
+  --overlay-b-20: rgba(0, 0, 0, 0.20);
+  --overlay-b-40: rgba(0, 0, 0, 0.40);
+  --overlay-b-80: rgba(0, 0, 0, 0.80);
 
   /* ── Borders ──────────────────────────────────────────────── */
-  --border-subtle:  rgba(255,255,255,0.06);
-  --border-default: rgba(255,255,255,0.12);
-  --border-strong:  rgba(255,255,255,0.20);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.20);
 }
 
 /* ── Reduced motion ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -151,43 +186,53 @@ input[type="range"]::-webkit-slider-thumb:hover {
   height: 12px !important;
 }
 
+/* ── Color card hover lift ───────────────────────────────────── */
+.color-card-lift {
+  transform: translateY(0);
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.color-card-lift:hover {
+  transform: translateY(-2px);
+}
+
 /* ── Light theme scaffold ────────────────────────────────────── */
 /* Activate by adding data-theme="light" to <html>.              */
 /* Values are placeholder — real light theme needs design review. */
 [data-theme="light"] {
-  --surface-0:      #ffffff;
-  --surface-1:      #f5f5f5;
-  --surface-2:      #fafafa;
-  --surface-3:      #f0f0f0;
-  --surface-4:      #e5e5e5;
+  --surface-0: #ffffff;
+  --surface-1: #f5f5f5;
+  --surface-2: #fafafa;
+  --surface-3: #f0f0f0;
+  --surface-4: #e5e5e5;
   --surface-active: #d4d4d4;
 
-  --c-text:      #171717;
-  --c-text-2:    #525252;
-  --c-text-3:    #737373;
-  --c-text-4:    #a3a3a3;
-  --c-accent:    #D97736;
+  --c-text: #171717;
+  --c-text-2: #525252;
+  --c-text-3: #737373;
+  --c-text-4: #a3a3a3;
+  --c-accent: #D97736;
 
-  --c-success:   #16a34a;
-  --c-warning:   #ca8a04;
-  --c-caution:   #ea580c;
-  --c-error:     rgba(220,38,38,0.45);
-  --c-star:      #ca8a04;
+  --c-success: #16a34a;
+  --c-warning: #ca8a04;
+  --c-caution: #ea580c;
+  --c-error: rgba(220, 38, 38, 0.45);
+  --c-star: #ca8a04;
 
-  --accent-glow:  rgba(217,119,54,0.12);
-  --accent-ring:  rgba(217,119,54,0.40);
+  --accent-glow: rgba(217, 119, 54, 0.12);
+  --accent-ring: rgba(217, 119, 54, 0.40);
 
-  --overlay-w-5:   rgba(0,0,0,0.03);
-  --overlay-w-8:   rgba(0,0,0,0.05);
-  --overlay-w-12:  rgba(0,0,0,0.08);
-  --overlay-w-20:  rgba(0,0,0,0.12);
+  --overlay-w-5: rgba(0, 0, 0, 0.03);
+  --overlay-w-8: rgba(0, 0, 0, 0.05);
+  --overlay-w-12: rgba(0, 0, 0, 0.08);
+  --overlay-w-20: rgba(0, 0, 0, 0.12);
 
-  --overlay-b-10:  rgba(0,0,0,0.06);
-  --overlay-b-20:  rgba(0,0,0,0.10);
-  --overlay-b-40:  rgba(0,0,0,0.20);
-  --overlay-b-80:  rgba(0,0,0,0.50);
+  --overlay-b-10: rgba(0, 0, 0, 0.06);
+  --overlay-b-20: rgba(0, 0, 0, 0.10);
+  --overlay-b-40: rgba(0, 0, 0, 0.20);
+  --overlay-b-80: rgba(0, 0, 0, 0.50);
 
-  --border-subtle:  rgba(0,0,0,0.06);
-  --border-default: rgba(0,0,0,0.12);
-  --border-strong:  rgba(0,0,0,0.20);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.20);
 }

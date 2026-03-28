@@ -1,9 +1,48 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { fontFamily } from "../../../lib/fontFace";
 import type { FontInfo } from "../../../hooks/useFonts";
 import type { OklchColor } from "../../../utils/oklch";
 import { oklchToCss, contrastRatio } from "../../../utils/oklch";
 import type { ContrastLevel } from "../types";
+
+// ── Fit text hook ────────────────────────────────────────────────────
+// Measures a text element against its container and returns a scale ≤ 1
+// so the text never truncates. Recalculates on deps change or resize.
+
+function useFitText(deps: unknown[]) {
+  const ref = useRef<HTMLElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef(1);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const container = containerRef.current;
+    if (!el || !container) return;
+
+    function measure() {
+      // Temporarily remove scale so scrollWidth reflects true text width
+      el!.style.transform = "none";
+      const textW = el!.scrollWidth;
+      const availW = container!.clientWidth;
+      const next = textW > 0 && availW > 0 && textW > availW
+        ? availW / textW
+        : 1;
+      scaleRef.current = next;
+      el!.style.transform = `scale(${next})`;
+      setScale(next);
+    }
+
+    measure();
+
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return { ref, containerRef, scale };
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -37,10 +76,10 @@ interface ColorCardProps {
   onFlip?: () => void;
 
   // Actions
+  onClick?: () => void;
   onSave?: () => "added" | "duplicate" | void;
   onUnsave?: () => void;
   isSaved?: boolean;
-  onDoubleClick?: () => void;
 }
 
 // ── Shared styles ────────────────────────────────────────────────────
@@ -69,29 +108,12 @@ function FlipIcon() {
 
 // ── Sub-components ───────────────────────────────────────────────────
 
-function HoverBadge({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div
-      className="px-1.5 py-0.5 rounded font-mono backdrop-blur-sm border"
-      style={{
-        fontSize: "var(--text-badge)",
-        background: OVERLAY_BG,
-        borderColor: OVERLAY_BORDER,
-        color: MUTED_COLOR,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 function HoverButton({ onClick, label, children }: { onClick: (e: React.MouseEvent) => void; label: string; children: React.ReactNode }) {
   return (
     <button
       className="w-6 h-6 rounded flex items-center justify-center backdrop-blur-sm border cursor-pointer transition-opacity"
       style={{ background: OVERLAY_BG, borderColor: OVERLAY_BORDER, color: MUTED_COLOR }}
-      onClick={onClick}
+      onClick={(e) => { e.stopPropagation(); onClick(e); }}
       aria-label={label}
     >
       {children}
@@ -167,11 +189,11 @@ export function ColorCard({
   pinnedFont,
   starredFonts,
   onPinFont,
+  onClick,
   onFlip,
   onSave,
   onUnsave,
   isSaved,
-  onDoubleClick,
 }: ColorCardProps) {
   const [showFontPicker, setShowFontPicker] = useState(false);
   const [savePulse, setSavePulse] = useState(false);
@@ -180,9 +202,9 @@ export function ColorCard({
 
   const renderFont = pinnedFont || font;
   const displayText = brandName || (renderFont ? renderFont.font_family : "");
+  const fit = useFitText([displayText, renderFont?.file_path]);
   const bgCss = oklchToCss(bgColor);
   const ratio = contrastRatio(bgColor, fgOklch);
-  const canSave = !!(onSave || onUnsave);
 
   const contrastLabel = useMemo(() => {
     if (contrastLevel === "clash") return `${ratio.toFixed(1)} CLASH`;
@@ -199,9 +221,7 @@ export function ColorCard({
 
   // ── Handlers ───────────────────────────────────────────────────────
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    // Single click = save/unsave
-    if (!canSave) return;
+  const handleSave = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (isSaved) {
       onUnsave?.();
@@ -212,12 +232,7 @@ export function ColorCard({
         setTimeout(() => setSavePulse(false), 200);
       }
     }
-  }, [canSave, isSaved, onSave, onUnsave]);
-
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDoubleClick?.();
-  }, [onDoubleClick]);
+  }, [isSaved, onSave, onUnsave]);
 
   const handleFlip = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -237,7 +252,11 @@ export function ColorCard({
 
   return (
     <div
-      className="@container group aspect-[4/3] rounded-xl flex flex-col justify-between relative cursor-pointer shadow-lg"
+      className="color-card-lift"
+      style={{ zIndex: isSpotlight ? 10 : undefined }}
+    >
+    <div
+      className="@container group aspect-[4/3] rounded-xl relative cursor-pointer"
       style={{
         backgroundColor: bgCss,
         color: fgColor,
@@ -245,45 +264,58 @@ export function ColorCard({
         opacity: dimmed ? 0.3 : 1,
         filter: dimmed ? "saturate(0.3)" : undefined,
         transform: `scale(${scale})`,
-        zIndex: isSpotlight ? 10 : undefined,
         padding: "clamp(12px, 6%, 24px)",
-        transition: `background-color 80ms ease ${cardIndex * 25}ms, color 80ms ease ${cardIndex * 25}ms, transform var(--dur-normal) var(--ease-hover), box-shadow var(--dur-normal) var(--ease-hover), opacity var(--dur-normal) var(--ease-hover), filter var(--dur-normal) var(--ease-hover)`,
+        transition: `background-color 80ms ease ${cardIndex * 25}ms, color 80ms ease ${cardIndex * 25}ms, transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 280ms cubic-bezier(0.25, 0.1, 0.25, 1), opacity var(--dur-normal) var(--ease-hover), filter var(--dur-normal) var(--ease-hover)`,
       }}
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
+      onClick={onClick}
     >
-      {/* ── Hover overlay: contrast + flip ─────────────────────────── */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity" style={{ padding: "inherit" }}>
-        <HoverBadge>{contrastLabel}</HoverBadge>
-        {onFlip && (
-          <HoverButton onClick={handleFlip} label="Flip background and foreground">
-            <FlipIcon />
-          </HoverButton>
+      {/* ── Top: hover actions (save left, flip right) ────────────── */}
+      <div
+        className="absolute inset-x-0 top-0 z-10 flex items-center justify-between pointer-events-none"
+        style={{ padding: "inherit" }}
+      >
+        {/* Save button — always visible when saved, hover-reveal otherwise */}
+        {(onSave || onUnsave) && (
+          <div className={`pointer-events-auto transition-opacity ${isSaved ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+            <HoverButton onClick={handleSave} label={isSaved ? "Remove from collection" : "Save to collection"}>
+              <BookmarkIcon filled={!!isSaved} />
+            </HoverButton>
+          </div>
         )}
+        {/* Spacer when no save button */}
+        {!onSave && !onUnsave && <div />}
+
+        {/* Flip button — hover only */}
+        {onFlip ? (
+          <div className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity">
+            <HoverButton onClick={handleFlip} label="Flip background and foreground">
+              <FlipIcon />
+            </HoverButton>
+          </div>
+        ) : <div />}
       </div>
 
-      {/* ── Saved indicator ─────────────────────────────────────────── */}
-      {isSaved && (
-        <div className="absolute top-3 right-3">
-          <div className="w-5 h-5 rounded flex items-center justify-center" style={{ color: fgColor, opacity: 0.7 }}>
-            <BookmarkIcon filled />
-          </div>
-        </div>
-      )}
-
-      {/* ── Center content ─────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
+      {/* ── Center content (true center, ignores top/bottom) ───────── */}
+      <div
+        ref={fit.containerRef}
+        className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none"
+        style={{ padding: "clamp(12px, 6%, 24px) clamp(16px, 8%, 32px)" }}
+      >
         {isLogoCard && logoSvg ? (
-          <div className="flex flex-col items-center gap-2">
+          <div
+            ref={fit.ref as React.RefObject<HTMLDivElement>}
+            className="flex flex-col items-center gap-3 whitespace-nowrap"
+            style={{ transformOrigin: "center" }}
+          >
             <div
-              className="flex items-center justify-center"
-              style={{ color: fgColor, height: "clamp(32px, 8cqi, 64px)" }}
+              className="flex items-center justify-center [&_svg]:w-full [&_svg]:h-full"
+              style={{ color: fgColor, height: "clamp(40px, 18cqi, 160px)" }}
               dangerouslySetInnerHTML={{ __html: logoSvg }}
             />
             {displayText && (
               <span
-                className="font-semibold tracking-tight leading-none text-center truncate max-w-full px-2"
-                style={{ fontSize: "clamp(14px, 4.5cqi, 24px)" }}
+                className="font-semibold tracking-tight leading-none text-center"
+                style={{ fontSize: 64 }}
               >
                 {displayText}
               </span>
@@ -291,10 +323,12 @@ export function ColorCard({
           </div>
         ) : (
           <span
-            className="tracking-tight leading-none text-center truncate max-w-full px-2"
+            ref={fit.ref as React.RefObject<HTMLSpanElement>}
+            className="tracking-tight leading-none text-center whitespace-nowrap"
             style={{
-              fontSize: "clamp(24px, 10cqi, 56px)",
+              fontSize: 80,
               fontFamily: renderFont ? fontFamily(renderFont.file_path) : undefined,
+              transformOrigin: "center",
             }}
           >
             {displayText}
@@ -302,21 +336,21 @@ export function ColorCard({
         )}
       </div>
 
-      {/* ── Bottom: font info + save pulse ─────────────────────────── */}
-      <div className="relative flex items-end justify-between gap-2">
+      {/* ── Bottom: font name + weight · contrast (absolute) ───────── */}
+      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 pointer-events-none" style={{ padding: "inherit" }}>
         <div className="min-w-0">
           <div className="font-medium truncate" style={{ fontSize: "var(--text-ui)", opacity: 0.9 }}>
             {isLogoCard ? "Logo" : renderFont?.font_family ?? ""}
           </div>
           <div className="font-mono mt-0.5" style={{ fontSize: "var(--text-label)", opacity: 0.6 }}>
-            {isLogoCard ? "Brand Mark" : renderFont ? `${renderFont.weight} · ${renderFont.classification.category}` : ""}
+            {isLogoCard ? "Brand Mark" : renderFont ? `${renderFont.weight} · ${contrastLabel}` : ""}
           </div>
         </div>
 
         {/* Pinned font dot */}
         {pinnedFont && !isLogoCard && (
           <button
-            className="w-2.5 h-2.5 rounded-full bg-white/80 flex-shrink-0 cursor-pointer hover:bg-white transition-colors"
+            className="w-2.5 h-2.5 rounded-full bg-white/80 flex-shrink-0 cursor-pointer hover:bg-white transition-colors pointer-events-auto"
             style={{ boxShadow: "0 0 3px rgba(0,0,0,0.4)" }}
             onClick={(e) => { e.stopPropagation(); onPinFont?.(null); }}
             title="Unpin font"
@@ -358,6 +392,7 @@ export function ColorCard({
           </button>
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -232,7 +232,7 @@ export default function App() {
   const [ceBrandName, setCeBrandName] = useState(
     () => localStorage.getItem("fontdrop-brand-name") || "",
   );
-  const [ceColCount, setCeColCount] = useState(4);
+
   const ceExportRef = useRef<(() => void) | null>(null);
 
   function handleCeBrandNameChange(v: string) {
@@ -621,15 +621,6 @@ Letter spacing: ${track}`;
             className="flex items-center gap-2 flex-shrink-0"
             onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
           >
-            <SegmentedControl
-              options={[1, 2, 4] as const}
-              value={ceColCount}
-              onChange={setCeColCount}
-            />
-            <div
-              className="w-px h-4 bg-border-default flex-shrink-0"
-              onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
-            />
             <Menu.Root direction="bottom" anchor="end">
               <Menu.Container
                 buttonSize={{ width: 78, height: 30 }}
@@ -848,7 +839,7 @@ Letter spacing: ${track}`;
           starred={starred.starred}
           logoSvg={logoSvg}
           brandName={ceBrandName}
-          colCount={ceColCount}
+
           exportRef={ceExportRef}
           onSwitchToGrid={() => setMode("grid")}
         />

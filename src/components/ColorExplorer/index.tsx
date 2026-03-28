@@ -49,7 +49,6 @@ interface ColorExplorerProps {
   starred: Set<string>;
   logoSvg?: string | null;
   brandName?: string;
-  colCount?: number;
   exportRef?: React.MutableRefObject<(() => void) | null>;
   onSwitchToGrid?: () => void;
 }
@@ -61,7 +60,6 @@ export function ColorExplorer({
   starred: starredPaths,
   logoSvg,
   brandName = "",
-  colCount = 4,
   exportRef,
   onSwitchToGrid,
 }: ColorExplorerProps) {
@@ -302,13 +300,6 @@ export function ColorExplorer({
   }, [spotlightFontPath]);
   // Clear spotlight on mode switch
   useEffect(() => { setSpotlightColorKey(null); }, [s.activeMethod]);
-
-  function handleDoubleClick(cardIndex: number) {
-    if (cardIndex >= cards.length) return;
-    const card = cards[cardIndex];
-    const key = colorKey(card.rampColor.color, card.fgOklch);
-    setSpotlightColorKey((prev) => prev === key ? null : key);
-  }
 
   function handlePinFont(font: FontInfo | null) {
     setSpotlightFontPath(font ? font.file_path : null);
@@ -718,7 +709,7 @@ export function ColorExplorer({
                 <motion.div
                   key={s.activeMethod}
                   className="grid gap-6 pb-12 min-w-0"
-                  style={{ gridTemplateColumns: colCount === 1 ? "1fr" : `repeat(${colCount}, minmax(0, 1fr))` }}
+                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))" }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -767,11 +758,10 @@ export function ColorExplorer({
                           pinnedFont={isSpot ? pinnedFont : undefined}
                           starredFonts={isSpot ? starredFonts : undefined}
                           onPinFont={isSpot ? handlePinFont : undefined}
-                          onDoubleClick={() => handleDoubleClick(cardIndex)}
+                          onClick={() => handleCardClick(card.rampIdx)}
                           onFlip={canFlip ? () => handleFlip(cardIndex) : undefined}
                           isSaved={collection.isSaved(renderBg, renderFgOklch)}
                           onSave={() => {
-                            handleCardClick(card.rampIdx);
                             const renderFont = card.font;
                             const { status } = collection.addItem({
                               bg: renderBg,
