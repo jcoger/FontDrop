@@ -22,9 +22,9 @@ interface HudBarProps {
   cardPairs: CardContrastPair[];
   contrastLevel: ContrastLevel;
   onContrastLevelChange: (v: ContrastLevel) => void;
-  onBuildSystem?: () => void;
+  onBrandKit?: () => void;
   onBackToExplore?: () => void;
-  buildSystemOpen?: boolean;
+  brandKitOpen?: boolean;
   activeMethod: string;
   collectionCount?: number;
   onCollectionClick?: () => void;
@@ -43,9 +43,9 @@ export function HudBar({
   cardPairs,
   contrastLevel,
   onContrastLevelChange,
-  onBuildSystem,
+  onBrandKit,
   onBackToExplore,
-  buildSystemOpen,
+  brandKitOpen,
   collectionCount = 0,
   onCollectionClick,
 }: HudBarProps) {
@@ -122,7 +122,7 @@ export function HudBar({
             {collectionCount}
           </button>
         )}
-        {buildSystemOpen ? (
+        {brandKitOpen ? (
           <button
             className="px-3 py-1.5 rounded font-semibold shadow-sm flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
             style={{ fontSize: "var(--text-body)", backgroundColor: "var(--border-subtle)", color: "var(--c-text-2)" }}
@@ -130,22 +130,25 @@ export function HudBar({
           >
             ← Back to Explore
           </button>
-        ) : (
-          <button
-            className="px-3 py-1.5 rounded font-semibold shadow-sm flex items-center gap-1.5 shrink-0 transition-colors"
-            style={{
-              fontSize: "var(--text-body)",
-              backgroundColor: hasSpotlight ? "var(--c-text)" : "var(--border-subtle)",
-              color: hasSpotlight ? "var(--surface-0)" : "var(--c-text-4)",
-              cursor: hasSpotlight ? "pointer" : "not-allowed",
-              opacity: hasSpotlight ? 1 : 0.5,
-            }}
-            onClick={() => hasSpotlight && onBuildSystem?.()}
-            disabled={!hasSpotlight}
-          >
-            Brand Kit →
-          </button>
-        )}
+        ) : (() => {
+          const canOpen = collectionCount > 0 || hasSpotlight;
+          return (
+            <button
+              className="px-3 py-1.5 rounded font-semibold shadow-sm flex items-center gap-1.5 shrink-0 transition-colors"
+              style={{
+                fontSize: "var(--text-body)",
+                backgroundColor: canOpen ? "var(--c-text)" : "var(--border-subtle)",
+                color: canOpen ? "var(--surface-0)" : "var(--c-text-4)",
+                cursor: canOpen ? "pointer" : "not-allowed",
+                opacity: canOpen ? 1 : 0.5,
+              }}
+              onClick={() => canOpen && onBrandKit?.()}
+              disabled={!canOpen}
+            >
+              Brand Kit →
+            </button>
+          );
+        })()}
       </div>
     </div>
   );

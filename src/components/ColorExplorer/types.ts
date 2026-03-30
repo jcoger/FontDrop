@@ -5,12 +5,10 @@ import type { OklchColor } from "../../utils/oklch";
 export interface RampColor {
   color: OklchColor;
   badge: string;
-  /** Pre-computed foreground CSS — used by Role Builder pairings */
   fgCss?: string;
 }
 
 export type ChromaMode = "max" | "fixed";
-export type RoleTheme = "light" | "dark";
 export type ContrastLevel = "display" | "clash" | "accessible";
 export type ColorVariety = "tight" | "auto" | "wide";
 
@@ -18,7 +16,6 @@ export type MethodName =
   | "Hue Lock"
   | "Temperature Corridor"
   | "Contrast Safe"
-  | "Role Builder"
   | "Extract"
   | "Word Picker"
   | "Macro Knob";
@@ -72,39 +69,22 @@ export interface ContrastRampColor extends RampColor {
   ratio: number;
 }
 
-// ── Brand Kit roles ───────────────────────────────────────────────────
+// ── Brand Kit ────────────────────────────────────────────────────────
 
-export type RoleName = "primary" | "background" | "text" | "secondary" | "highlight";
+export type BrandKitSlot = "bg" | "headline" | "body" | "surface" | "accent";
 
-/** Maps each role to a CollectionItem.id (or null for derived). */
-export type RoleAssignments = Record<RoleName, string | null>;
-
-export type RoleOverrides = {
-  background: OklchColor | null;
-  text: OklchColor | null;
-  secondary: OklchColor | null;
-  highlight: OklchColor | null;
-};
-
-export interface DerivedRoles {
-  primary: OklchColor;
-  primaryHex: string;
-  background: OklchColor;
-  backgroundHex: string;
-  text: OklchColor;
-  textHex: string;
-  secondary: OklchColor;
-  secondaryHex: string;
-  highlight: OklchColor;
-  highlightHex: string;
+export interface BrandKitColors {
+  bg: OklchColor;
+  headline: OklchColor;
+  body: OklchColor;
+  surface: OklchColor;
+  accent: OklchColor;
 }
 
-export interface RoleBuilderParams {
-  primary: OklchColor;
-  theme: RoleTheme;
-  accentOffset: number;
-  accentChromaMult: number;
-  overrides: RoleOverrides;
+export interface BrandKitFont {
+  name: string;
+  weight: string;
+  category: string;
 }
 
 // ── Extract ───────────────────────────────────────────────────────────

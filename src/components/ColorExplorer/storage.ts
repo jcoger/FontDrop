@@ -56,15 +56,6 @@ export const LS_KEYS = {
     fgLock:       "fontdrop-ce-cs-fgLock",
   },
 
-  roleBuilder: {
-    primary:         "fontdrop-ce-brandkit-primary",
-    primaryHex:      "fontdrop-ce-brandkit-primaryHex",
-    theme:           "fontdrop-ce-brandkit-theme",
-    accentOffset:    "fontdrop-ce-brandkit-accentOffset",
-    accentChromaMult:"fontdrop-ce-brandkit-accentChromaMult",
-    roleAssignments: "fontdrop-brandkit-roles",
-  },
-
   macroKnob: {
     knob:          "fontdrop-ce-macroknob-knob",
     hue:           "fontdrop-ce-macroknob-hue",

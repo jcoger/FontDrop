@@ -9,7 +9,7 @@ interface HubPanelProps {
   onRemove: (id: string) => void;
   onRestore: (item: CollectionItem) => void;
   onClearAll: () => void;
-  onSendToBuildSystem: (item: CollectionItem) => void;
+  onSendToBrandKit: (item: CollectionItem) => void;
   onClose: () => void;
 }
 
@@ -19,7 +19,7 @@ export function HubPanel({
   onRemove,
   onRestore,
   onClearAll,
-  onSendToBuildSystem,
+  onSendToBrandKit,
   onClose,
 }: HubPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -261,7 +261,7 @@ export function HubPanel({
                 <button
                   className="mt-auto px-4 py-2 rounded font-semibold cursor-pointer transition-colors"
                   style={{ fontSize: "var(--text-body)", backgroundColor: "var(--c-text)", color: "var(--surface-0)" }}
-                  onClick={() => onSendToBuildSystem(selected)}
+                  onClick={() => onSendToBrandKit(selected)}
                 >
                   Send to Brand Kit →
                 </button>

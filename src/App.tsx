@@ -245,7 +245,7 @@ export default function App() {
 
   // Grid settings
   const [colCount, setColCount] = useState(4);
-  const [familiesMode, setFamiliesMode] = useState(true);
+  const [familiesMode, setFamiliesMode] = useState(false);
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
 
   // Filters

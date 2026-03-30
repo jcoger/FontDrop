@@ -18,7 +18,7 @@ import { HLParams, HLBottomControls, generateHueMode, hlFlipCard, hlContrastRang
 import type { HLRampColor } from "./methods/HLParams";
 import { TCParams, TCBottomControls, generateDualCorridor } from "./methods/TemperatureCorridor";
 import { generateContrastSafe } from "./methods/ContrastSafe";
-import { RBBottomControls, deriveRoles, rolePairings, proposeRoles } from "./methods/RoleBuilder";
+// BrandKitView replaces BuildSystemPanel
 import { EXParams, EXBottomControls } from "./methods/Extract";
 import { WPParams, WPBottomControls, generateWordPicker } from "./methods/WordPicker";
 import type { WPRampColor } from "./methods/WordPicker";
@@ -32,11 +32,11 @@ import { MethodSidebar } from "./components/MethodSidebar";
 import { BottomBar } from "./components/BottomBar";
 import { MethodBar } from "./components/MethodBar";
 import { HudBar } from "./components/HudBar";
-import { BuildSystemPanel } from "./components/BuildSystemPanel";
+import { BrandKitView } from "./components/BrandKitView";
 import { PaletteHistoryStrip } from "./components/PaletteHistoryStrip";
 import type { HistoryEntry } from "./components/PaletteHistoryStrip";
 import { HubPanel } from "./components/HubPanel";
-import { exportSystemCSS, exportSystemJSON, downloadFile, todayStr } from "./exportUtils";
+
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -74,202 +74,60 @@ export function ColorExplorer({
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ── Build System mode ───────────────────────────────────────────
-  const [buildSystemOpen, setBuildSystemOpen] = useState(false);
-  const [heroCard, setHeroCard] = useState<{ bg: OklchColor; fg: OklchColor; fontName: string; fontWeight: string; fontPath?: string } | undefined>();
+  // ── Brand Kit mode ──────────────────────────────────────────────
+  const [brandKitItem, setBrandKitItem] = useState<import("./useCollection").CollectionItem | null>(null);
+  const brandKitOpen = brandKitItem !== null;
 
-  function openBuildSystem() {
-    // Find the card the user selected (spotlight or working color)
+  function openBrandKit() {
+    // Prefer: spotlight card saved to collection, else most recent collection item
     const spotCard = spotlightColorKey !== null
       ? cards.find((c) => colorKey(c.rampColor.color, c.fgOklch) === spotlightColorKey)
       : null;
-    const selectedCard = spotCard || cards.find((c) => c.rampIdx === effectiveWorkingIndex);
 
-    if (selectedCard) {
-      const bg = selectedCard.rampColor.color;
-      const fg = selectedCard.fgOklch;
-      const font = selectedCard.font;
-
-      // Capture the exact card for the hero display
-      setHeroCard({
-        bg,
-        fg,
-        fontName: font?.font_family || "",
-        fontWeight: String(font?.weight || ""),
-        fontPath: font?.file_path,
-      });
-
-      // Set primary color from the selected card
-      s.handleRbPrimaryHex(oklchToHex(bg));
-
-      // Auto-save to collection (returns existing ID if duplicate)
-      const { id: itemId } = collection.addItem({
-        bg,
-        fg,
+    if (spotCard) {
+      // Auto-save spotlight card to collection
+      const font = spotCard.font;
+      const { id } = collection.addItem({
+        bg: spotCard.rampColor.color,
+        fg: spotCard.fgOklch,
         fontName: font?.font_family || "",
         fontWeight: String(font?.weight || ""),
         fontCategory: font?.classification?.category || "",
         sourceMode: s.activeMethod,
       });
-
-      // Assign as PRIMARY, propose remaining roles from collection
-      if (itemId) {
-        setTimeout(() => {
-          s.setRoleAssignments(() => {
-            const assignments = proposeRoles(collection.items);
-            assignments.primary = itemId;
-            return assignments;
-          });
-        }, 0);
-      }
+      const item = collection.items.find((i) => i.id === id) || {
+        id,
+        bg: spotCard.rampColor.color,
+        fg: spotCard.fgOklch,
+        fontName: font?.font_family || "",
+        fontWeight: String(font?.weight || ""),
+        fontCategory: font?.classification?.category || "",
+        sourceMode: s.activeMethod,
+        savedAt: new Date().toISOString(),
+      };
+      setBrandKitItem(item);
+    } else if (collection.items.length > 0) {
+      // Use most recent collection item
+      setBrandKitItem(collection.items[collection.items.length - 1]);
     }
-
-    setBuildSystemOpen(true);
   }
 
-  function closeBuildSystem() {
-    setBuildSystemOpen(false);
-    setHeroCard(undefined);
+  function closeBrandKit() {
+    setBrandKitItem(null);
   }
 
   // ── Hub mode ──────────────────────────────────────────────────
   const [hubOpen, setHubOpen] = useState(false);
 
-  function openHub() { setHubOpen(true); setBuildSystemOpen(false); }
+  function openHub() { setHubOpen(true); setBrandKitItem(null); }
   function closeHub() { setHubOpen(false); }
 
-  function handleSendToBuildSystem(item: import("./useCollection").CollectionItem) {
+  function handleSendToBrandKit(item: import("./useCollection").CollectionItem) {
     closeHub();
-    setHeroCard({
-      bg: item.bg,
-      fg: item.fg,
-      fontName: item.fontName,
-      fontWeight: item.fontWeight,
-      fontPath: undefined,
-    });
-    s.handleRbPrimaryHex(oklchToHex(item.bg));
-    const assignments = proposeRoles(collection.items);
-    assignments.primary = item.id;
-    s.setRoleAssignments(assignments);
-    setBuildSystemOpen(true);
+    setBrandKitItem(item);
   }
 
-  // Resolve role assignments against collection → build overrides
-  const resolvedOverrides = useMemo((): import("./types").RoleOverrides => {
-    const base = { ...s.rbOverrides };
-    const roles: (keyof import("./types").RoleOverrides)[] = ["background", "text", "secondary", "highlight"];
-    for (const role of roles) {
-      const itemId = s.roleAssignments[role];
-      if (itemId) {
-        const item = collection.items.find((i) => i.id === itemId);
-        if (item) base[role] = item.bg;
-        else { /* item deleted — clear assignment */ }
-      }
-    }
-    // Also handle primary from assignment
-    const primaryId = s.roleAssignments.primary;
-    if (primaryId) {
-      const item = collection.items.find((i) => i.id === primaryId);
-      if (item) s.handleRbPrimaryHex(oklchToHex(item.bg));
-    }
-    return base;
-  }, [s.rbOverrides, s.roleAssignments, collection.items]);
-
-  // Brand Kit roles — derived when panel is open
-  const bsRoles = useMemo(() => {
-    if (!buildSystemOpen) return null;
-    return deriveRoles({
-      primary: s.rbPrimary,
-      theme: s.rbTheme,
-      accentOffset: s.rbAccentOffset,
-      accentChromaMult: s.rbAccentChromaMult,
-      overrides: resolvedOverrides,
-    });
-  }, [buildSystemOpen, s.rbPrimary, s.rbTheme, s.rbAccentOffset, s.rbAccentChromaMult, resolvedOverrides]);
-
-  // Export System — CSS file download
-  const handleExportSystemCSS = useCallback(() => {
-    if (!bsRoles) return;
-    const roleExports = [
-      { key: "primary", name: "Primary", bg: bsRoles.primary },
-      { key: "secondary", name: "Secondary", bg: bsRoles.secondary },
-      { key: "background", name: "Background", bg: bsRoles.background },
-      { key: "text", name: "Text", bg: bsRoles.text },
-      { key: "highlight", name: "Highlight", bg: bsRoles.highlight },
-    ];
-    downloadFile(`fontdrop-brand-kit-${todayStr()}.css`, exportSystemCSS(roleExports), "text/css");
-    setToast("CSS downloaded");
-  }, [bsRoles]);
-
-  // Export Brand Kit — JSON file download
-  const handleExportSystemJSON = useCallback(() => {
-    if (!bsRoles) return;
-    const roleExports = [
-      { key: "primary", name: "Primary", bg: bsRoles.primary },
-      { key: "secondary", name: "Secondary", bg: bsRoles.secondary },
-      { key: "background", name: "Background", bg: bsRoles.background },
-      { key: "text", name: "Text", bg: bsRoles.text },
-      { key: "highlight", name: "Highlight", bg: bsRoles.highlight },
-    ];
-    downloadFile(`fontdrop-brand-kit-${todayStr()}.json`, exportSystemJSON(roleExports));
-    setToast("JSON downloaded");
-  }, [bsRoles]);
-
-  // Clipboard export (used by the export ref)
-  const handleExportSystem = useCallback(() => {
-    if (!bsRoles) return;
-    const roles = [
-      { name: "Primary", key: "primary", hex: bsRoles.primaryHex, color: bsRoles.primary },
-      { name: "Secondary", key: "secondary", hex: bsRoles.secondaryHex, color: bsRoles.secondary },
-      { name: "Background", key: "background", hex: bsRoles.backgroundHex, color: bsRoles.background },
-      { name: "Text", key: "text", hex: bsRoles.textHex, color: bsRoles.text },
-      { name: "Highlight", key: "highlight", hex: bsRoles.highlightHex, color: bsRoles.highlight },
-    ];
-    const lines: string[] = [];
-    lines.push(`Brand Kit — ${bsRoles.primaryHex}`);
-    lines.push("FontDrop Brand Kit\n");
-    lines.push("Roles:");
-    roles.forEach((r) => {
-      const { l, c, h } = r.color;
-      lines.push(`  ${r.name}: ${r.hex}  oklch(${l.toFixed(2)}, ${c.toFixed(3)}, ${Math.round(h)})`);
-    });
-    lines.push("\nCSS Custom Properties:");
-    lines.push(":root {");
-    roles.forEach((r) => lines.push(`  --color-${r.key}: ${r.hex};`));
-    lines.push("}");
-    navigator.clipboard.writeText(lines.join("\n"));
-    setToast("Copied to clipboard");
-  }, [bsRoles]);
-
-  // Export Brand Kit — Copy Prompt for AI tools
-  const handleExportPrompt = useCallback(() => {
-    if (!bsRoles) return;
-    const roleNames: { key: import("./types").RoleName; name: string }[] = [
-      { key: "primary", name: "Primary" },
-      { key: "secondary", name: "Secondary" },
-      { key: "background", name: "Background" },
-      { key: "text", name: "Text" },
-      { key: "highlight", name: "Highlight" },
-    ];
-    const lines: string[] = [];
-    lines.push(`Brand Kit for ${brandName || "Untitled"}\n`);
-    for (const r of roleNames) {
-      const bg = bsRoles[r.key];
-      const item = collection.items.find((i) => i.id === s.roleAssignments[r.key]);
-      const bgHex = oklchToHex(bg);
-      const bgOklch = `oklch(${bg.l.toFixed(2)}, ${bg.c.toFixed(3)}, ${Math.round(bg.h)})`;
-      let line = `${r.name}: bg ${bgHex} (${bgOklch})`;
-      if (item) {
-        const fgHex = oklchToHex(item.fg);
-        line += ` + fg ${fgHex}`;
-        if (item.fontName) line += ` · Font: ${item.fontName} ${item.fontWeight}`;
-      }
-      lines.push(line);
-    }
-    lines.push(`\nGenerated by FontDrop · Display-P3 gamut`);
-    navigator.clipboard.writeText(lines.join("\n"));
-    setToast("Prompt copied");
-  }, [bsRoles, collection.items, s.roleAssignments, brandName]);
+  // Export ref is managed by BrandKitView when open, palette export when closed
 
   // ── Card pulse ──────────────────────────────────────────────────
   const [pulsingIdx, setPulsingIdx] = useState<number | null>(null);
@@ -324,18 +182,6 @@ export function ColorExplorer({
     }
   }
 
-  // ── Role Builder derived roles ───────────────────────────────────
-  const rbRoles = useMemo(() => {
-    if (s.activeMethod !== "Role Builder") return null;
-    return deriveRoles({
-      primary: s.rbPrimary,
-      theme: s.rbTheme,
-      accentOffset: s.rbAccentOffset,
-      accentChromaMult: s.rbAccentChromaMult,
-      overrides: s.rbOverrides,
-    });
-  }, [s.activeMethod, s.rbPrimary, s.rbTheme, s.rbAccentOffset, s.rbAccentChromaMult, s.rbOverrides]);
-
   // ── Ramp generation ──────────────────────────────────────────────
   const ramp = useMemo((): RampColor[] => {
     if (s.activeMethod === "Macro Knob")
@@ -344,8 +190,6 @@ export function ColorExplorer({
       return generateWordPicker(s.wpTags as [] | [any] | [any, any], s.wpDrift, resolveVariety(s.wpVariety), s.wpAccent, s.contrastLevel);
     if (s.activeMethod === "Extract")
       return buildExtractRamp(applyExtractTransforms(s.exRawClusters, s.exRemapEnabled, s.exLightnessLock, s.exLockedL));
-    if (s.activeMethod === "Role Builder" && rbRoles)
-      return rolePairings(rbRoles);
     if (s.activeMethod === "Temperature Corridor") {
       const tcGenCount = resolveVariety(s.tcVariety);
       const accentCeil = Math.max(0, Math.min(1, s.tcChromaCeiling2 + s.tcAccentChromaOffset / 100));
@@ -361,10 +205,10 @@ export function ColorExplorer({
     const hlCount = resolveVariety(s.hlVariety);
     const lValues = sampleToneCurve(hlCount, s.curveMidY);
     return generateHueMode({ hue: s.hue, steps: hlCount, chromaMode: s.chromaMode, fixedChroma: s.fixedChroma, lValues, fgPreset: s.hlFgPreset, fgLOverride: s.hlFgLOverride, fgCOverride: s.hlFgCOverride, contrastLevel: s.contrastLevel, isClash: s.contrastLevel === "clash" });
-  }, [s.activeMethod, s.hue, s.steps, s.chromaMode, s.fixedChroma, s.accentEnabled, s.accentHue, s.accentL, s.curveMidY, s.hlFgPreset, s.hlFgLOverride, s.hlFgCOverride, s.hlVariety, s.tcHCenter, s.tcHueWidth, s.tcChromaFloor, s.tcChromaCeiling, s.lRange, s.tcCount, s.tcLMidBias, s.tcHueOffset, s.tcChromaCeiling2, s.tcAccentWeight, s.tcAccentChromaOffset, s.csPrimary, s.csLRange, s.csCRange, s.csHueMode, s.csThreshold, s.csDensity, s.csFgLock, rbRoles, s.exRawClusters, s.exRemapEnabled, s.exLightnessLock, s.exLockedL, s.wpTags, s.wpDrift, s.wpCount, s.wpVariety, s.wpAccent, s.mkKnob, s.mkHue, s.mkSpread, s.mkVariMode, s.mkRelMode, s.contrastLevel, s.tcVariety, activeFontCount]);
+  }, [s.activeMethod, s.hue, s.steps, s.chromaMode, s.fixedChroma, s.accentEnabled, s.accentHue, s.accentL, s.curveMidY, s.hlFgPreset, s.hlFgLOverride, s.hlFgCOverride, s.hlVariety, s.tcHCenter, s.tcHueWidth, s.tcChromaFloor, s.tcChromaCeiling, s.lRange, s.tcCount, s.tcLMidBias, s.tcHueOffset, s.tcChromaCeiling2, s.tcAccentWeight, s.tcAccentChromaOffset, s.csPrimary, s.csLRange, s.csCRange, s.csHueMode, s.csThreshold, s.csDensity, s.csFgLock, s.exRawClusters, s.exRemapEnabled, s.exLightnessLock, s.exLockedL, s.wpTags, s.wpDrift, s.wpCount, s.wpVariety, s.wpAccent, s.mkKnob, s.mkHue, s.mkSpread, s.mkVariMode, s.mkRelMode, s.contrastLevel, s.tcVariety, activeFontCount]);
 
   const sortedRamp = useMemo(
-    () => s.activeMethod === "Role Builder" ? ramp : [...ramp].sort((a, b) => a.color.l - b.color.l),
+    () => [...ramp].sort((a, b) => a.color.l - b.color.l),
     [ramp, s.activeMethod],
   );
 
@@ -416,7 +260,6 @@ export function ColorExplorer({
     if (sortedRamp.length === 0) return [];
     const isCs = s.activeMethod === "Contrast Safe";
     const isTc = s.activeMethod === "Temperature Corridor" || s.activeMethod === "Word Picker" || s.activeMethod === "Macro Knob";
-    const isRb = s.activeMethod === "Role Builder";
 
     // Find the OklchColor that produced a given CSS string from the ramp
     function fgOklchFor(css: string, palette: RampColor[]): OklchColor {
@@ -426,10 +269,6 @@ export function ColorExplorer({
 
     function build(font: FontInfo | null, i: number, isLogo: boolean): CardEntry {
       const rampIdx = i % sortedRamp.length, rc = sortedRamp[rampIdx];
-      if (isRb && rc.fgCss) {
-        const fgO = fgOklchFor(rc.fgCss, sortedRamp);
-        return { font, rampColor: rc, rampIdx, fgColor: rc.fgCss, fgOklch: fgO, dimmed: false, badgeColor: undefined, isLogoCard: isLogo };
-      }
       if (isCs) {
         const csrc = rc as ContrastRampColor, testCss = oklchToCss(csrc.color);
         const bgC = s.csFgLock ? csrc.color : s.csPrimary;
@@ -508,12 +347,11 @@ export function ColorExplorer({
     setToast("Palette copied to clipboard");
   }, [sortedRamp, s.activeMethod]);
 
-  // Export ref switches between palette export and system export
-  const activeExport = buildSystemOpen ? handleExportSystem : handleExport;
+  // Export ref: BrandKitView manages its own when open, palette export otherwise
   useEffect(() => {
-    if (exportRef) exportRef.current = activeExport;
-    return () => { if (exportRef) exportRef.current = null; };
-  }, [exportRef, activeExport]);
+    if (!brandKitOpen && exportRef) exportRef.current = handleExport;
+    return () => { if (!brandKitOpen && exportRef) exportRef.current = null; };
+  }, [exportRef, handleExport, brandKitOpen]);
 
   // ── Arrow-key hue nudge ──────────────────────────────────────────
   useEffect(() => {
@@ -592,13 +430,13 @@ export function ColorExplorer({
         contrastLevel={s.contrastLevel}
         onContrastLevelChange={s.setContrastLevel}
         activeMethod={s.activeMethod}
-        buildSystemOpen={buildSystemOpen}
-        onBuildSystem={openBuildSystem}
-        onBackToExplore={closeBuildSystem}
+        brandKitOpen={brandKitOpen}
+        onBrandKit={openBrandKit}
+        onBackToExplore={closeBrandKit}
         collectionCount={collection.count}
         onCollectionClick={openHub}
       />
-      {!buildSystemOpen && (
+      {!brandKitOpen && (
         <MethodBar
           activeMethod={s.activeMethod}
           onMethodChange={s.switchMethod}
@@ -607,7 +445,7 @@ export function ColorExplorer({
         />
       )}
 
-      <div className="flex flex-1 overflow-hidden" style={{ opacity: buildSystemOpen || hubOpen ? 0 : 1, transition: `opacity var(--dur-normal) var(--ease-out)`, display: buildSystemOpen || hubOpen ? "none" : undefined }}>
+      <div className="flex flex-1 overflow-hidden" style={{ opacity: brandKitOpen || hubOpen ? 0 : 1, transition: `opacity var(--dur-normal) var(--ease-out)`, display: brandKitOpen || hubOpen ? "none" : undefined }}>
         {/* Sidebar */}
         <MethodSidebar>
           {s.activeMethod === "Macro Knob" ? (
@@ -785,25 +623,18 @@ export function ColorExplorer({
         </div>
       </div>
 
-      {/* Build System panel */}
-      {buildSystemOpen && bsRoles && (
-        <BuildSystemPanel
-          roles={bsRoles}
-          overrides={s.rbOverrides}
-          onOverrideChange={s.handleRbOverride}
-          onOverrideReset={s.handleRbOverrideReset}
-          theme={s.rbTheme}
-          onThemeChange={s.setRbTheme}
-          previewFont={pinnedFont || starredFonts[0] || null}
+      {/* Brand Kit view */}
+      {brandKitItem && (
+        <BrandKitView
+          initialBg={brandKitItem.bg}
+          initialFg={brandKitItem.fg}
+          font={{ name: brandKitItem.fontName, weight: brandKitItem.fontWeight, category: brandKitItem.fontCategory }}
+          fonts={fonts}
           brandName={brandName}
-          collectionItems={collection.items}
-          roleAssignments={s.roleAssignments}
-          onRoleAssign={(role, itemId) => s.setRoleAssignments((prev) => ({ ...prev, [role]: itemId }))}
-          onRoleUnassign={(role) => s.setRoleAssignments((prev) => ({ ...prev, [role]: null }))}
-          onExportCSS={handleExportSystemCSS}
-          onExportJSON={handleExportSystemJSON}
-          onExportPrompt={handleExportPrompt}
-          heroCard={heroCard}
+          logoSvg={logoSvg}
+          onClose={closeBrandKit}
+          onToast={setToast}
+          exportRef={exportRef}
         />
       )}
 
@@ -815,13 +646,13 @@ export function ColorExplorer({
           onRemove={collection.removeById}
           onRestore={collection.restoreItem}
           onClearAll={collection.clear}
-          onSendToBuildSystem={handleSendToBuildSystem}
+          onSendToBrandKit={handleSendToBrandKit}
           onClose={closeHub}
         />
       )}
 
       {/* Palette history strip */}
-      {!buildSystemOpen && !hubOpen && (
+      {!brandKitOpen && !hubOpen && (
         <PaletteHistoryStrip
           currentColors={sortedRamp.slice(0, 5).map((rc) => rc.color)}
           currentMethod={s.activeMethod}
@@ -831,11 +662,8 @@ export function ColorExplorer({
       )}
 
       {/* Bottom bar */}
-      <BottomBar label={hubOpen ? "Collection" : buildSystemOpen ? "Brand Kit" : s.activeMethod}>
-        {buildSystemOpen ? (
-          <RBBottomControls accentOffset={s.rbAccentOffset} onAccentOffsetChange={s.setRbAccentOffset}
-            accentChromaMult={s.rbAccentChromaMult} onAccentChromaMultChange={s.setRbAccentChromaMult} />
-        ) : s.activeMethod === "Macro Knob" ? (
+      <BottomBar label={hubOpen ? "Collection" : brandKitOpen ? "Brand Kit" : s.activeMethod}>
+        {s.activeMethod === "Macro Knob" ? (
           <MKBottomControls knob={s.mkKnob} hue={s.mkHue} spread={s.mkSpread} contrastLevel={s.contrastLevel} colorCount={activeFontCount} />
         ) : s.activeMethod === "Word Picker" ? (
           <WPBottomControls activeTags={s.wpTags} drift={s.wpDrift} count={s.wpCount} />

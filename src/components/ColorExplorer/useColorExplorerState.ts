@@ -8,12 +8,8 @@ import type {
   ChromaMode,
   ContrastLevel,
   ColorVariety,
-  RoleTheme,
   HueMode,
   Threshold,
-  RoleName,
-  RoleOverrides,
-  RoleAssignments,
   ExtractedCluster,
 } from "./types";
 import type { WPTagName } from "./methods/wpLogic";
@@ -81,40 +77,6 @@ export function useColorExplorerState() {
   function handleCsPrimaryHex(hex: string) {
     setCsPrimaryHex(hex);
     setCsPrimary(hexToOklch(hex));
-  }
-
-  // ── Brand Kit (was Role Builder) ─────────────────────────────────
-  // Migrate old localStorage keys on first load
-  useEffect(() => {
-    const oldKeys = [
-      ["fontdrop-ce-rb-primary", LS_KEYS.roleBuilder.primary],
-      ["fontdrop-ce-rb-primaryHex", LS_KEYS.roleBuilder.primaryHex],
-      ["fontdrop-ce-rb-theme", LS_KEYS.roleBuilder.theme],
-      ["fontdrop-ce-rb-accentOffset", LS_KEYS.roleBuilder.accentOffset],
-      ["fontdrop-ce-rb-accentChromaMult", LS_KEYS.roleBuilder.accentChromaMult],
-    ];
-    for (const [oldKey, newKey] of oldKeys) {
-      if (localStorage.getItem(oldKey) !== null && localStorage.getItem(newKey) === null) {
-        localStorage.setItem(newKey, localStorage.getItem(oldKey)!);
-      }
-    }
-  }, []);
-  const [rbPrimary, setRbPrimary] = usePersisted<OklchColor>(LS_KEYS.roleBuilder.primary, { mode: "oklch", l: 0.45, c: 0.2, h: 264 });
-  const [rbPrimaryHex, setRbPrimaryHex] = usePersisted(LS_KEYS.roleBuilder.primaryHex, "#4338ca");
-  const [rbTheme, setRbTheme] = usePersisted<RoleTheme>(LS_KEYS.roleBuilder.theme, "light");
-  const [rbAccentOffset, setRbAccentOffset] = usePersisted(LS_KEYS.roleBuilder.accentOffset, 150);
-  const [rbAccentChromaMult, setRbAccentChromaMult] = usePersisted(LS_KEYS.roleBuilder.accentChromaMult, 0.8);
-  const [rbOverrides, setRbOverrides] = useState<RoleOverrides>({ background: null, text: null, secondary: null, highlight: null });
-  const [roleAssignments, setRoleAssignments] = usePersisted<RoleAssignments>(LS_KEYS.roleBuilder.roleAssignments, { primary: null, secondary: null, background: null, text: null, highlight: null });
-  function handleRbPrimaryHex(hex: string) {
-    setRbPrimaryHex(hex);
-    setRbPrimary(hexToOklch(hex));
-  }
-  function handleRbOverride(role: RoleName, color: OklchColor) {
-    if (role !== "primary") setRbOverrides((p) => ({ ...p, [role]: color }));
-  }
-  function handleRbOverrideReset(role: RoleName) {
-    if (role !== "primary") setRbOverrides((p) => ({ ...p, [role]: null }));
   }
 
   // ── Macro Knob ──────────────────────────────────────────────────
@@ -266,13 +228,6 @@ export function useColorExplorerState() {
     csThreshold, setCsThreshold,
     csDensity, setCsDensity,
     csFgLock, setCsFgLock,
-    // Role Builder
-    rbPrimary, rbPrimaryHex, handleRbPrimaryHex,
-    rbTheme, setRbTheme,
-    rbAccentOffset, setRbAccentOffset,
-    rbAccentChromaMult, setRbAccentChromaMult,
-    rbOverrides, handleRbOverride, handleRbOverrideReset,
-    roleAssignments, setRoleAssignments,
     // Macro Knob
     mkKnob, setMkKnob,
     mkHue, setMkHue,
