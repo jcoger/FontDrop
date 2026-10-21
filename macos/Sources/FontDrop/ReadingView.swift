@@ -80,7 +80,7 @@ struct ReadingView: View {
                                           isSelected: model.selectedCandidate == c.id,
                                           isSaved: saved.contains(c.family),
                                           isChosen: chosen == c.family,
-                                          xHeightNote: xHeightNote(display: displayFace.resolvedPath, candidate: bodyFace.resolvedPath),
+                                          xHeightNote: measuredXHeightNote(display: displayFace.resolvedPath, candidate: bodyFace.resolvedPath),
                                           context: PairContext(brand: model.brand?.name ?? "Brand Name",
                                                                display: displayFace, body: bodyFace, tick: tick),
                                           template: template) {
@@ -143,15 +143,6 @@ struct ReadingView: View {
         model.lenses.contrast = .any; model.lenses.structure = .any; model.lenses.foundry = .any
     }
 
-    /// "x-height 9% smaller", measured from the two loaded fonts so it has a direction.
-    /// Only for candidates the engine already tagged with an x-height reason.
-    private func xHeightNote(display: String, candidate: String) -> String? {
-        guard case .success(let d)? = FontLoader.shared.cached(display),
-              case .success(let c)? = FontLoader.shared.cached(candidate), d.xHeightRatio > 0 else { return nil }
-        let diff = (c.xHeightRatio / d.xHeightRatio - 1) * 100
-        if abs(diff) < 1 { return "Same x-height" }
-        return "x-height \(Int(abs(diff).rounded()))% \(diff < 0 ? "smaller" : "larger") than Display"
-    }
 }
 
 // MARK: - Toolbar lenses
@@ -320,6 +311,13 @@ struct ReadingInspector: View {
         }
     }
 
+    private func inspectorXHeightNote(_ c: Candidate) -> String? {
+        guard let display = model.displayFamily else { return nil }
+        let body = model.familyByName[c.family].map { model.face("reading", $0) }
+            ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading"))
+        return measuredXHeightNote(display: model.face("display", display).resolvedPath, candidate: body.resolvedPath)
+    }
+
     private func why(_ c: Candidate) -> some View {
         InspectorSection(title: Lexicon.whyItPairs) {
             if c.evidence.isEmpty {
@@ -334,7 +332,7 @@ struct ReadingInspector: View {
                         if let term = Lexicon.term(forLens: e.lens) { HelpButton(term: term) }
                         Spacer()
                     }
-                    let detail = Lexicon.whyDetail(e)
+                    let detail = e.lens == "x-height" ? (inspectorXHeightNote(c) ?? Lexicon.whyDetail(e)) : Lexicon.whyDetail(e)
                     if !detail.isEmpty { Text(detail).font(.callout) }
                     if e.effect == 0 {
                         Text(Lexicon.notScored).font(.caption2).foregroundStyle(.secondary)
@@ -411,4 +409,14 @@ struct ReadingInspector: View {
             }
         }
     }
+}
+
+/// "x-height 9% smaller than Display", measured from the two loaded fonts so it has a direction.
+/// Shared by the card chip and the inspector's Why list so both say the same number.
+func measuredXHeightNote(display: String, candidate: String) -> String? {
+    guard case .success(let d)? = FontLoader.shared.cached(display),
+          case .success(let c)? = FontLoader.shared.cached(candidate), d.xHeightRatio > 0 else { return nil }
+    let diff = (c.xHeightRatio / d.xHeightRatio - 1) * 100
+    if abs(diff) < 1 { return "Same x-height" }
+    return "x-height \(Int(abs(diff).rounded()))% \(diff < 0 ? "smaller" : "larger") than Display"
 }

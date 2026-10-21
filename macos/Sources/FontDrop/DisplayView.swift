@@ -180,7 +180,7 @@ struct FamilyInspector: View {
         InspectorSection(title: "Facts") {
             fact("x-height", d.xHeight.map { String(format: "%.3f", $0) } ?? "Unavailable")
             Divider().padding(.vertical, 5)
-            fact("Skeleton", family.skeleton.isEmpty ? "Unknown" : family.skeleton.capitalized)
+            fact("Structure", family.skeleton.isEmpty ? "Unknown" : Lexicon.structure(family.skeleton))
             Divider().padding(.vertical, 5)
             fact("License", family.isTrial ? Lexicon.licenseTrial : Lexicon.licenseOK)
             if let vendor = family.vendor {
