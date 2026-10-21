@@ -251,14 +251,24 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("failed to resolve app data dir");
+            // Open the window on what the DB already knows; scan, classify and
+            // enrich on a second connection in the background, then tell the
+            // UI to reload. A classifier version bump used to freeze launch
+            // for ~25 s before the window appeared.
             let conn = db::open_db(&data_dir);
-            db::populate_db(&conn);
-            db::enrich_from_name_tables(&conn);
-            db::classify_all(&conn);
-            db::enrich_metrics(&conn);
-            google_fonts::enrich_from_google(&conn, &data_dir, false);
-            app.manage(db::AppDataDir(data_dir));
+            app.manage(db::AppDataDir(data_dir.clone()));
             app.manage(db::DbState(std::sync::Mutex::new(conn)));
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use tauri::Emitter;
+                let bg = db::open_db(&data_dir);
+                db::populate_db(&bg);
+                db::enrich_from_name_tables(&bg);
+                db::classify_all(&bg);
+                db::enrich_metrics(&bg);
+                google_fonts::enrich_from_google(&bg, &data_dir, false);
+                let _ = handle.emit("library-updated", ());
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

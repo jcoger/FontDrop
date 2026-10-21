@@ -179,7 +179,8 @@ pub fn open_db(app_data_dir: &Path) -> Connection {
     std::fs::create_dir_all(app_data_dir).ok();
     let db_path = app_data_dir.join("fontdrop.db");
     let conn = Connection::open(db_path).expect("failed to open font database");
-    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
+    // busy_timeout: the background scan writes while the UI reads and edits.
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;")
         .expect("failed to set pragmas");
     conn.execute_batch(CREATE_TABLE)
         .expect("failed to create fonts table");

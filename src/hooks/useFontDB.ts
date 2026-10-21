@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { FontInfo, Classification } from "../types/font";
 
 /** Extended row shape from the SQLite database. */
@@ -55,19 +56,34 @@ export function useFontDB() {
   const [error, setError] = useState<string | null>(null);
   const [pathToId, setPathToId] = useState<PathToIdMap>(new Map());
 
+  // Show what the DB already has right away. The library scan runs in the
+  // background and emits "library-updated" when done; a first-ever launch
+  // (empty DB) stays in the loading state until then.
   useEffect(() => {
+    const apply = (rows: FontDBRow[]) => {
+      setFonts(rows);
+      const map = new Map<string, string>();
+      for (const r of rows) map.set(r.file_path, r.font_id);
+      setPathToId(map);
+    };
     invoke<FontDBRow[]>("get_font_db")
       .then((rows) => {
-        setFonts(rows);
-        // Build path → id map for localStorage migration
-        const map = new Map<string, string>();
-        for (const r of rows) {
-          map.set(r.file_path, r.font_id);
-        }
-        setPathToId(map);
+        apply(rows);
+        if (rows.length > 0) setLoading(false);
       })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        setError(String(e));
+        setLoading(false);
+      });
+    const unlisten = listen("library-updated", () => {
+      invoke<FontDBRow[]>("get_font_db")
+        .then(apply)
+        .catch((e) => setError(String(e)))
+        .finally(() => setLoading(false));
+    });
+    return () => {
+      unlisten.then((off) => off());
+    };
   }, []);
 
   const updateClassification = useCallback(
