@@ -1,4 +1,4 @@
-import type { FontInfo } from "../hooks/useFonts";
+import type { FontInfo } from "../types/font";
 
 export interface FontFamily {
   name: string;

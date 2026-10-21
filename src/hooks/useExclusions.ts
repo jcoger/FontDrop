@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { FontInfo } from "./useFonts";
+import type { FontInfo } from "../types/font";
 import {
   DEFAULT_EXCLUSION_FAMILIES,
   DEFAULT_EXCLUSION_PREFIXES,

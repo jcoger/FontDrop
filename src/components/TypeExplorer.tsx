@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { List, RowComponentProps } from "react-window";
 import { fontFamily } from "../lib/fontFace";
-import type { FontInfo } from "../hooks/useFonts";
+import type { FontInfo } from "../types/font";
 import type { Controls } from "../types/controls";
 
 const FONT_COL_W = 168;

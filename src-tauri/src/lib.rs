@@ -1,25 +1,43 @@
-use std::path::PathBuf;
 use serde::Serialize;
+use tauri::Manager;
 use ttf_parser::{Face, Tag, Style, Width};
 
-#[derive(Serialize)]
+mod db;
+mod classifier;
+mod google_fonts;
+mod metrics;
+mod pairing;
+mod userdata;
+
+#[derive(Serialize, Clone)]
 pub struct Classification {
     pub category: String, // "sans-serif" | "serif" | "script" | "decorative" | "monospace"
     pub style: String,    // "normal" | "italic"
     pub width: String,    // "condensed" | "normal" | "extended"
 }
 
-#[derive(Serialize)]
-pub struct FontInfo {
-    pub file_name: String,
-    pub file_path: String,
-    pub font_family: String,
-    pub weight: u16,       // numeric weight: 100–900, default 400
-    pub source: String,    // "system" | "library" | "user"
-    pub classification: Classification,
+#[cfg(test)]
+mod name_tests {
+    use super::{looks_trial, strip_instance_words};
+    #[test]
+    fn spots_trial_builds() {
+        assert!(looks_trial("TestSöhne"));
+        assert!(looks_trial("GT Flexa Trial"));
+        assert!(looks_trial("This is a demo font for testing only"));
+        assert!(!looks_trial("Contest Sans"));
+        assert!(!looks_trial("Timeless Serif"));
+    }
+    #[test]
+    fn strips_default_instance_words() {
+        assert_eq!(strip_instance_words("Montserrat Thin"), "Montserrat");
+        assert_eq!(strip_instance_words("Nunito Sans 12pt ExtraLight 12pt"), "Nunito Sans");
+        assert_eq!(strip_instance_words("Merriweather Light 18pt"), "Merriweather");
+        assert_eq!(strip_instance_words("Rubik Mono One"), "Rubik Mono One");
+        assert_eq!(strip_instance_words("Black"), "Black");
+    }
 }
 
-fn parse_family(stem: &str) -> String {
+pub fn parse_family(stem: &str) -> String {
     let suffixes = [
         "Black", "Bold", "BoldItalic", "ExtraBold", "ExtraLight",
         "Heavy", "Italic", "Light", "Medium", "Regular", "SemiBold",
@@ -39,9 +57,100 @@ fn parse_family(stem: &str) -> String {
     name.trim().to_string()
 }
 
-struct FontMeta {
-    classification: Classification,
-    weight: u16,
+/// The family name the font file declares about itself: the typographic family
+/// (name ID 16) if present, else the legacy family (name ID 1). File names are
+/// unreliable ("TestSöhne-BuchKursiv.otf" is a style of Söhne, not a family), so
+/// this is the source of truth; `parse_family` is only the fallback.
+/// Collections (.ttc) use their first face.
+pub fn read_family_name(path: &std::path::Path) -> Option<String> {
+    use skrifa::{string::StringId, FontRef, MetadataProvider};
+    let data = std::fs::read(path).ok()?;
+    let font = FontRef::from_index(&data, 0).ok()?;
+    let name = [StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME]
+        .into_iter()
+        .find_map(|id| {
+            let name = font.localized_strings(id).english_or_first()?.to_string();
+            let name = name.trim().to_string();
+            (!name.is_empty()).then_some(name)
+        })?;
+    // A variable font's name often carries its default instance
+    // ("Montserrat Thin", "Merriweather Light 18pt"). The family is the rest.
+    if font.axes().len() > 0 {
+        return Some(strip_instance_words(&name));
+    }
+    Some(name)
+}
+
+/// Drop trailing weight, width and optical-size words from a family name.
+pub fn strip_instance_words(name: &str) -> String {
+    const WORDS: &[&str] = &[
+        "thin", "hairline", "extralight", "ultralight", "light", "book", "regular", "normal",
+        "medium", "semibold", "demibold", "bold", "extrabold", "ultrabold", "black", "heavy",
+        "italic", "condensed", "expanded", "variable", "vf",
+    ];
+    let mut words: Vec<&str> = name.split_whitespace().collect();
+    while words.len() > 1 {
+        let last = words[words.len() - 1].to_lowercase();
+        let opsz = last.ends_with("pt") && last[..last.len() - 2].chars().all(|c| c.is_ascii_digit());
+        if WORDS.contains(&last.as_str()) || opsz {
+            words.pop();
+        } else {
+            break;
+        }
+    }
+    words.join(" ")
+}
+
+/// Who made the font, from inside the file: OS/2 vendor code (the cleanest
+/// foundry key, e.g. "PP", "ITFO", "KLIM"), name ID 8 (manufacturer) and
+/// name ID 9 (designer). Placeholder vendor codes come back as None.
+pub struct NameMeta {
+    pub vendor: Option<String>,
+    pub manufacturer: Option<String>,
+    pub designer: Option<String>,
+    /// Trial / test / demo build, from the family name or licence text (IDs 1, 16, 13).
+    /// Not a warning: trials are how designers explore and how clients end up
+    /// buying fonts. The app flags them at hand-off with a link to the foundry.
+    pub trial: bool,
+    /// Where to get the font: vendor URL (ID 11), else licence URL (ID 14).
+    pub foundry_url: Option<String>,
+}
+
+/// Words foundries use for trial builds ("TestSöhne", "GT Flexa Trial", "... Demo").
+pub fn looks_trial(text: &str) -> bool {
+    let t = text.to_lowercase();
+    t.split(|c: char| !c.is_alphanumeric()).any(|w| matches!(w, "trial" | "demo" | "test" | "evaluation" | "testing"))
+        || t.starts_with("test")
+}
+
+pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
+    use skrifa::raw::TableProvider;
+    use skrifa::{string::StringId, FontRef, MetadataProvider};
+    let data = std::fs::read(path).ok()?;
+    let font = FontRef::from_index(&data, 0).ok()?;
+    let text = |id| {
+        font.localized_strings(id)
+            .english_or_first()
+            .map(|s| s.to_string().trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+    let vendor = font.os2().ok().map(|t| t.ach_vend_id().to_string().trim().to_string()).filter(|v| {
+        !v.is_empty() && !matches!(v.to_uppercase().as_str(), "UKWN" | "NONE" | "XXXX" | "----" | "PFED" | "\0\0\0\0")
+    });
+    let trial = [StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME, StringId::LICENSE_DESCRIPTION]
+        .into_iter()
+        .filter_map(text)
+        .any(|t| looks_trial(&t));
+    let foundry_url = [StringId::VENDOR_URL, StringId::LICENSE_URL]
+        .into_iter()
+        .filter_map(text)
+        .find(|u| u.starts_with("http"));
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url })
+}
+
+pub struct FontMeta {
+    pub classification: Classification,
+    pub weight: u16,
 }
 
 fn default_meta() -> FontMeta {
@@ -55,14 +164,14 @@ fn default_meta() -> FontMeta {
     }
 }
 
-fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
+pub fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
     // ttf-parser only handles TTF/OTF — WOFF/WOFF2 are compressed, use defaults
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_lowercase());
 
-    if !matches!(ext.as_deref(), Some("ttf") | Some("otf")) {
+    if !matches!(ext.as_deref(), Some("ttf") | Some("otf") | Some("ttc")) {
         return default_meta();
     }
 
@@ -110,8 +219,6 @@ fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
         "monospace"
     } else {
         // Signal 1: Panose (OS/2 bytes 32–41, 10-byte array)
-        // bFamilyKind: 2=LatinText, 3=Script, 4=Decorative, 5=Symbol
-        // For LatinText: bSerifStyle byte 1: 2–10=serif, 11–15=sans-serif
         let panose_cat: Option<&str> = os2
             .and_then(|d| if d.len() >= 42 { Some(&d[32..42]) } else { None })
             .and_then(|p| match p[0] {
@@ -136,7 +243,6 @@ fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
         } else if n.contains("sans") || n.contains("grotesk") || n.contains("gothic") {
             Some("sans-serif")
         } else if n.contains("serif") {
-            // "serif" without "sans" before it
             if !n.contains("sans") { Some("serif") } else { Some("sans-serif") }
         } else {
             None
@@ -152,7 +258,6 @@ fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
             _ => None,
         };
 
-        // Priority: Panose > name keywords > sFamilyClass > "other"
         panose_cat.or(name_cat).or(sfc_cat).unwrap_or("other")
     };
 
@@ -166,80 +271,53 @@ fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
     }
 }
 
-fn scan_dir(dir: &PathBuf, source: &str, results: &mut Vec<FontInfo>) {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            scan_dir(&path, source, results);
-            continue;
-        }
-
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_lowercase());
-
-        if !matches!(ext.as_deref(), Some("ttf") | Some("otf") | Some("woff") | Some("woff2")) {
-            continue;
-        }
-
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
-
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or(&file_name);
-
-        let family = parse_family(stem);
-        let meta = parse_font_meta(&path, &family);
-
-        results.push(FontInfo {
-            font_family: family,
-            file_name,
-            file_path: path.to_string_lossy().to_string(),
-            weight: meta.weight,
-            source: source.to_string(),
-            classification: meta.classification,
-        });
-    }
-}
-
-#[tauri::command]
-fn get_system_fonts() -> Vec<FontInfo> {
-    let mut fonts: Vec<FontInfo> = Vec::new();
-
-    let scan_targets: Vec<(PathBuf, &str)> = vec![
-        (PathBuf::from("/System/Library/Fonts"), "system"),
-        (PathBuf::from("/Library/Fonts"), "library"),
-        (
-            dirs::home_dir()
-                .map(|h| h.join("Library/Fonts"))
-                .unwrap_or_default(),
-            "user",
-        ),
-    ];
-
-    for (dir, source) in &scan_targets {
-        scan_dir(dir, source, &mut fonts);
-    }
-
-    fonts
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_system_fonts])
+        .setup(|app| {
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data dir");
+            // Open the window on what the DB already knows; scan, classify and
+            // enrich on a second connection in the background, then tell the
+            // UI to reload. A classifier version bump used to freeze launch
+            // for ~25 s before the window appeared.
+            let conn = db::open_db(&data_dir);
+            app.manage(db::AppDataDir(data_dir.clone()));
+            app.manage(db::DbState(std::sync::Mutex::new(conn)));
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                use tauri::Emitter;
+                let bg = db::open_db(&data_dir);
+                db::populate_db(&bg);
+                db::enrich_from_name_tables(&bg);
+                db::classify_all(&bg);
+                db::enrich_metrics(&bg);
+                google_fonts::enrich_from_google(&bg, &data_dir, false);
+                let _ = handle.emit("library-updated", ());
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            db::get_font_db,
+            db::update_font_classification,
+            db::classify_single_font,
+            db::refresh_google_fonts,
+            db::set_google_api_key,
+            db::get_google_api_key,
+            pairing::get_font_pairs,
+            userdata::brands_list,
+            userdata::brand_create,
+            userdata::brand_update,
+            userdata::brand_delete,
+            userdata::shortlist_get,
+            userdata::shortlist_set,
+            userdata::choice_set,
+            userdata::choices_get,
+            userdata::house_style_get
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
