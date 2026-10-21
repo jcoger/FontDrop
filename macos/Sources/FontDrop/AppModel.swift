@@ -17,6 +17,10 @@ struct LaunchOptions {
     var appearance: String?      // "light" | "dark"
     var brand: String?
     var select: String?          // family to select (Display) or candidate (Reading)
+    var noBrand = false          // start with no brand selected (to see the "Name this brand" sheet)
+    var demoChoose: String?      // with --no-brand: act as if "Use for Display" was pressed on this family
+    var template: String?        // Reading template id: article | hero | appui | poster
+    var openPlayground = false   // open every playground group
 
     init(arguments: [String] = CommandLine.arguments, environment: [String: String] = ProcessInfo.processInfo.environment) {
         func value(_ flag: String) -> String? {
@@ -33,6 +37,11 @@ struct LaunchOptions {
         appearance = value("--appearance")
         brand = value("--brand")
         select = value("--select")
+        noBrand = arguments.contains("--no-brand")
+        demoChoose = value("--demo-choose")
+        if demoChoose != nil { noBrand = true }       // the sheet only shows when there is no brand
+        template = value("--template")
+        openPlayground = arguments.contains("--open-playground")
     }
 }
 
@@ -136,9 +145,46 @@ final class AppModel {
     var selectedCandidate: String?
     private var candidatesKey: String?
 
+    /// How many candidates Reading asked the core for. "Show more" adds a page.
+    static let candidatePage = 40
+    private(set) var candidateLimit = AppModel.candidatePage
+    private(set) var candidatesHasMore = false
+    /// Off by default: Reading only offers faces made for long text. "Show them" turns the rule off.
+    private(set) var includeUnfitFaces = false
+
+    func setIncludeUnfit(_ on: Bool) async {
+        includeUnfitFaces = on
+        candidateLimit = Self.candidatePage
+        await loadCandidates()
+    }
+
+    /// Which presentation template Reading draws (Templates/Registry.swift).
+    var templateID: String = UserDefaults.standard.string(forKey: "readingTemplate") ?? "article" {
+        didSet { UserDefaults.standard.set(templateID, forKey: "readingTemplate") }
+    }
+
+    /// Playground settings per brand + job + family.
+    let typeSettings: TypeSettingsStore
+
+    /// An action that needs a brand and has none yet. The "Name this brand" sheet shows while this is set.
+    enum PendingAction: Equatable {
+        case choose(job: String, family: String)
+        case shortlist(job: String, family: String, on: Bool)
+    }
+    var pending: PendingAction?
+
+    /// What "Undo" restores for each job: the face chosen before the last choice (nil = nothing).
+    private(set) var undoChoice: [String: String?] = [:]
+    /// Bumps on every choice. The inspector watches it to play the success animation.
+    private(set) var choicePulse = 0
+
     var errorMessage: String?
 
-    init(options: LaunchOptions) { self.options = options }
+    init(options: LaunchOptions) {
+        self.options = options
+        typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: options.screenshot == nil && !options.bench)
+        if let t = options.template { templateID = t }
+    }
 
     // MARK: derived
 
@@ -149,6 +195,16 @@ final class AppModel {
     var readingFamily: FamilySummary? { choices["reading"].flatMap { familyByName[$0] } }
 
     func chosen(_ screen: Screen) -> String? { screen.job.flatMap { choices[$0] } }
+
+    // Playground settings, keyed brand + job + family.
+    func settingsKey(_ job: String, _ family: String) -> String {
+        TypeSettingsStore.key(brand: brandID, job: job, family: family)
+    }
+    /// A face with the designer's playground settings for this job, ready for `FaceText`.
+    func face(_ job: String, _ family: FamilySummary) -> FaceSpec {
+        FaceSpec(path: family.filePath, settings: typeSettings.settings(settingsKey(job, family.name), job: job))
+    }
+    var displayFace: FaceSpec? { displayFamily.map { face("display", $0) } }
 
     func shortlist(_ job: String) -> [String] { shortlists[job] ?? [] }
 
@@ -212,7 +268,7 @@ final class AppModel {
 
             let saved = UserDefaults.standard.object(forKey: "lastBrand") as? Int64
             let wanted = options.brand.flatMap { n in brands.first { $0.name == n }?.id }
-            await selectBrand(wanted ?? brands.first { $0.id == saved }?.id ?? brands.first?.id)
+            await selectBrand(options.noBrand ? nil : (wanted ?? brands.first { $0.id == saved }?.id ?? brands.first?.id))
             screen = options.screen
             phase = .ready
 
@@ -274,7 +330,8 @@ final class AppModel {
     func selectBrand(_ id: Int64?) async {
         brandID = id
         if let id { UserDefaults.standard.set(id, forKey: "lastBrand") }
-        candidates = []; candidatesKey = nil; selectedCandidate = nil
+        candidates = []; candidatesKey = nil; selectedCandidate = nil; candidateLimit = Self.candidatePage
+        undoChoice = [:]
         await reloadBrandData()
     }
 
@@ -292,14 +349,29 @@ final class AppModel {
         } catch { report(error) }
     }
 
-    func createBrand(_ name: String) async {
+    /// Creates a brand, selects it, then runs whatever was waiting for one. Returns the new brand's id.
+    @discardableResult
+    func createBrand(_ name: String) async -> Int64? {
         let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !n.isEmpty else { return }
+        guard !n.isEmpty else { return nil }
         do {
             let b = try await background { try $0.brandCreate(name: n) }
             brands = try await background { try $0.brandsList() }
             await selectBrand(b.id)
-        } catch { report(error) }
+            return b.id
+        } catch { report(error); return nil }
+    }
+
+    /// The "Name this brand" sheet's Create button: make the brand, then apply the choice that asked for it.
+    func createBrandAndApplyPending(_ name: String) async {
+        let action = pending
+        guard await createBrand(name) != nil else { return }
+        pending = nil
+        switch action {
+        case .choose(let job, let family)?: await choose(job, family: family)
+        case .shortlist(let job, let family, let on)?: await setShortlist(job, family: family, on: on)
+        case nil: break
+        }
     }
 
     func renameBrand(_ brand: Brand, to name: String) async {
@@ -314,17 +386,39 @@ final class AppModel {
 
     // MARK: choices and shortlist
 
+    /// Chooses `family` for `job`. With no brand yet this asks for a name first (the sheet), then comes back here.
     func choose(_ job: String, family: String) async {
-        guard let id = brandID else { errorMessage = "Create a brand first. Choices belong to a brand."; return }
+        guard let id = brandID else { pending = .choose(job: job, family: family); return }
         do {
+            let previous = choices[job]
             try await background { try $0.choose(brand: id, job: job, family: family) }
+            if previous != family { undoChoice[job] = .some(previous) }
             choices[job] = family
+            choicePulse += 1
             if job == "display" { candidates = []; candidatesKey = nil; selectedCandidate = nil }
         } catch { report(error) }
     }
 
+    /// Puts back the face chosen before, or clears the job when there was none.
+    func undo(_ job: String) async {
+        guard let id = brandID, let record = undoChoice[job] else { return }
+        undoChoice[job] = nil
+        do {
+            if let previous = record {
+                try await background { try $0.choose(brand: id, job: job, family: previous) }
+                choices[job] = previous
+            } else {
+                try await background { try $0.choiceClear(brand: id, job: job) }
+                choices[job] = nil
+            }
+            if job == "display" { candidates = []; candidatesKey = nil; selectedCandidate = nil }
+        } catch { report(error) }
+    }
+
+    func canUndo(_ job: String) -> Bool { undoChoice[job] != nil }
+
     func setShortlist(_ job: String, family: String, on: Bool) async {
-        guard let id = brandID else { errorMessage = "Create a brand first. Shortlists belong to a brand."; return }
+        guard let id = brandID else { pending = .shortlist(job: job, family: family, on: on); return }
         var list = shortlists[job] ?? []
         if on { if !list.contains(family) { list.append(family) } } else { list.removeAll { $0 == family } }
         shortlists[job] = list
@@ -342,26 +436,29 @@ final class AppModel {
     /// candidate are loaded before the list is shown, so the cards never write state.
     func loadCandidates() async {
         guard let display = displayFamily else { candidates = []; candidatesKey = nil; return }
-        let key = "\(brandID ?? 0)/\(display.fontId)"
+        let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)"
         if key == candidatesKey { return }
         candidatesLoading = true
         candidatesError = nil
-        let id = display.fontId
+        let id = display.fontId, limit = UInt32(candidateLimit)
+        let job: String? = includeUnfitFaces ? nil : "reading"
         do {
-            let buckets = try await background { try $0.fontPairs(fontId: id, excludedIds: [], job: "reading") }
+            let ranked = try await background {
+                try $0.fontCandidates(fontId: id, excludedIds: [], job: job, limit: limit)
+            }
             var seen = Set<String>()
             var list: [Candidate] = []
-            for bucket in buckets {
-                for p in bucket.pairs where !p.family.isEmpty && seen.insert(p.family).inserted {
-                    // Show the family's regular upright face, not whichever file the engine matched.
-                    let path = familyByName[p.family]?.filePath ?? p.filePath
-                    list.append(Candidate(id: p.fontId, family: p.family, filePath: path,
-                                          pairType: p.pairType, evidence: p.evidence, order: list.count))
-                }
+            for p in ranked where !p.family.isEmpty && seen.insert(p.family).inserted {
+                // Show the family's regular upright face, not whichever file the engine matched.
+                let path = familyByName[p.family]?.filePath ?? p.filePath
+                list.append(Candidate(id: p.fontId, family: p.family, filePath: path,
+                                      pairType: p.pairType, evidence: p.evidence, order: list.count))
             }
-            await FontLoader.shared.preload(paths: list.map(\.filePath))
+            let allPaths = list.flatMap { c in (fontsByFamily[c.family] ?? []).map(\.filePath) + [c.filePath] }
+            await FontLoader.shared.preload(paths: allPaths)
             guard displayFamily?.fontId == id else { return }   // changed while loading
             candidates = list
+            candidatesHasMore = ranked.count >= candidateLimit
             candidatesKey = key
             fontTick += 1
             if selectedCandidate == nil || !list.contains(where: { $0.id == selectedCandidate }) {
@@ -372,6 +469,12 @@ final class AppModel {
             candidatesError = "\(error)"
         }
         candidatesLoading = false
+    }
+
+    /// Asks the core for another page of candidates. The list keeps its order; the new ones arrive at the end.
+    func showMoreCandidates() async {
+        candidateLimit += Self.candidatePage
+        await loadCandidates()
     }
 
     func candidate(_ id: String?) -> Candidate? { candidates.first { $0.id == id } }

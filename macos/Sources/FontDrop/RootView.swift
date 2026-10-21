@@ -31,6 +31,9 @@ struct RootView: View {
             }
         }
         .overlay { phaseOverlay }
+        .sheet(isPresented: Binding(get: { model.pending != nil }, set: { if !$0 { model.pending = nil } })) {
+            NameBrandSheet().environment(model)
+        }
         .alert("Something went wrong", isPresented: Binding(get: { model.errorMessage != nil },
                                                             set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
