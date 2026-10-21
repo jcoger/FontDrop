@@ -109,7 +109,11 @@ pub struct NameMeta {
     pub manufacturer: Option<String>,
     pub designer: Option<String>,
     /// Trial / test / demo build, from the family name or licence text (IDs 1, 16, 13).
+    /// Not a warning: trials are how designers explore and how clients end up
+    /// buying fonts. The app flags them at hand-off with a link to the foundry.
     pub trial: bool,
+    /// Where to get the font: vendor URL (ID 11), else licence URL (ID 14).
+    pub foundry_url: Option<String>,
 }
 
 /// Words foundries use for trial builds ("TestSöhne", "GT Flexa Trial", "... Demo").
@@ -137,7 +141,11 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
         .into_iter()
         .filter_map(text)
         .any(|t| looks_trial(&t));
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial })
+    let foundry_url = [StringId::VENDOR_URL, StringId::LICENSE_URL]
+        .into_iter()
+        .filter_map(text)
+        .find(|u| u.starts_with("http"));
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url })
 }
 
 pub struct FontMeta {

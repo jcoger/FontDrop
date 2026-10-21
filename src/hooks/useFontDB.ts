@@ -8,6 +8,8 @@ export interface FontDBRow extends FontInfo {
   font_id: string;
   /** 1 = trial / test / demo build */
   is_trial?: number | null;
+  /** Foundry or licence page from the file */
+  foundry_url?: string | null;
   name: string;
   foundry: string | null;
   designer: string | null;

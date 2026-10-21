@@ -29,7 +29,7 @@ Claude in Paper then applies `set_type` output through Paper's own MCP (family, 
 ## Guardrails
 
 - Local only. Font files never leave the machine; only names and measurements are shared.
-- Licences: trial fonts are flagged in every answer, so nobody ships a trial face by accident.
+- Licences: trial fonts are welcome while exploring (that is how designers and clients end up buying fonts). Answers mark them as trial with the foundry link, and hand-off lists them under "license before shipping".
 - No silent changes: apply mode always reports what it set.
 
 ## What has to be true first
