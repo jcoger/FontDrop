@@ -6,7 +6,7 @@
 **Gut-check:** would a designer who never read a type book know what to do, and why?
 
 **Open questions**
-1. "Less common first" needs popularity data. Until then the sort can't honestly say "unexpected" (see 2.4).
+1. Section 7 (cold read) overrides earlier rows. "Less common first" needs popularity data. Until then the sort can't honestly say "unexpected" (see 2.4).
 2. The contrast slider replaces the Contrast menu once pair types map to a continuous score. Copy for both is below.
 
 ## 1. Lexicon (one concept, one word)
@@ -127,3 +127,35 @@ Source citations shown to designers use author names, not codes: "Latin, Typewol
 ## Gates
 
 A pass after 2.4 and 4.10 · B pass for these surfaces (loading/error states not in scope) · C pass (no em dashes) · D pass · E n/a (no errors in scope besides 6.12) · F pass, all shorter or equal · G pass after 3 · H pending cold read · K pass (no colour-only meaning; VoiceOver label 4.8) · N pass · O cuts listed · Q pass after 3.10 · R pass after 4
+
+## 7. Cold read, round 1 (2026-10-21): changes
+
+A fresh reader (working brand designer, no plan) read the rendered strings. Findings were checked against the engine before applying. These rows override sections 1 to 6.
+
+| ID | Was | Now | Why |
+|---|---|---|---|
+| 7.1 | Filter **Contrast**: Similar · Distinct · Bold · Any | **Difference**: Close · Clear · Strong · Any | "Contrast" meant three things: the filter, a group and stroke contrast. "Bold" read as weight. Contrast now means stroke only, its normal type meaning |
+| 7.2 | Future slider **Contrast**, Similar ↔ Bold | **Difference**, Close ↔ Strong | Same steps as 7.1 |
+| 7.3 | Group **Contrast** | **Clear difference** | Frees "contrast" (7.1) |
+| 7.4 | Group **In-between**: "…The books warn against it." | **Too close**: "So alike it can look like a mistake." | Label said nothing alone; "the books" was vague and preachy |
+| 7.5 | Group **Superfamily**: "Drawn as a set by the same designer." | "Drawn as one set. Safest choice." | Superfamilies are often drawn by a team |
+| 7.6 | Filter **Feel**: Matching · Mixed · Either | **Structure**: Same · Mixed · Any | Its help defined Feel with structure, so it was one idea under two names. "Any" everywhere, never "Either" |
+| 7.7 | Help, Feel | Help, Structure filter: **"Same structure reads calm. Mixed adds tension. Not scored."** | Covers every mix, not only humanist ones |
+| 7.8 | Chip **Mixed feel** | **Mixed structure** | Follows 7.6 |
+| 7.9 | Chip **x-height 9% smaller** | **x-height 9% smaller than Display** | Name the reference point |
+| 7.10 | Chip **High contrast with even stroke** | **Even stroke vs high-contrast Display** | Says which face is which |
+| 7.11 | Chip **Nearly identical** | **Too close to Display**, warning style (icon + secondary color) | Looked like a positive chip |
+| 7.12 | Help, Rational: "…modern serifs" | "…and Didone serifs like Bodoni" | "Modern" reads as "recent" to designers |
+| 7.13 | Help, Structure: "…from rational rules" | "How the letters are built: from the pen, from circles and lines, or upright and regular." | Defined rational with "rational" |
+| 7.14 | Help, Stroke: "How much the strokes go thick to thin." | **Stroke contrast**: "How much strokes change from thick to thin." | Label now carries the word contrast (7.1) |
+| 7.15 | Sources as surnames: "Latin, Typewolf, Bonneville, Mayer" | Short titles: **Better Web Typography · Typewolf checklist · Smashing (Bonneville) · Smashing (Mayer)** · **Universal Principles of Typography** · **Flexible Typesetting** · **Typekit** | "Latin" read as the script; "Stocks" as finance. Full citations live in the README credits |
+| 7.16 | Strength words with no ranking | Help line under each: **Firm**: "Most sources agree." **Common advice**: "Several sources recommend it." **Rule of thumb**: "Helps, no guarantee." **Use with care**: "Sources disagree." | Reader couldn't rank Common advice vs Rule of thumb |
+| 7.17 | Licence **No trial marks** / **Trial** | **Not marked as trial** / **Trial version · License before you ship** | "Trial marks" read as watermarks. Still accurate: we only detect trial words |
+| 7.18 | Next step **Set the type** | **Next: sizes and spacing** | Says where it goes |
+| 7.19 | **3 hidden by your filters · Show all** | **3 hidden by your filters · Clear filters** | Two hidden counts; "Show all" was unclear about the 42 |
+| 7.20 | **42 hidden · Why?** | **42 not made for long text · Show them** (popover unchanged) | Separate control for the role rule |
+| 7.21 | **No matches with these filters. Show all** | **No matches with these filters. Clear filters** | Same as 7.19 |
+
+Landed and locked (reader said clear): the hidden-count line with Why, the Harmony and Superfamily descriptions, "Not scored. Your choice.", "License before you ship", "Pick a Display face first", "Name this brand", "Nothing here yet".
+
+Engine follow-up: source codes in `core/src/pairing.rs` stay codes; the UI maps them to the short titles in 7.15.
