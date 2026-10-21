@@ -96,6 +96,18 @@ pub struct PairBucket {
     pub pairs: Vec<PairMatch>,
 }
 
+/// One entry of the flat ranked list (`Library::font_candidates`). Best first;
+/// `rank` is the 0-based position. One per family.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct PairCandidate {
+    pub font_id: String,
+    pub family: String,
+    pub file_path: String,
+    pub pair_type: String,
+    pub evidence: Vec<Evidence>,
+    pub rank: u32,
+}
+
 /// What the designer's chosen Display + Reading pairs have in common.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct HouseStyle {
@@ -313,6 +325,57 @@ impl Library {
             .collect())
     }
 
+    /// A flat ranked list of partners for `font_id`, one per family, best first,
+    /// at most `limit`. Same exclusions as `font_pairs` (`job` "reading" drops
+    /// families unfit for body text). Unlike the buckets there is no cap of 11,
+    /// so the app can page through more ("Show more") and filter client-side.
+    pub fn font_candidates(
+        &self,
+        font_id: String,
+        excluded_ids: Vec<String>,
+        job: Option<String>,
+        limit: u32,
+    ) -> Result<Vec<PairCandidate>, CoreError> {
+        let conn = self.lock()?;
+        let scored = pairing::font_candidates(&conn, &font_id, excluded_ids, job.as_deref(), limit as usize)
+            .map_err(|m| {
+                if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
+            })?;
+        let mut paths: HashMap<String, (String, String)> = HashMap::new();
+        let mut stmt = conn.prepare("SELECT font_id, file_path, font_family FROM fonts")?;
+        for r in stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+        })? {
+            let (id, p, fam) = r?;
+            paths.insert(id, (p, fam));
+        }
+        Ok(scored
+            .into_iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
+                PairCandidate {
+                    family,
+                    file_path,
+                    font_id: p.font_id,
+                    pair_type: p.pair_type,
+                    evidence: p
+                        .evidence
+                        .into_iter()
+                        .map(|e| Evidence {
+                            lens: e.lens,
+                            detail: e.detail,
+                            source: e.source,
+                            strength: e.strength,
+                            effect: e.effect,
+                        })
+                        .collect(),
+                    rank: i as u32,
+                }
+            })
+            .collect())
+    }
+
     // ── Brands ────────────────────────────────────────────────────────────────
 
     pub fn brands_list(&self) -> Result<Vec<userdata::Brand>, CoreError> {
@@ -352,6 +415,11 @@ impl Library {
     /// The one family chosen for this brand and job (replaces any earlier choice).
     pub fn choose(&self, brand: i64, job: String, family: String) -> Result<(), CoreError> {
         userdata::choose(&*self.lock()?, brand, &job, &family).map_err(from_msg)
+    }
+
+    /// Remove the choice for this brand and job (used by "Undo" after a first choice).
+    pub fn choice_clear(&self, brand: i64, job: String) -> Result<(), CoreError> {
+        userdata::clear_choice(&*self.lock()?, brand, &job).map_err(from_msg)
     }
 
     pub fn choices(&self, brand: i64) -> Result<Vec<userdata::Choice>, CoreError> {

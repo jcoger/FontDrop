@@ -17,8 +17,7 @@ struct SetView: View {
                 }
 
                 if let display = model.displayFamily {
-                    FontText(path: display.filePath, text: SampleCopy.displayHeadline, size: 52,
-                             checkCoverage: false, tick: tick)
+                    FaceText(face: model.face("display", display), text: SampleCopy.displayHeadline, ratio: 1.3, tick: tick)
                         .lineLimit(3)
                 } else {
                     Text("Choose a Display face to see it here.").foregroundStyle(.secondary)
@@ -26,8 +25,7 @@ struct SetView: View {
                 if let reading = model.readingFamily {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(SampleCopy.paragraphs, id: \.self) { p in
-                            FontText(path: reading.filePath, text: p, size: 17, checkCoverage: false, tick: tick)
-                                .lineSpacing(5)
+                            FaceText(face: model.face("reading", reading), text: p, ratio: 1.1, tick: tick)
                         }
                     }
                     .frame(maxWidth: 560, alignment: .leading)

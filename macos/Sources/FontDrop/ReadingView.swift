@@ -1,22 +1,10 @@
 import FontDropCore
 import SwiftUI
 
-/// Sample copy shown in every candidate. Neutral on purpose; no client names.
-enum SampleCopy {
-    static let headline = "Nobody has to ask, and nobody has to tip twice."
-    static let paragraphs = [
-        "Book a table for four and we hold it until you arrive. Your name is on the list, the kitchen knows, and the first round is already poured.",
-        "They know the window seat is yours and the music stays low. Nothing to confirm, nothing to repeat.",
-    ]
-    static let button = "Reserve a table"
-    static let caption = "Avg. wait 4 min"
-    static let displayHeadline = "Good things, held warm."
-}
-
 struct ReadingView: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 290, maximum: 420), spacing: 16, alignment: .top)]
+    private let columns = [GridItem(.adaptive(minimum: 330, maximum: 460), spacing: 16, alignment: .top)]
 
     var body: some View {
         @Bindable var model = model
@@ -25,11 +13,12 @@ struct ReadingView: View {
                 content(display)
             } else {
                 ContentUnavailableView {
-                    Label("Choose a Display face first", systemImage: "textformat.size")
+                    Label(Lexicon.needsDisplayTitle, systemImage: "textformat.size")
                 } description: {
-                    Text("Reading candidates are matched to your Display face.")
+                    Text(Lexicon.needsDisplayBody)
                 } actions: {
-                    Button("Go to Display") { model.screen = .display }
+                    Button(Lexicon.needsDisplayCTA) { model.screen = .display }
+                        .buttonStyle(.borderedProminent)
                 }
             }
         }
@@ -39,19 +28,29 @@ struct ReadingView: View {
 
     @ViewBuilder
     private func content(_ display: FamilySummary) -> some View {
+        @Bindable var model = model
         let result = model.readingResult
         let tick = model.fontTick
         let chosen = model.chosen(.reading)
         let saved = Set(model.shortlist("reading"))
+        let displayFace = model.face("display", display)
+        let template = Templates.descriptor(model.templateID)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(model.brand?.name ?? "Brand") headline \u{00B7} \(display.name) \u{00B7} Display")
-                        .font(.caption).foregroundStyle(.secondary)
-                    FontText(path: display.filePath, text: SampleCopy.displayHeadline, size: 44,
-                             checkCoverage: false, tick: tick)
-                        .lineLimit(2)
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(model.brand?.name ?? "Your brand") pair \u{00B7} \(display.name) with each candidate")
+                            .font(.callout.weight(.semibold))
+                        Text("Headlines are set in your Display face. Body and interface text are the candidate.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Picker("Template", selection: $model.templateID) {
+                        ForEach(Templates.all) { Text($0.title).tag($0.id) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .help("Show the pair in a different layout")
                 }
                 statusRow(shown: result.shown.count, hidden: result.hidden)
 
@@ -62,25 +61,37 @@ struct ReadingView: View {
                                            description: Text(error))
                 } else if result.shown.isEmpty {
                     ContentUnavailableView {
-                        Label(model.candidates.isEmpty ? "No candidates" : "Nothing matches these lenses",
+                        Label(model.candidates.isEmpty ? "No candidates" : Lexicon.readingNone,
                               systemImage: "line.3.horizontal.decrease.circle")
                     } description: {
                         Text(model.candidates.isEmpty
                              ? "The engine found no Reading partners for \(display.name)."
-                             : "\(result.hidden) hidden by your lenses. Set a lens to Any to see them.")
+                             : "\(result.hidden) hidden by your filters.")
                     } actions: {
-                        if !model.lenses.isNeutral { Button("Show everything") { resetLenses() } }
+                        if !model.lenses.isNeutral { Button(Lexicon.clearFilters) { resetLenses() } }
                     }
                 } else {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(result.shown) { c in
-                            CandidateCard(candidate: c, family: model.familyByName[c.family], tick: tick,
+                            let family = model.familyByName[c.family]
+                            let bodyFace = family.map { model.face("reading", $0) }
+                                ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading"))
+                            CandidateCard(candidate: c, family: family, tick: tick,
                                           isSelected: model.selectedCandidate == c.id,
                                           isSaved: saved.contains(c.family),
-                                          isChosen: chosen == c.family)
-                                .onTapGesture { model.selectedCandidate = c.id }
+                                          isChosen: chosen == c.family,
+                                          xHeightNote: measuredXHeightNote(display: displayFace.resolvedPath, candidate: bodyFace.resolvedPath),
+                                          context: PairContext(brand: model.brand?.name ?? "Brand Name",
+                                                               display: displayFace, body: bodyFace, tick: tick),
+                                          template: template) {
+                                model.selectedCandidate = c.id
+                            } showWhy: {
+                                model.selectedCandidate = c.id
+                                model.showInspector = true
+                            }
                         }
                     }
+                    footer(result: result)
                 }
             }
             .padding(20)
@@ -89,48 +100,77 @@ struct ReadingView: View {
 
     private func statusRow(shown: Int, hidden: Int) -> some View {
         HStack(spacing: 10) {
-            Label("Text cuts only", systemImage: "line.3.horizontal.decrease")
+            Label(model.includeUnfitFaces ? Lexicon.showingEvery : Lexicon.readingFixed,
+                  systemImage: "line.3.horizontal.decrease")
                 .font(.caption).foregroundStyle(.secondary)
-                .help("The engine only offers faces with regular, italic and bold, not condensed or mono.")
+                .help(Lexicon.readingFixedWhy)
+            Button(model.includeUnfitFaces ? Lexicon.onlyTextFaces : Lexicon.showThem) {
+                Task { await model.setIncludeUnfit(!model.includeUnfitFaces) }
+            }
+            .buttonStyle(.link).font(.caption)
             Text("\(shown) shown").font(.caption).foregroundStyle(.secondary)
             if hidden > 0 {
-                Text("\u{00B7} \(hidden) hidden by your lenses").font(.caption).foregroundStyle(.secondary)
-                Button("Show everything") { resetLenses() }.buttonStyle(.link).font(.caption)
+                Text("\u{00B7} \(hidden) hidden by your filters").font(.caption).foregroundStyle(.secondary)
+                Button(Lexicon.clearFilters) { resetLenses() }.buttonStyle(.link).font(.caption)
             }
             Spacer()
+            GlossaryButton()
         }
     }
 
-    private func resetLenses() {
-        model.lenses.contrast = .any; model.lenses.hand = .either; model.lenses.foundry = .any
+    /// Under the grid: how many the filters hide (with a way out) and a way to ask for more.
+    @ViewBuilder
+    private func footer(result: (shown: [Candidate], hidden: Int)) -> some View {
+        VStack(spacing: 10) {
+            if result.hidden > 0 {
+                HStack(spacing: 6) {
+                    Text("Your filters hide \(result.hidden) more of the \(model.candidates.count) loaded.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button(Lexicon.clearFilters) { resetLenses() }.buttonStyle(.link)
+                }
+            }
+            if model.candidatesHasMore {
+                Button(Lexicon.showMore) { Task { await model.showMoreCandidates() } }
+                    .controlSize(.large)
+                    .disabled(model.candidatesLoading)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 6)
     }
+
+    private func resetLenses() {
+        model.lenses.contrast = .any; model.lenses.structure = .any; model.lenses.foundry = .any
+    }
+
 }
 
 // MARK: - Toolbar lenses
 
-/// The four questions. Each is a menu with an "any" state. Nothing is a slider.
+/// The four questions. Each is a menu with an "any" state. Nothing is a slider yet:
+/// `ContrastLens.steps` is the order a Similar-to-Bold slider would use.
 struct LensToolbar: ToolbarContent {
     @Binding var lenses: Lenses
 
     var body: some ToolbarContent {
         ToolbarItemGroup {
-            LensMenu(title: "How much contrast", value: lenses.contrast.rawValue) {
-                Picker("How much contrast", selection: $lenses.contrast) {
+            LensMenu(title: Lexicon.contrastLabel, value: lenses.contrast.rawValue) {
+                Picker(Lexicon.contrastLabel, selection: $lenses.contrast) {
                     ForEach(ContrastLens.allCases) { Text($0.rawValue).tag($0) }
                 }
             }
-            LensMenu(title: "Same hand", value: lenses.hand.rawValue) {
-                Picker("Same hand", selection: $lenses.hand) {
-                    ForEach(HandLens.allCases) { Text($0.rawValue).tag($0) }
+            LensMenu(title: Lexicon.structureLabel, value: lenses.structure.rawValue) {
+                Picker(Lexicon.structureLabel, selection: $lenses.structure) {
+                    ForEach(StructureLens.allCases) { Text($0.rawValue).tag($0) }
                 }
             }
-            LensMenu(title: "Same foundry", value: lenses.foundry.rawValue) {
-                Picker("Same foundry", selection: $lenses.foundry) {
+            LensMenu(title: Lexicon.foundryLabel, value: lenses.foundry.rawValue) {
+                Picker(Lexicon.foundryLabel, selection: $lenses.foundry) {
                     ForEach(FoundryLens.allCases) { Text($0.rawValue).tag($0) }
                 }
             }
-            LensMenu(title: "Sort", value: lenses.sort.rawValue) {
-                Picker("Sort", selection: $lenses.sort) {
+            LensMenu(title: Lexicon.sortLabel, value: lenses.sort.rawValue) {
+                Picker(Lexicon.sortLabel, selection: $lenses.sort) {
                     ForEach(ReadingSort.allCases) { Text($0.rawValue).tag($0) }
                 }
             }
@@ -155,6 +195,7 @@ struct LensMenu<Options: View>: View {
 
 // MARK: - Candidate card
 
+/// One candidate: the pair drawn in the chosen template, the reasons as chips, and a footer.
 struct CandidateCard: View {
     let candidate: Candidate
     let family: FamilySummary?
@@ -162,8 +203,11 @@ struct CandidateCard: View {
     let isSelected: Bool
     let isSaved: Bool
     let isChosen: Bool
-
-    private var path: String { candidate.filePath }
+    let xHeightNote: String?
+    let context: PairContext
+    let template: TemplateDescriptor
+    let select: () -> Void
+    let showWhy: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -179,27 +223,11 @@ struct CandidateCard: View {
             .padding(.horizontal, 14).padding(.vertical, 10)
             Divider()
 
-            VStack(alignment: .leading, spacing: 12) {
-                FontText(path: path, text: SampleCopy.headline, size: 24, checkCoverage: false, tick: tick)
-                ForEach(SampleCopy.paragraphs, id: \.self) { p in
-                    FontText(path: path, text: p, size: 14, checkCoverage: false, tick: tick)
-                        .lineSpacing(3)
-                }
-                HStack(spacing: 10) {
-                    FontText(path: path, text: SampleCopy.button, size: 14, checkCoverage: false, tick: tick)
-                        .foregroundStyle(.background)
-                        .padding(.horizontal, 14).padding(.vertical, 7)
-                        .background(Capsule().fill(.primary))
-                    FontText(path: path, text: SampleCopy.caption, size: 12, checkCoverage: false, tick: tick)
-                        .italic().foregroundStyle(.secondary)
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(14)
+            template.make(context)
 
             FlowLayout(spacing: 6) {
-                ForEach(Array(candidate.evidence.enumerated()), id: \.offset) { _, e in
-                    EvidenceChip(evidence: e)
+                ForEach(chips, id: \.text) { chip in
+                    EvidenceChip(text: chip.text, effect: chip.effect, help: chip.help, warning: chip.warning)
                 }
             }
             .padding(.horizontal, 14)
@@ -207,7 +235,7 @@ struct CandidateCard: View {
             HStack {
                 Text(footer).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Text("Why this one").font(.caption).foregroundStyle(Color.accentColor)
+                Button("Why", action: showWhy).buttonStyle(.link).font(.caption)
             }
             .padding(14)
         }
@@ -216,6 +244,20 @@ struct CandidateCard: View {
             .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.25),
                           lineWidth: isSelected ? 2 : 1))
         .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture(perform: select)
+    }
+
+    private struct Chip { let text: String; let effect: Int8; let help: String; var warning = false }
+
+    /// Engine evidence in designer words, plus "Mixed feel" when the two faces cross traditions.
+    private var chips: [Chip] {
+        var out = candidate.evidence.map { e in
+            Chip(text: Lexicon.chip(e, xHeightNote: e.lens == "x-height" ? xHeightNote : nil),
+                 effect: e.effect, help: Lexicon.sources(e.source), warning: e.lens == "Near-duplicate")
+        }
+        if candidate.isCrossedHands { out.append(Chip(text: "Mixed structure", effect: 0, help: Lexicon.Term.sameStructure.help)) }
+        var seen = Set<String>()
+        return out.filter { seen.insert($0.text).inserted }
     }
 
     private var footer: String {
@@ -229,23 +271,27 @@ struct CandidateCard: View {
 
 struct ReadingInspector: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let selected = model.candidate(model.selectedCandidate)
+        let isChosen = selected.map { model.chosen(.reading) == $0.family } ?? false
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if let c = selected {
                     header(c)
-                    evidence(c)
+                    why(c)
+                    playgrounds(c)
                 } else {
-                    Text("Select a candidate to read its evidence.")
+                    Text("Select a candidate to see why it pairs.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 shortlist(selected)
             }
             .padding(16)
         }
-        .safeAreaInset(edge: .bottom) { action(selected) }
+        .safeAreaInset(edge: .bottom) { action(selected, isChosen: isChosen) }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isChosen)
     }
 
     private func header(_ c: Candidate) -> some View {
@@ -253,8 +299,7 @@ struct ReadingInspector: View {
         return VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(c.family).font(.title3.weight(.semibold))
-                Text("Reading candidate \u{00B7} \(c.evidence.count) lenses measured")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("Reading candidate").font(.caption).foregroundStyle(.secondary)
             }
             Button {
                 Task { await model.setShortlist("reading", family: c.family, on: !isSaved) }
@@ -266,27 +311,38 @@ struct ReadingInspector: View {
         }
     }
 
-    private func evidence(_ c: Candidate) -> some View {
-        InspectorSection(title: "Evidence") {
+    private func inspectorXHeightNote(_ c: Candidate) -> String? {
+        guard let display = model.displayFamily else { return nil }
+        let body = model.familyByName[c.family].map { model.face("reading", $0) }
+            ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading"))
+        return measuredXHeightNote(display: model.face("display", display).resolvedPath, candidate: body.resolvedPath)
+    }
+
+    private func why(_ c: Candidate) -> some View {
+        InspectorSection(title: Lexicon.whyItPairs) {
             if c.evidence.isEmpty {
                 Text("The engine measured nothing notable.").font(.callout).foregroundStyle(.secondary)
             }
             ForEach(Array(c.evidence.enumerated()), id: \.offset) { i, e in
                 if i > 0 { Divider().padding(.vertical, 6) }
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Image(systemName: symbol(e)).font(.caption).foregroundStyle(tint(e))
-                        Text(e.lens).font(.caption).foregroundStyle(.secondary)
+                        Text(Lexicon.whyTitle(e)).font(.caption).foregroundStyle(.secondary)
+                        if let term = Lexicon.term(forLens: e.lens) { HelpButton(term: term) }
                         Spacer()
-                        Text(strength(e)).font(.caption.weight(.medium))
                     }
-                    if !e.detail.isEmpty { Text(e.detail).font(.callout) }
-                    if !e.source.isEmpty {
-                        Text(e.source).font(.caption2).foregroundStyle(.tertiary)
-                    }
+                    let detail = e.lens == "x-height" ? (inspectorXHeightNote(c) ?? Lexicon.whyDetail(e)) : Lexicon.whyDetail(e)
+                    if !detail.isEmpty { Text(detail).font(.callout) }
                     if e.effect == 0 {
-                        Text("Shown, not scored. Your call.").font(.caption2).foregroundStyle(.secondary)
+                        Text(Lexicon.notScored).font(.caption2).foregroundStyle(.secondary)
+                    } else {
+                        let word = Lexicon.strength(e.strength)
+                        Text([word, Lexicon.strengthHelp[word]].compactMap { $0 }.joined(separator: " \u{00B7} "))
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
+                    let sources = Lexicon.sources(e.source)
+                    if !sources.isEmpty { Text(sources).font(.caption2).foregroundStyle(.tertiary) }
                 }
             }
         }
@@ -300,17 +356,25 @@ struct ReadingInspector: View {
         e.effect > 0 ? .accentColor : e.effect < 0 ? .orange : .secondary
     }
 
-    /// Effect 0 is the designer's call, so it says so instead of a strength.
-    private func strength(_ e: Evidence) -> String {
-        e.effect == 0 ? "Your call" : e.strength.capitalized
+    /// Two collapsible groups: the Display face and the selected candidate. Both feed the cards live.
+    @ViewBuilder
+    private func playgrounds(_ c: Candidate) -> some View {
+        let open = model.options.openPlayground
+        if let display = model.displayFamily {
+            PlaygroundGroup(job: "display", family: display, title: "Display \u{00B7} \(display.name)",
+                            preview: SampleCopy.displayHeadline, startOpen: open)
+        }
+        if let family = model.familyByName[c.family] {
+            PlaygroundGroup(job: "reading", family: family, title: "Reading \u{00B7} \(family.name)",
+                            preview: SampleCopy.paragraphs[0], startOpen: open)
+        }
     }
 
     private func shortlist(_ selected: Candidate?) -> some View {
         let list = model.shortlist("reading")
-        return InspectorSection(title: "Shortlist \u{00B7} Reading", trailing: "\(list.count)") {
+        return InspectorSection(title: Lexicon.shortlistTitle, trailing: "\(list.count)") {
             if list.isEmpty {
-                Text("Nothing yet. Add candidates you want to come back to. The shortlist is kept for this brand.")
-                    .font(.callout).foregroundStyle(.secondary)
+                Text(Lexicon.shortlistEmpty).font(.callout).foregroundStyle(.secondary)
             }
             ForEach(Array(list.enumerated()), id: \.element) { i, name in
                 if i > 0 { Divider().padding(.vertical, 5) }
@@ -328,17 +392,31 @@ struct ReadingInspector: View {
                     }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
                     .help("Remove from shortlist")
+                    .accessibilityLabel("Remove \(name) from shortlist")
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func action(_ selected: Candidate?) -> some View {
-        let isChosen = selected.map { model.chosen(.reading) == $0.family } ?? false
-        DecisionButton(title: isChosen ? "Chosen for Reading" : "Use for Reading",
-                       disabled: selected == nil || isChosen) {
-            if let c = selected { Task { await model.choose("reading", family: c.family) } }
+    private func action(_ selected: Candidate?, isChosen: Bool) -> some View {
+        if isChosen {
+            ChosenPanel(job: "reading", nextTitle: Lexicon.setTheType) { model.screen = .set }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+        } else {
+            DecisionButton(title: Lexicon.useFor("reading"), disabled: selected == nil) {
+                if let c = selected { Task { await model.choose("reading", family: c.family) } }
+            }
         }
     }
+}
+
+/// "x-height 9% smaller than Display", measured from the two loaded fonts so it has a direction.
+/// Shared by the card chip and the inspector's Why list so both say the same number.
+func measuredXHeightNote(display: String, candidate: String) -> String? {
+    guard case .success(let d)? = FontLoader.shared.cached(display),
+          case .success(let c)? = FontLoader.shared.cached(candidate), d.xHeightRatio > 0 else { return nil }
+    let diff = (c.xHeightRatio / d.xHeightRatio - 1) * 100
+    if abs(diff) < 1 { return "Same x-height" }
+    return "x-height \(Int(abs(diff).rounded()))% \(diff < 0 ? "smaller" : "larger") than Display"
 }

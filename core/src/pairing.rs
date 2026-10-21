@@ -374,14 +374,10 @@ pub fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
         .collect()
 }
 
-/// Score every non-hidden candidate against `primary` and fill the three buckets.
-pub fn bucket_pairs(
-    primary: &FontData,
-    all: &[FontData],
-    excluded: &HashSet<String>,
-) -> Vec<PairBucket> {
-    // Score, best first, then keep only each family's best file: the slots
-    // should be different typefaces, not four weights of one.
+/// Score every non-hidden candidate against `primary`, best first, one per
+/// family (each family's best file). The slots should be different typefaces,
+/// not several weights of one. Shared by the buckets and the flat list.
+fn rank_by_family(primary: &FontData, all: &[FontData], excluded: &HashSet<String>) -> Vec<PairScore> {
     let mut scores: Vec<(PairScore, &str)> = all
         .iter()
         .filter(|c| !excluded.contains(&c.font_id))
@@ -390,11 +386,54 @@ pub fn bucket_pairs(
         .collect();
     scores.sort_by(|a, b| b.0.precise.partial_cmp(&a.0.precise).unwrap_or(std::cmp::Ordering::Equal));
     let mut seen: HashSet<&str> = HashSet::new();
-    let ranked: Vec<PairScore> = scores
+    scores
         .into_iter()
         .filter(|(_, fam)| seen.insert(*fam))
         .map(|(s, _)| s)
-        .collect();
+        .collect()
+}
+
+/// A flat ranked list, best first, one entry per family, at most `limit`.
+/// No bucket caps: the caller decides how many to show and filters client-side.
+pub fn ranked_candidates(
+    primary: &FontData,
+    all: &[FontData],
+    excluded: &HashSet<String>,
+    limit: usize,
+) -> Vec<PairScore> {
+    let mut ranked = rank_by_family(primary, all, excluded);
+    ranked.truncate(limit);
+    ranked
+}
+
+/// Same exclusions as `font_pairs` (hidden fonts; unfit-for-reading when `job`
+/// is "reading"), but one flat ranked list instead of three capped buckets.
+pub fn font_candidates(
+    conn: &Connection,
+    font_id: &str,
+    excluded_ids: Vec<String>,
+    job: Option<&str>,
+    limit: usize,
+) -> Result<Vec<PairScore>, String> {
+    let all = load_all_fonts(conn)?;
+    let primary = all
+        .iter()
+        .find(|f| f.font_id == font_id)
+        .ok_or_else(|| format!("Font {} not found", font_id))?;
+    let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    if job == Some("reading") {
+        excluded.extend(unfit_for_reading(&all));
+    }
+    Ok(ranked_candidates(primary, &all, &excluded, limit))
+}
+
+/// Score every non-hidden candidate against `primary` and fill the three buckets.
+pub fn bucket_pairs(
+    primary: &FontData,
+    all: &[FontData],
+    excluded: &HashSet<String>,
+) -> Vec<PairBucket> {
+    let ranked = rank_by_family(primary, all, excluded);
 
     // 11 slots: up to 3 uniform and 2 designed-together; contrast fills the rest.
     let take = |ty: &str, cap: usize| -> Vec<PairScore> {
@@ -473,6 +512,69 @@ mod tests {
         let hidden: HashSet<String> = ["c0", "c1", "c2", "c3"].iter().map(|s| s.to_string()).collect();
         let ids = bucket_ids(&bucket_pairs(&p, &all, &hidden));
         assert!(ids.iter().all(|id| !hidden.contains(id)), "hidden font in results: {ids:?}");
+    }
+
+    // ── Flat ranked candidates ─────────────────────────────────────────────
+
+    #[test]
+    fn candidates_respect_the_limit_and_beat_the_bucket_cap() {
+        let (p, all) = harmonious_pool(30);
+        let none = HashSet::new();
+        assert_eq!(ranked_candidates(&p, &all, &none, 25).len(), 25);
+        assert_eq!(ranked_candidates(&p, &all, &none, 5).len(), 5);
+        assert!(ranked_candidates(&p, &all, &none, 100).len() > 11, "buckets cap at 11; the flat list must not");
+    }
+
+    #[test]
+    fn candidates_are_one_per_family() {
+        let (p, mut all) = harmonious_pool(6);
+        // Three more files of Cand0 (other weights): still one entry for the family.
+        for (i, w) in [300u16, 700, 900].iter().enumerate() {
+            let mut c = font(&format!("extra{i}"), "Cand0");
+            c.flesh_serif = 1;
+            c.weight = *w;
+            all.push(c);
+        }
+        let ranked = ranked_candidates(&p, &all, &HashSet::new(), 50);
+        let fam_of = |id: &str| all.iter().find(|f| f.font_id == id).unwrap().font_family.clone();
+        let families: Vec<String> = ranked.iter().map(|s| fam_of(&s.font_id)).collect();
+        let unique: HashSet<&String> = families.iter().collect();
+        assert_eq!(families.len(), unique.len(), "duplicate family in {families:?}");
+        assert_eq!(families.len(), 6);
+    }
+
+    #[test]
+    fn candidates_exclude_hidden_fonts() {
+        let (p, all) = harmonious_pool(8);
+        let hidden: HashSet<String> = ["c0", "c1", "c2"].iter().map(|s| s.to_string()).collect();
+        let ranked = ranked_candidates(&p, &all, &hidden, 50);
+        assert_eq!(ranked.len(), 5);
+        assert!(ranked.iter().all(|s| !hidden.contains(&s.font_id)));
+    }
+
+    #[test]
+    fn candidates_for_reading_drop_unfit_families() {
+        // Cand0 ships all four styles; Cand1 has only a regular, so it is unfit for body text.
+        let p = font("p", "Primary");
+        let mut all = vec![font("p", "Primary")];
+        for (id, file, w) in [
+            ("a1", "A-Regular.ttf", 400u16), ("a2", "A-Italic.ttf", 400),
+            ("a3", "A-Bold.ttf", 700), ("a4", "A-BoldItalic.ttf", 700),
+        ] {
+            let mut c = font(id, "Cand0");
+            c.flesh_serif = 1;
+            c.file_name = file.to_string();
+            c.weight = w;
+            all.push(c);
+        }
+        let mut thin = font("b1", "Cand1");
+        thin.flesh_serif = 1;
+        all.push(thin);
+        let unfit = unfit_for_reading(&all);
+        assert!(unfit.contains("b1") && !unfit.contains("a1"));
+        let ranked = ranked_candidates(&p, &all, &unfit, 50);
+        assert_eq!(ranked.len(), 1);
+        assert!(ranked[0].font_id.starts_with('a'));
     }
 
     // ── Ground-truth eval (real DB; run on demand) ─────────────────────────
