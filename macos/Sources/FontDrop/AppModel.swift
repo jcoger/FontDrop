@@ -227,6 +227,37 @@ final class AppModel {
             if options.bench || options.screenshot != nil { print("FONTDROP ready: \(families.count) families") }
         } catch {
             phase = .failed("\(error)")
+            return
+        }
+        // Like the Tauri app: show what the DB already has, then rescan in the
+        // background (new or removed fonts, classifier updates) and reload.
+        // Skipped for --screenshot / --bench so those runs stay repeatable.
+        if !options.refresh && !options.bench && options.screenshot == nil, let lib = core {
+            await refreshInBackground(lib)
+        }
+    }
+
+    private func refreshInBackground(_ lib: Library) async {
+        do {
+            _ = try await Task.detached(priority: .utility) { try lib.refreshLibrary() }.value
+            let (fams, fonts) = try await Task.detached(priority: .userInitiated) {
+                (try lib.listFamilies(), try lib.listFonts())
+            }.value
+            let home = NSHomeDirectory()
+            families = fams.sorted {
+                let a = Self.tier($0.filePath, home: home), b = Self.tier($1.filePath, home: home)
+                return a != b ? a < b : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            familyByName = Dictionary(fams.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+            fontsByFamily = Dictionary(grouping: fonts, by: \.family)
+            fontCount = fonts.count
+            await FontLoader.shared.preload(paths: fams.map(\.filePath)) { n in
+                Task { @MainActor [weak self] in self?.fontTick = n }
+            }
+            fontTick += 1
+        } catch {
+            // A failed rescan keeps the library as it was; nothing to show the user yet.
+            print("FONTDROP background refresh failed: \(error)")
         }
     }
 
