@@ -1,0 +1,28 @@
+[package]
+name = "fontdrop_core"
+version = "0.1.0"
+edition = "2021"
+description = "FontDrop core engine exposed to Swift through UniFFI (spike)"
+
+[lib]
+name = "fontdrop_core"
+crate-type = ["staticlib", "lib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+uniffi = "=0.32.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
+thiserror = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = "debuginfo"
