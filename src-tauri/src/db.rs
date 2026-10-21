@@ -38,6 +38,8 @@ pub struct FontRow {
     pub weight_range_max: Option<i32>,
     pub spacing_personality: Option<String>,
     pub width_class: Option<String>,
+    /// 1 = trial / test / demo build (name or licence text), 0 = not, None = not read yet
+    pub is_trial: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
     // carry forward the existing fields so the UI doesn't break
@@ -141,6 +143,7 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE IF NOT EXISTS brands (id INTEGER PRIMARY KEY, name TEXT NOT NULL, logo_svg TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));",
     "CREATE TABLE IF NOT EXISTS shortlist (brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, job TEXT NOT NULL, font_family TEXT NOT NULL, added_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (brand_id, job, font_family));",
     "CREATE TABLE IF NOT EXISTS choices (brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, job TEXT NOT NULL, font_family TEXT NOT NULL, chosen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (brand_id, job));",
+    "ALTER TABLE fonts ADD COLUMN is_trial INTEGER;",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -262,7 +265,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
 /// font (vendor_id NULL = not read yet; '' = read, no real vendor code). Foundry
 /// and designer only fill gaps; existing values (Google enrichment, edits) stay.
 pub fn enrich_from_name_tables(conn: &Connection) {
-    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL") {
+    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL") {
         Ok(mut st) => st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
@@ -271,15 +274,15 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     };
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
-        let (vendor, manufacturer, designer) = match meta {
-            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer),
-            None => (String::new(), None, None),
+        let (vendor, manufacturer, designer, trial) = match meta {
+            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial),
+            None => (String::new(), None, None, false),
         };
         conn.execute(
             "UPDATE fonts SET vendor_id = ?1, \
              foundry = COALESCE(NULLIF(foundry, ''), ?2), \
-             designer = COALESCE(NULLIF(designer, ''), ?3) WHERE font_id = ?4",
-            params![vendor, manufacturer, designer, font_id],
+             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4 WHERE font_id = ?5",
+            params![vendor, manufacturer, designer, trial as i32, font_id],
         )
         .ok();
     }
@@ -560,7 +563,7 @@ pub fn get_font_db(state: tauri::State<'_, DbState>) -> Result<Vec<FontRow>, Str
                     optical_role, superfamily_group, superfamily_role,
                     ascender_descender_ratio, weight_range_min, weight_range_max,
                     spacing_personality, width_class,
-                    created_at, updated_at
+                    created_at, updated_at, is_trial
              FROM fonts ORDER BY font_family COLLATE NOCASE",
         )
         .map_err(|e| e.to_string())?;
@@ -606,6 +609,7 @@ pub fn get_font_db(state: tauri::State<'_, DbState>) -> Result<Vec<FontRow>, Str
                 width_class: row.get(29)?,
                 created_at: row.get(30)?,
                 updated_at: row.get(31)?,
+                is_trial: row.get(32)?,
             })
         })
         .map_err(|e| e.to_string())?;

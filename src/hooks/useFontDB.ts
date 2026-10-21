@@ -6,6 +6,8 @@ import type { FontInfo, Classification } from "../types/font";
 /** Extended row shape from the SQLite database. */
 export interface FontDBRow extends FontInfo {
   font_id: string;
+  /** 1 = trial / test / demo build */
+  is_trial?: number | null;
   name: string;
   foundry: string | null;
   designer: string | null;

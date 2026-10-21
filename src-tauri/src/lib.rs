@@ -18,7 +18,15 @@ pub struct Classification {
 
 #[cfg(test)]
 mod name_tests {
-    use super::strip_instance_words;
+    use super::{looks_trial, strip_instance_words};
+    #[test]
+    fn spots_trial_builds() {
+        assert!(looks_trial("TestSöhne"));
+        assert!(looks_trial("GT Flexa Trial"));
+        assert!(looks_trial("This is a demo font for testing only"));
+        assert!(!looks_trial("Contest Sans"));
+        assert!(!looks_trial("Timeless Serif"));
+    }
     #[test]
     fn strips_default_instance_words() {
         assert_eq!(strip_instance_words("Montserrat Thin"), "Montserrat");
@@ -100,6 +108,15 @@ pub struct NameMeta {
     pub vendor: Option<String>,
     pub manufacturer: Option<String>,
     pub designer: Option<String>,
+    /// Trial / test / demo build, from the family name or licence text (IDs 1, 16, 13).
+    pub trial: bool,
+}
+
+/// Words foundries use for trial builds ("TestSöhne", "GT Flexa Trial", "... Demo").
+pub fn looks_trial(text: &str) -> bool {
+    let t = text.to_lowercase();
+    t.split(|c: char| !c.is_alphanumeric()).any(|w| matches!(w, "trial" | "demo" | "test" | "evaluation" | "testing"))
+        || t.starts_with("test")
 }
 
 pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
@@ -116,7 +133,11 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
     let vendor = font.os2().ok().map(|t| t.ach_vend_id().to_string().trim().to_string()).filter(|v| {
         !v.is_empty() && !matches!(v.to_uppercase().as_str(), "UKWN" | "NONE" | "XXXX" | "----" | "PFED" | "\0\0\0\0")
     });
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER) })
+    let trial = [StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME, StringId::LICENSE_DESCRIPTION]
+        .into_iter()
+        .filter_map(text)
+        .any(|t| looks_trial(&t));
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial })
 }
 
 pub struct FontMeta {
