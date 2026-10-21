@@ -210,6 +210,45 @@ enum Lexicon {
     static let clearFilters = "Clear filters"
     static let showMore = "Show more"
 
+    // MARK: Finding fonts (8.x)
+
+    enum Finder {
+        static func sourceLabel(_ s: Source) -> String {
+            switch s { case .yours: "Your fonts"; case .google: "Google Fonts"; case .system: "Mac system" }
+        }
+        static func kindLabel(_ k: Kind) -> String {
+            switch k { case .serif: "Serif"; case .sans: "Sans"; case .script: "Script"; case .display: "Display"; case .mono: "Mono" }
+        }
+        static func traitLabel(_ t: Trait) -> String {
+            switch t {
+            case .italic: "Italic"; case .variable: "Variable"; case .condensed: "Condensed"
+            case .wide: "Wide"; case .trial: "Trial"
+            }
+        }
+        static let more = "More"
+        static let moreHelp = "Style filters and hidden families"
+        static let traitsHeader = "Style"
+        static let showHidden = "Show hidden"
+        static let hide = "Hide"
+        static let unhide = "Unhide"
+        static let hidden = "Hidden"
+        static let hideHelp = "Hide this family from every list. Show it again from More."
+        static let unhideHelp = "Put this family back in the lists."
+        static let save = "Save"
+        static let saved = "Saved"
+        static let removeSaved = "Remove from Saved"
+        static let savedEmpty = "Nothing saved yet. Star a family to keep it here."
+        static let searchPrompt = "Search name, foundry or designer"
+        static let noMatches = "No families match these filters."
+        static let sourceFact = "Source"
+        /// 7.20: the long-text rule's count, with its own control.
+        static func notForLongText(_ n: Int) -> String { "\(n) not made for long text" }
+        static let lessCommon = "Less common first"
+        static let lessCommonHelp = "Faces fewer sites use. Families not on Google Fonts come first."
+        /// "Your fonts \u{00B7} Google Fonts", for the inspector.
+        static func sources(_ list: [Source]) -> String { list.map(sourceLabel).joined(separator: " \u{00B7} ") }
+    }
+
     // MARK: Inspector (4.x)
 
     static let whyItPairs = "Why it pairs"

@@ -29,6 +29,8 @@ struct SidebarView: View {
                 ForEach([Screen.display, .reading, .ui, .mono]) { screen in typeRow(screen).tag(screen) }
             }
 
+            Section("Library") { savedRow }
+
             Section {
                 Label("Set", systemImage: Screen.set.symbol).tag(Screen.set)
                 HStack {
@@ -79,6 +81,26 @@ struct SidebarView: View {
         .contextMenu {
             Button("Rename\u{2026}") { renameText = brand.name; renaming = brand }
         }
+    }
+
+    /// Saved: the starred families. A shortcut for the Saved chip on the Display grid.
+    private var savedRow: some View {
+        let on = model.filter.savedOnly
+        return Button {
+            model.filter.savedOnly.toggle()
+            if ![Screen.display, .ui, .mono].contains(model.screen) { model.screen = .display }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: on ? "star.fill" : "star").foregroundStyle(on ? Color.accentColor : Color.secondary)
+                Text(Lexicon.Finder.saved)
+                Spacer()
+                Text("\(model.savedCount)").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(on ? RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)).padding(.horizontal, 6) : nil)
     }
 
     private func typeRow(_ screen: Screen) -> some View {
