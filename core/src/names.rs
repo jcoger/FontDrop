@@ -13,7 +13,7 @@ pub struct Classification {
 
 #[cfg(test)]
 mod name_tests {
-    use super::{looks_trial, strip_instance_words};
+    use super::{looks_trial, strip_instance_words, trial_from_names};
     #[test]
     fn spots_trial_builds() {
         assert!(looks_trial("TestSöhne"));
@@ -21,6 +21,14 @@ mod name_tests {
         assert!(looks_trial("This is a demo font for testing only"));
         assert!(!looks_trial("Contest Sans"));
         assert!(!looks_trial("Timeless Serif"));
+    }
+    #[test]
+    fn trial_reads_the_file_name_too() {
+        // GT Flexa Var Trial.ttf: every name-table entry is "GT Flexa Var"; the file name carries the word.
+        assert!(!trial_from_names(["GT Flexa Var", "GT Flexa Var", "Version 3.000;FEAKit 1.0"]));
+        assert!(trial_from_names(["GT Flexa Var", "GT Flexa Var Trial"])); // file stem
+        assert!(trial_from_names(["GT Flexa Var", "GT-Flexa-Var-Trial"])); // hyphenated stem
+        assert!(!trial_from_names(["Timeless Serif", "Timeless Serif Regular"]));
     }
     #[test]
     fn strips_default_instance_words() {
@@ -109,6 +117,17 @@ pub struct NameMeta {
     pub trial: bool,
     /// Where to get the font: vendor URL (ID 11), else licence URL (ID 14).
     pub foundry_url: Option<String>,
+    /// The file has variation axes (an `fvar` table).
+    pub variable: bool,
+}
+
+/// Does any of these strings (name-table entries, the file name) read as a trial build?
+/// The family names (IDs 1, 16) and the licence text (13) are not enough. "GT Flexa Var Trial.ttf"
+/// has no trial word in any of its name-table entries (family, full name, PostScript name,
+/// unique ID are all "GT Flexa Var"); only the file name says so. Foundries ship trials
+/// with "Trial" in the file name, so the file name counts.
+pub fn trial_from_names<'a>(names: impl IntoIterator<Item = &'a str>) -> bool {
+    names.into_iter().any(looks_trial)
 }
 
 /// Words foundries use for trial builds ("TestSöhne", "GT Flexa Trial", "... Demo").
@@ -132,15 +151,19 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
     let vendor = font.os2().ok().map(|t| t.ach_vend_id().to_string().trim().to_string()).filter(|v| {
         !v.is_empty() && !matches!(v.to_uppercase().as_str(), "UKWN" | "NONE" | "XXXX" | "----" | "PFED" | "\0\0\0\0")
     });
-    let trial = [StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME, StringId::LICENSE_DESCRIPTION]
+    let mut names: Vec<String> = [StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME, StringId::FULL_NAME, StringId::LICENSE_DESCRIPTION]
         .into_iter()
         .filter_map(text)
-        .any(|t| looks_trial(&t));
+        .collect();
+    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+        names.push(stem.to_string());
+    }
+    let trial = trial_from_names(names.iter().map(String::as_str));
     let foundry_url = [StringId::VENDOR_URL, StringId::LICENSE_URL]
         .into_iter()
         .filter_map(text)
         .find(|u| u.starts_with("http"));
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url })
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: font.axes().len() > 0 })
 }
 
 pub struct FontMeta {
