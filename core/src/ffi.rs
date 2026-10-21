@@ -417,6 +417,11 @@ impl Library {
         userdata::choose(&*self.lock()?, brand, &job, &family).map_err(from_msg)
     }
 
+    /// Remove the choice for this brand and job (used by "Undo" after a first choice).
+    pub fn choice_clear(&self, brand: i64, job: String) -> Result<(), CoreError> {
+        userdata::clear_choice(&*self.lock()?, brand, &job).map_err(from_msg)
+    }
+
     pub fn choices(&self, brand: i64) -> Result<Vec<userdata::Choice>, CoreError> {
         userdata::choices(&*self.lock()?, brand).map_err(from_msg)
     }
