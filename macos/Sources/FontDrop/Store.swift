@@ -29,8 +29,14 @@ final class Store {
     var pairsError: String?
 
     let dbPath: String
+    /// Opened on first load. The core migrates the DB to the current schema as it opens.
+    private var library: Library?
+    var refreshing = false
 
     init(dbPath: String) { self.dbPath = dbPath }
+
+    /// The shared engine handle (also used by the bench).
+    var core: Library? { library }
 
     var selected: FamilySummary? { families.first { $0.id == selection } }
 
@@ -38,11 +44,18 @@ final class Store {
     func load() async {
         let db = dbPath
         do {
+            let lib: Library
+            if let existing = library {
+                lib = existing
+            } else {
+                lib = try await Task.detached(priority: .userInitiated) { try Library.open(path: db) }.value
+                library = lib
+            }
             let (fams, famMs, fonts, fontMs) = try await Task.detached(priority: .userInitiated) {
                 let t0 = DispatchTime.now()
-                let fams = try listFamilies(dbPath: db)
+                let fams = try lib.listFamilies()
                 let t1 = DispatchTime.now()
-                let fonts = try listFonts(dbPath: db)
+                let fonts = try lib.listFonts()
                 let t2 = DispatchTime.now()
                 return (fams, ms(t0, t1), fonts, ms(t1, t2))
             }.value
@@ -56,14 +69,31 @@ final class Store {
         }
     }
 
+    /// Scan + classify off the main thread, then re-read the families.
+    func refresh() async {
+        guard let lib = library, !refreshing else { return }
+        refreshing = true
+        let t0 = DispatchTime.now()
+        let result: Result<UInt32, Error> = await Task.detached(priority: .utility) {
+            Result { try lib.refreshLibrary() }
+        }.value
+        let elapsed = ms(t0, DispatchTime.now())
+        refreshing = false
+        switch result {
+        case .success(let n): timings.append(Timing(label: "refresh_library (\(n) fonts)", ms: elapsed))
+        case .failure(let e): loadError = "\(e)"
+        }
+        await load()
+    }
+
     func loadPairs(for family: FamilySummary) async {
+        guard let lib = library else { return }
         pairsLoading = true
-        let db = dbPath
         let id = family.fontId
         let (result, elapsed, err): ([PairBucket], Double, String?) = await Task.detached(priority: .userInitiated) {
             let t0 = DispatchTime.now()
             do {
-                let r = try fontPairs(dbPath: db, fontId: id, excludedIds: [], job: nil)
+                let r = try lib.fontPairs(fontId: id, excludedIds: [], job: nil)
                 return (r, ms(t0, DispatchTime.now()), nil)
             } catch {
                 return ([], ms(t0, DispatchTime.now()), "\(error)")

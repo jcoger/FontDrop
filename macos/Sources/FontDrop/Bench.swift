@@ -80,12 +80,12 @@ enum Bench {
 
         // pair query latency, 5 families
         var pairMs: [Double] = []
-        let db = store.dbPath
+        guard let lib = store.core else { return }
         for f in store.families.prefix(60).filter({ $0.styleCount > 2 }).prefix(5) {
             let id = f.fontId
             let m: Double = await Task.detached {
                 let t0 = DispatchTime.now()
-                _ = try? fontPairs(dbPath: db, fontId: id, excludedIds: [], job: nil)
+                _ = try? lib.fontPairs(fontId: id, excludedIds: [], job: nil)
                 return ms(t0, DispatchTime.now())
             }.value
             pairMs.append(m)

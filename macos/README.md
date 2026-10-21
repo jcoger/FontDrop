@@ -59,3 +59,11 @@ Things I tried that did not help: fixed row heights (`.frame(height:)`) made it 
 - `list_families` picks "upright nearest 400" using the `style` column plus file name; `db.rs::unify_family_skeletons` uses file name only. A few families may differ.
 - `font_pairs` re-scans the table for `file_path`; fold it into `load_all_fonts`.
 - `FamilySummary.serif` is `flesh_serif != 0`.
+
+## Wave 1 update: one shared engine
+
+The engine now lives only in `core/` (db, scan, classifier, metrics, pairing, userdata, google_fonts, name-table helpers). `src-tauri` is a thin shell that depends on it by path. The Swift surface is behind the core's `uniffi` feature (off by default, so the Tauri app does not carry the FFI scaffolding; `core/build-swift.sh` turns it on).
+
+Swift calls one object: `Library.open(path:)` (runs migrations), then `listFamilies()`, `listFonts()`, `fontPairs(fontId:excludedIds:job:)`, brands CRUD, `shortlistGet/Set`, `choose/choices`, `houseStyle()`, `refreshLibrary()` (scan + classify on its own connection; call from a background task). Errors are the `CoreError` enum. `--refresh` runs it from the app.
+
+Against a rescanned DB copy the family list is the current model: 709 families from 5,982 files (the spike's 3,339 came from a stale DB). Screenshot: `docs/screenshot-wave1.png`.

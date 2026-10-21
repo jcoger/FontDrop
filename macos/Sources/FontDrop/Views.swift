@@ -52,7 +52,10 @@ struct RootView: View {
         } detail: {
             DetailView(store: store)
         }
-        .task { await store.load() }
+        .task {
+            await store.load()
+            if CommandLine.arguments.contains("--refresh") { await store.refresh() }
+        }
         .task(id: store.selection) {
             if let f = store.selected { await store.loadPairs(for: f) }
         }
@@ -102,7 +105,7 @@ struct FamilyListView: View {
         List(store.families, selection: $store.selection) { f in
             VStack(alignment: .leading, spacing: 2) {
                 FontText(path: f.filePath, preferred: f.name, size: 22)
-                Text("\(f.name) · \(f.styleCount) styles · \(f.serif ? "serif" : f.skeleton)")
+                Text("\(f.name) · \(f.styleCount) styles · \(f.serif ? "serif" : f.skeleton)\(f.isTrial ? " · trial" : "")")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(.vertical, 3)
@@ -159,7 +162,7 @@ struct DetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
                         FontText(path: f.filePath, preferred: f.name, size: 56)
-                        Text("\(f.name) · \(f.styleCount) styles · skeleton \(f.skeleton)")
+                        Text("\(f.name) · \(f.styleCount) styles · skeleton \(f.skeleton)\(f.isTrial ? " · trial" : "")")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
                     if store.pairsLoading { ProgressView("Finding pairs") }

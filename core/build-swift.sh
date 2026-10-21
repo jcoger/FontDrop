@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerates everything Swift needs from the Rust core, from scratch:
-#   1. builds libfontdrop_core.a (release, aarch64-apple-darwin)
+#   1. builds libfontdrop_core.a (release, aarch64-apple-darwin, --features uniffi)
 #   2. generates the Swift bindings with UniFFI (library mode, no .udl file)
 #   3. packages the static lib + C header + modulemap as an XCFramework
 #   4. writes the local Swift package macos/FontDropCore (Package.swift,
@@ -23,7 +23,7 @@ rm -rf "$BUILD" "$PKG/FontDropCore.xcframework" "$PKG/Sources/FontDropCore/fontd
 mkdir -p "$BUILD/headers" "$BUILD/swift" "$PKG/Sources/FontDropCore"
 
 echo "==> cargo build (release, $TARGET)"
-(cd "$CORE" && "$CARGO" build --release --target "$TARGET")
+(cd "$CORE" && "$CARGO" build --release --features uniffi --target "$TARGET")
 
 echo "==> generate Swift bindings"
 (cd "$CORE" && "$CARGO" run --release --features bindgen --bin uniffi-bindgen -- \
