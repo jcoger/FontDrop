@@ -255,16 +255,10 @@ fn is_monospaced(font: &FontRef) -> bool {
     advances.len() == 4 && advances.iter().all(|a| (a - advances[0]).abs() < 0.5)
 }
 
-/// Serif test on 'l' (fallback 'I'): ink just above the baseline vs ink at
-/// mid-height. A serif foot is much wider than the stem; a sans foot isn't.
-/// Slab and bracketed serifs both read wide; flared (Optima) reads sans.
-fn measure_serif(font: &FontRef) -> Option<bool> {
-    // Monospaced faces do the Mono job and aren't judged as serif or sans for
-    // pairing. Their 'l' carries a foot bar that reads as a serif.
-    if is_monospaced(font) {
-        return Some(false);
-    }
-    let contours = get_glyph_contours(font, 'l').or_else(|| get_glyph_contours(font, 'I'))?;
+/// Foot width over stem width for one glyph: ink just above the baseline vs
+/// ink at mid-height. A serif foot is much wider than the stem.
+fn foot_ratio(font: &FontRef, ch: char) -> Option<f32> {
+    let contours = get_glyph_contours(font, ch)?;
     let pts: Vec<&Point> = contours.iter().flat_map(|c| c.points.iter()).collect();
     if pts.is_empty() { return None; }
     let (min_x, max_x) = pts.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p.x), b.max(p.x)));
@@ -278,7 +272,28 @@ fn measure_serif(font: &FontRef) -> Option<bool> {
         .iter()
         .map(|f| ink_width(&contours, min_y + h * f, min_x, max_x))
         .fold(0.0_f32, f32::max);
-    Some(foot / stem > 1.6)
+    Some(foot / stem)
+}
+
+/// Serif test: a wide foot on both 'l' and 'i'. Requiring both stops a tailed
+/// 'l' (DIN, Seravek) from reading as a serif. Falls back to 'l' or 'I' alone
+/// when 'i' is missing. Slab and bracketed serifs read wide; flared (Optima)
+/// reads sans.
+fn measure_serif(font: &FontRef) -> Option<bool> {
+    // Monospaced faces do the Mono job and aren't judged as serif or sans for
+    // pairing. Their 'l' carries a foot bar that reads as a serif.
+    if is_monospaced(font) {
+        return Some(false);
+    }
+    let l = foot_ratio(font, 'l').or_else(|| foot_ratio(font, 'I'))?;
+    match foot_ratio(font, 'i') {
+        // Sans measure 1.0; flared sans (Optima) about 1.2; wedge serifs
+        // (OT Jubilee) about 1.33; bracketed serifs 2.5 and up. The line sits
+        // between flared and wedge. Very subtle serifs (PP Museum, 1.09) still
+        // read as sans: a known miss, not tuned away.
+        Some(i) => Some(l > 1.27 && i > 1.27),
+        None => Some(l > 1.27),
+    }
 }
 
 /// Aperture of 'c': how far apart the two stroke ends sit. From mid-height,
@@ -762,7 +777,7 @@ mod tests {
     }
 
     // ── Skeleton answer set (system fonts with an established skeleton) ────
-    //   cargo test --lib skeleton_answer_set -- --ignored --nocapture
+    //   cd core && cargo test --lib skeleton_answer_set -- --ignored --nocapture
     const ANSWERS: &[(&str, &str, &str)] = &[
         ("/System/Library/Fonts/Supplemental/GillSans.ttc", "Gill Sans", "dynamic"),
         ("/System/Library/Fonts/Palatino.ttc", "Palatino", "dynamic"),
@@ -836,5 +851,16 @@ mod tests {
                 measure_stress_angle(&f).map(|v| format!("{v:.0}")).unwrap_or("-".into()));
         }
         println!("\nskeleton answer set: {right} of {}", ANSWERS.len());
+    }
+
+    /// Print foot ratios for files in FOOT_FILES (comma-separated paths).
+    #[test]
+    #[ignore]
+    fn print_foot_ratios() {
+        for path in std::env::var("FOOT_FILES").unwrap_or_default().split(',').filter(|p| !p.is_empty()) {
+            let data = std::fs::read(path).unwrap();
+            let f = FontRef::from_index(&data, 0).unwrap();
+            println!("{:<40} l {:?} i {:?}", path.rsplit('/').next().unwrap(), foot_ratio(&f, 'l'), foot_ratio(&f, 'i'));
+        }
     }
 }

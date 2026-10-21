@@ -1,11 +1,10 @@
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{parse_family, parse_font_meta, read_family_name, read_name_meta, Classification};
+use crate::names::{parse_family, parse_font_meta, read_family_name, read_name_meta, Classification};
 use crate::classifier;
 use crate::metrics;
 
@@ -66,11 +65,6 @@ pub struct FontUpdate {
     pub category: Option<String>,
     pub classification_reason: Option<String>,
 }
-
-// ── Managed state ─────────────────────────────────────────────────────────────
-
-pub struct DbState(pub Mutex<Connection>);
-pub struct AppDataDir(pub PathBuf);
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -152,7 +146,13 @@ const MIGRATIONS: &[&str] = &[
 /// Apply any migrations with index >= the DB's current user_version, then
 /// stamp user_version to MIGRATIONS.len(). Tolerates "duplicate column"
 /// (existing DBs already have these columns) but surfaces any other error.
+#[cfg(test)]
 pub(crate) fn run_migrations(conn: &Connection) {
+    try_run_migrations(conn).expect("schema migration failed");
+}
+
+/// Same as `run_migrations`, but reports failure instead of panicking.
+pub fn try_run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
     let current: i64 = conn
         .query_row("PRAGMA user_version;", [], |r| r.get(0))
         .unwrap_or(0);
@@ -167,7 +167,7 @@ pub(crate) fn run_migrations(conn: &Connection) {
             // error here is expected and safe to ignore. Anything else is a
             // real failure we must not hide.
             if !msg.contains("duplicate column") {
-                panic!("schema migration {} failed: {}", i, e);
+                return Err(e);
             }
         }
     }
@@ -176,22 +176,31 @@ pub(crate) fn run_migrations(conn: &Connection) {
     // (the value is MIGRATIONS.len(), not user input).
     let target = MIGRATIONS.len();
     conn.execute_batch(&format!("PRAGMA user_version = {};", target))
-        .expect("failed to set user_version");
 }
 
 // ── DB init ───────────────────────────────────────────────────────────────────
 
-pub fn open_db(app_data_dir: &Path) -> Connection {
-    std::fs::create_dir_all(app_data_dir).ok();
-    let db_path = app_data_dir.join("fontdrop.db");
-    let conn = Connection::open(db_path).expect("failed to open font database");
+/// File name of the library database inside the app data dir.
+pub const DB_FILE: &str = "fontdrop.db";
+
+/// Open (creating if needed) the library DB at `db_path`, in WAL mode with a
+/// busy timeout, and bring its schema up to date. Every app that opens the DB
+/// through here gets the current schema, whatever wrote the file before.
+pub fn try_open_db_at(db_path: &Path) -> Result<Connection, rusqlite::Error> {
+    if let Some(dir) = db_path.parent() {
+        std::fs::create_dir_all(dir).ok();
+    }
+    let conn = Connection::open(db_path)?;
     // busy_timeout: the background scan writes while the UI reads and edits.
-    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;")
-        .expect("failed to set pragmas");
-    conn.execute_batch(CREATE_TABLE)
-        .expect("failed to create fonts table");
-    run_migrations(&conn);
-    conn
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;")?;
+    conn.execute_batch(CREATE_TABLE)?;
+    try_run_migrations(&conn)?;
+    Ok(conn)
+}
+
+/// Panicking convenience for the app shell, which has no way to run without a DB.
+pub fn open_db(app_data_dir: &Path) -> Connection {
+    try_open_db_at(&app_data_dir.join(DB_FILE)).expect("failed to open font database")
 }
 
 // ── Scan + upsert ─────────────────────────────────────────────────────────────
@@ -247,6 +256,11 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
             .unwrap_or(&file_name);
 
         let family = read_family_name(&path).unwrap_or_else(|| parse_family(stem));
+        // Apple's private system faces (".SF Arabic", ".LastResort") are hidden
+        // from Font Book and every font menu; hide them here too.
+        if family.starts_with('.') || family == "LastResort" {
+            continue;
+        }
         let meta = parse_font_meta(&path, &family);
 
         results.push(ScannedFont {
@@ -291,9 +305,28 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     }
 }
 
+/// Drop rows whose font file is gone (uninstalled since the last scan) and
+/// Apple's private system faces. The scan only ever added and updated rows, so
+/// removed fonts stayed in the library forever.
+fn prune_missing(conn: &Connection) {
+    let rows: Vec<(String, String, String)> = match conn.prepare("SELECT font_id, file_path, font_family FROM fonts") {
+        Ok(mut st) => st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .map(|it| it.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default(),
+        Err(_) => return,
+    };
+    for (id, path, family) in rows {
+        let hidden = family.starts_with('.') || family == "LastResort";
+        if hidden || !Path::new(&path).exists() {
+            conn.execute("DELETE FROM fonts WHERE font_id = ?1", params![id]).ok();
+        }
+    }
+}
+
 /// Bump when the classifier's rules change: every non-override font is then
 /// reclassified once on the next launch instead of only the 'unknown' ones.
-pub const CLASSIFIER_VERSION: i64 = 6;
+pub const CLASSIFIER_VERSION: i64 = 8;
 
 fn meta_get(conn: &Connection, key: &str) -> Option<String> {
     conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| r.get(0)).ok()
@@ -394,6 +427,37 @@ fn unify_family_skeletons(conn: &Connection) {
             "UPDATE fonts SET skeleton = ?1, flesh_contrast = ?2, classification_reason = ?3 \
              WHERE font_family = ?4 AND user_override = 0",
             params![skeleton, flesh, format!("family Regular: {}", reason.trim_start_matches("family Regular: ")), family],
+        )
+        .ok();
+    }
+    unify_family_serif(conn);
+}
+
+/// Serif or sans is a family trait too. Italics end in curves, not foot
+/// serifs, so an italic file of a serif family measured as sans. The upright
+/// face nearest weight 400 decides for the whole family.
+fn unify_family_serif(conn: &Connection) {
+    let rows: Vec<(String, String, i64, i32)> = match conn.prepare("SELECT font_family, file_name, weight, flesh_serif FROM fonts") {
+        Ok(mut stmt) => stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .map(|it| it.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default(),
+        Err(_) => return,
+    };
+    let mut best: std::collections::HashMap<String, (i64, i32)> = std::collections::HashMap::new();
+    for (family, file_name, weight, serif) in rows {
+        let lower = file_name.to_lowercase();
+        let slanted = lower.contains("italic") || lower.contains("oblique") || lower.contains("kursiv");
+        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+        let entry = best.entry(family).or_insert((i64::MAX, 0));
+        if dist < entry.0 {
+            *entry = (dist, serif);
+        }
+    }
+    for (family, (_, serif)) in best {
+        conn.execute(
+            "UPDATE fonts SET flesh_serif = ?1 WHERE font_family = ?2 AND user_override = 0",
+            params![serif, family],
         )
         .ok();
     }
@@ -547,14 +611,13 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
             }
         }
     }
+    prune_missing(conn);
 }
 
-// ── Tauri commands ────────────────────────────────────────────────────────────
+// ── Queries the apps call ─────────────────────────────────────────────────────
 
-#[tauri::command]
-pub fn get_font_db(state: tauri::State<'_, DbState>) -> Result<Vec<FontRow>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
+/// Every font row, sorted by family (what the Tauri UI loads on start).
+pub fn get_font_rows(conn: &Connection) -> Result<Vec<FontRow>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT font_id, name, file_path, file_name, source,
@@ -625,13 +688,11 @@ pub fn get_font_db(state: tauri::State<'_, DbState>) -> Result<Vec<FontRow>, Str
     Ok(result)
 }
 
-#[tauri::command]
 pub fn update_font_classification(
-    state: tauri::State<'_, DbState>,
+    conn: &Connection,
     font_id: String,
     updates: FontUpdate,
 ) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
     let now = now_iso();
 
     // Build dynamic SET clauses
@@ -684,12 +745,10 @@ pub fn update_font_classification(
     Ok(())
 }
 
-#[tauri::command]
 pub fn classify_single_font(
-    state: tauri::State<'_, DbState>,
+    conn: &Connection,
     font_id: String,
 ) -> Result<classifier::ClassificationResult, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
 
     let (file_path, family_name, category): (String, String, String) = conn
         .query_row(
@@ -723,19 +782,14 @@ pub fn classify_single_font(
     Ok(result)
 }
 
-#[tauri::command]
-pub fn refresh_google_fonts(
-    state: tauri::State<'_, DbState>,
-    data_dir: tauri::State<'_, AppDataDir>,
-) -> Result<u32, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
+/// Re-pull the Google Fonts catalogue and return how many fonts gained a foundry.
+pub fn refresh_google_fonts(conn: &Connection, data_dir: &Path) -> Result<u32, String> {
     // Count fonts before enrichment
     let before: u32 = conn
         .query_row("SELECT COUNT(*) FROM fonts WHERE foundry IS NOT NULL", [], |r| r.get(0))
         .unwrap_or(0);
 
-    crate::google_fonts::enrich_from_google(&conn, &data_dir.0, true);
+    crate::google_fonts::enrich_from_google(conn, data_dir, true);
 
     let after: u32 = conn
         .query_row("SELECT COUNT(*) FROM fonts WHERE foundry IS NOT NULL", [], |r| r.get(0))
@@ -744,20 +798,19 @@ pub fn refresh_google_fonts(
     Ok(after - before)
 }
 
-#[tauri::command]
-pub fn set_google_api_key(
-    data_dir: tauri::State<'_, AppDataDir>,
-    key: String,
-) -> Result<(), String> {
-    crate::google_fonts::save_api_key(&data_dir.0, &key);
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_google_api_key(
-    data_dir: tauri::State<'_, AppDataDir>,
-) -> Result<Option<String>, String> {
-    Ok(crate::google_fonts::get_api_key(&data_dir.0))
+/// The startup sequence both apps run off the main thread: scan the disk,
+/// read name tables, classify, measure, enrich from Google Fonts. Opens its own
+/// connection (WAL), so readers elsewhere are never blocked for long. Returns
+/// the number of font rows afterwards.
+pub fn refresh_library(db_path: &Path) -> Result<u32, String> {
+    let conn = try_open_db_at(db_path).map_err(|e| e.to_string())?;
+    populate_db(&conn);
+    enrich_from_name_tables(&conn);
+    classify_all(&conn);
+    enrich_metrics(&conn);
+    let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
+    crate::google_fonts::enrich_from_google(&conn, data_dir, false);
+    conn.query_row("SELECT COUNT(*) FROM fonts", [], |r| r.get(0)).map_err(|e| e.to_string())
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -807,10 +860,53 @@ mod tests {
         assert_eq!(v as usize, MIGRATIONS.len());
     }
 
+    /// An install written by an older build: fonts table without vendor_id,
+    /// is_trial, foundry_url, and no userdata tables. Opening it through the
+    /// core must migrate it in place and keep its rows.
+    #[test]
+    fn opening_an_old_schema_db_migrates_it() {
+        let dir = std::env::temp_dir().join(format!("fontdrop-core-old-schema-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("old.db");
+        let _ = std::fs::remove_file(&path);
+        {
+            let old = Connection::open(&path).unwrap();
+            old.execute_batch(CREATE_TABLE).unwrap();
+            // The first nine migrations had shipped; vendor_id and everything after had not.
+            for stmt in &MIGRATIONS[..9] {
+                old.execute_batch(stmt).ok(); // classification_reason is already in CREATE_TABLE
+            }
+            old.execute_batch("PRAGMA user_version = 9;").unwrap();
+            old.execute(
+                "INSERT INTO fonts (font_id, name, file_path, file_name, source, font_family, created_at, updated_at)
+                 VALUES ('a', 'Sample Regular', '/tmp/Sample-Regular.otf', 'Sample-Regular.otf', 'user', 'Sample', 'x', 'x')",
+                [],
+            )
+            .unwrap();
+            assert!(old.prepare("SELECT vendor_id FROM fonts").is_err());
+            assert!(old.prepare("SELECT is_trial FROM fonts").is_err());
+            assert!(old.prepare("SELECT foundry_url FROM fonts").is_err());
+            assert!(old.prepare("SELECT * FROM brands").is_err());
+        }
+
+        let conn = try_open_db_at(&path).unwrap();
+        conn.execute_batch("SELECT vendor_id, is_trial, foundry_url FROM fonts;").unwrap();
+        conn.execute_batch("SELECT * FROM brands; SELECT * FROM shortlist; SELECT * FROM choices; SELECT * FROM meta;").unwrap();
+        let v: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0)).unwrap();
+        assert_eq!(v as usize, MIGRATIONS.len());
+        let kept: i64 = conn.query_row("SELECT COUNT(*) FROM fonts WHERE font_id = 'a'", [], |r| r.get(0)).unwrap();
+        assert_eq!(kept, 1);
+        // user data works on the migrated DB
+        let b = crate::userdata::create_brand(&conn, "Sample Brand").unwrap();
+        assert_eq!(crate::userdata::list_brands(&conn).unwrap(), vec![b]);
+        drop(conn);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// Re-run the startup scan against a COPY of a real database, so a data fix
     /// can be measured without touching the live one. Run on demand:
     ///   cp "<app support>/fontdrop.db" /tmp/fd-copy.db
-    ///   FONTDROP_DB=/tmp/fd-copy.db cargo test --lib rescan_copy -- --ignored --nocapture
+    ///   cd core && FONTDROP_DB=/tmp/fd-copy.db cargo test --lib rescan_copy -- --ignored --nocapture
     #[test]
     #[ignore]
     fn rescan_copy() {
@@ -833,7 +929,7 @@ mod tests {
     }
 
     /// Build a fresh benchmark DB from a folder of fonts (one subfolder per family):
-    ///   BENCH_FONTS=<dir> BENCH_DB=<new.db> cargo test --lib build_bench_db -- --ignored --nocapture
+    ///   cd core && BENCH_FONTS=<dir> BENCH_DB=<new.db> cargo test --lib build_bench_db -- --ignored --nocapture
     #[test]
     #[ignore]
     fn build_bench_db() {
