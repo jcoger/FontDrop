@@ -239,10 +239,31 @@ fn ink_width(contours: &[Contour], y: f32, min_x: f32, max_x: f32) -> f32 {
     (0..steps).filter(|i| inside(contours, min_x + dx * (*i as f32 + 0.5), y)).count() as f32 * dx
 }
 
+/// The font declares fixed pitch (post.isFixedPitch), or its lowercase
+/// advances are all equal.
+fn is_monospaced(font: &FontRef) -> bool {
+    use skrifa::raw::TableProvider;
+    if font.post().map(|p| p.is_fixed_pitch() != 0).unwrap_or(false) {
+        return true;
+    }
+    let metrics = font.glyph_metrics(skrifa::instance::Size::unscaled(), skrifa::instance::LocationRef::default());
+    let charmap = font.charmap();
+    let advances: Vec<f32> = ['i', 'm', 'l', 'w']
+        .iter()
+        .filter_map(|c| charmap.map(*c).and_then(|g| metrics.advance_width(g)))
+        .collect();
+    advances.len() == 4 && advances.iter().all(|a| (a - advances[0]).abs() < 0.5)
+}
+
 /// Serif test on 'l' (fallback 'I'): ink just above the baseline vs ink at
 /// mid-height. A serif foot is much wider than the stem; a sans foot isn't.
 /// Slab and bracketed serifs both read wide; flared (Optima) reads sans.
 fn measure_serif(font: &FontRef) -> Option<bool> {
+    // Monospaced faces do the Mono job and aren't judged as serif or sans for
+    // pairing. Their 'l' carries a foot bar that reads as a serif.
+    if is_monospaced(font) {
+        return Some(false);
+    }
     let contours = get_glyph_contours(font, 'l').or_else(|| get_glyph_contours(font, 'I'))?;
     let pts: Vec<&Point> = contours.iter().flat_map(|c| c.points.iter()).collect();
     if pts.is_empty() { return None; }

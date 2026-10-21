@@ -287,7 +287,7 @@ pub fn enrich_from_name_tables(conn: &Connection) {
 
 /// Bump when the classifier's rules change: every non-override font is then
 /// reclassified once on the next launch instead of only the 'unknown' ones.
-pub const CLASSIFIER_VERSION: i64 = 5;
+pub const CLASSIFIER_VERSION: i64 = 6;
 
 fn meta_get(conn: &Connection, key: &str) -> Option<String> {
     conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| r.get(0)).ok()
