@@ -75,7 +75,7 @@ src/hooks/useExclusions.ts
 ### Step 1 — Re-verify `useFonts()` is dead before deleting
 
 ```
-cd /Users/jcoger/fontdrop
+cd fontdrop  # repo root
 grep -rn "useFonts(" src/        # call sites — expect ZERO (only the definition line in useFonts.ts)
 grep -rn "get_system_fonts" src/ # frontend invokes — expect ZERO
 ```
@@ -152,7 +152,7 @@ cd src-tauri && cargo build 2>&1 | tail -8
 **Expected:** clean build with **no `unused` warnings** for `FontInfo`/`scan_dir`/`get_system_fonts` (they're gone). If the build warns that something you kept is now unused, investigate — you may have removed too much or too little.
 
 ```
-cd /Users/jcoger/fontdrop
+cd fontdrop  # repo root
 grep -rn "useFonts" src/        # expect ZERO
 grep -rn "get_system_fonts" src/ src-tauri/   # expect ZERO
 ```
