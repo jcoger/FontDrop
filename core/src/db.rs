@@ -141,6 +141,16 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE IF NOT EXISTS choices (brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, job TEXT NOT NULL, font_family TEXT NOT NULL, chosen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (brand_id, job));",
     "ALTER TABLE fonts ADD COLUMN is_trial INTEGER;",
     "ALTER TABLE fonts ADD COLUMN foundry_url TEXT;",
+    // Finding fonts (finder.rs). Variable-font flag, read from the file's fvar table.
+    "ALTER TABLE fonts ADD COLUMN is_variable INTEGER;",
+    // Trial detection now also reads the full name (ID 4); re-read every file once.
+    "UPDATE fonts SET is_trial = NULL;",
+    // Google's public family list: normalized name -> category and popularity rank (1 = most popular).
+    "CREATE TABLE IF NOT EXISTS google_families (norm TEXT PRIMARY KEY, family TEXT NOT NULL, category TEXT, popularity INTEGER);",
+    // Per-user hides. hidden = 1: the user hid it. hidden = 0: the user showed a built-in junk family again.
+    "CREATE TABLE IF NOT EXISTS hidden (family TEXT PRIMARY KEY COLLATE NOCASE, hidden INTEGER NOT NULL DEFAULT 1);",
+    // Saved families (a star), global; separate from per-brand shortlists.
+    "CREATE TABLE IF NOT EXISTS favorites (family TEXT PRIMARY KEY COLLATE NOCASE, added_at TEXT NOT NULL DEFAULT (datetime('now')));",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -282,7 +292,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
 /// font (vendor_id NULL = not read yet; '' = read, no real vendor code). Foundry
 /// and designer only fill gaps; existing values (Google enrichment, edits) stay.
 pub fn enrich_from_name_tables(conn: &Connection) {
-    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL") {
+    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL") {
         Ok(mut st) => st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
@@ -291,15 +301,15 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     };
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
-        let (vendor, manufacturer, designer, trial, url) = match meta {
-            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url),
-            None => (String::new(), None, None, false, None),
+        let (vendor, manufacturer, designer, trial, url, variable) = match meta {
+            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable),
+            None => (String::new(), None, None, false, None, false),
         };
         conn.execute(
             "UPDATE fonts SET vendor_id = ?1, \
              foundry = COALESCE(NULLIF(foundry, ''), ?2), \
-             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5 WHERE font_id = ?6",
-            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id], // '' = read, none
+             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7 WHERE font_id = ?6",
+            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32], // '' = read, none
         )
         .ok();
     }
@@ -810,6 +820,8 @@ pub fn refresh_library(db_path: &Path) -> Result<u32, String> {
     enrich_metrics(&conn);
     let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
     crate::google_fonts::enrich_from_google(&conn, data_dir, false);
+    // Google's public family list (no key). Last, and never fatal: offline keeps the last stored list.
+    crate::google_list::sync_catalog(&conn, data_dir);
     conn.query_row("SELECT COUNT(*) FROM fonts", [], |r| r.get(0)).map_err(|e| e.to_string())
 }
 
@@ -899,6 +911,36 @@ mod tests {
         // user data works on the migrated DB
         let b = crate::userdata::create_brand(&conn, "Sample Brand").unwrap();
         assert_eq!(crate::userdata::list_brands(&conn).unwrap(), vec![b]);
+        drop(conn);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An install that already stamped is_trial = 0 with the old check (family names and licence
+    /// text only) must be re-read once: the finding-fonts migrations reset the flag.
+    #[test]
+    fn migration_makes_old_trial_flags_get_re_read() {
+        let dir = std::env::temp_dir().join(format!("fontdrop-core-trial-reset-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("old.db");
+        let _ = std::fs::remove_file(&path);
+        {
+            let old = Connection::open(&path).unwrap();
+            old.execute_batch(CREATE_TABLE).unwrap();
+            for stmt in &MIGRATIONS[..16] {
+                old.execute_batch(stmt).ok();
+            }
+            old.execute_batch("PRAGMA user_version = 16;").unwrap();
+            old.execute(
+                "INSERT INTO fonts (font_id, name, file_path, file_name, source, font_family, is_trial, created_at, updated_at)
+                 VALUES ('v', 'GT Flexa Var Trial', '/tmp/GT Flexa Var Trial.ttf', 'GT Flexa Var Trial.ttf', 'user', 'GT Flexa Var', 0, 'x', 'x')",
+                [],
+            )
+            .unwrap();
+        }
+        let conn = try_open_db_at(&path).unwrap();
+        let trial: Option<i64> = conn.query_row("SELECT is_trial FROM fonts WHERE font_id = 'v'", [], |r| r.get(0)).unwrap();
+        assert_eq!(trial, None, "NULL means 'read the file again'");
+        conn.execute_batch("SELECT is_variable FROM fonts; SELECT * FROM google_families; SELECT * FROM hidden; SELECT * FROM favorites;").unwrap();
         drop(conn);
         let _ = std::fs::remove_dir_all(&dir);
     }

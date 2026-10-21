@@ -27,9 +27,10 @@ enum FoundryLens: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// "Unexpected first" is gone until there is popularity data. Best match is the engine's order.
+/// Best match is the engine's order. "Less common first" uses Google's popularity rank
+/// (the only popularity data there is) and puts families Google does not list first.
 enum ReadingSort: String, CaseIterable, Identifiable {
-    case bestMatch = "Best match", xHeight = "Same x-height first", name = "Name"
+    case bestMatch = "Best match", xHeight = "Same x-height first", name = "Name", lessCommon = "Less common first"
     var id: String { rawValue }
 }
 
@@ -50,17 +51,21 @@ struct Candidate: Identifiable, Hashable {
     let pairType: String      // contrast | uniform | middle | superfamily | uncertain
     let evidence: [Evidence]
     let order: Int
+    /// Google popularity rank, 1 = most used. Nil: Google does not list the family (often paid or trial faces).
+    let googleRank: Int?
 
-    init(_ m: PairCandidate, order: Int) {
+    init(_ m: PairCandidate, order: Int, googleRank: Int? = nil) {
         id = m.fontId; family = m.family; filePath = m.filePath
-        pairType = m.pairType; evidence = m.evidence; self.order = order
+        pairType = m.pairType; evidence = m.evidence; self.order = order; self.googleRank = googleRank
     }
 
     /// For tests and previews.
-    init(id: String, family: String, filePath: String = "", pairType: String, evidence: [Evidence], order: Int) {
+    init(id: String, family: String, filePath: String = "", pairType: String, evidence: [Evidence], order: Int, googleRank: Int? = nil) {
         self.id = id; self.family = family; self.filePath = filePath
-        self.pairType = pairType; self.evidence = evidence; self.order = order
+        self.pairType = pairType; self.evidence = evidence; self.order = order; self.googleRank = googleRank
     }
+
+    var onGoogle: Bool { googleRank != nil }
 
     static func == (a: Candidate, b: Candidate) -> Bool { a.id == b.id }
     func hash(into h: inout Hasher) { h.combine(id) }
@@ -95,6 +100,9 @@ enum LensEngine {
             shown.sort { ($0.xHeightGap ?? 99, $0.order) < ($1.xHeightGap ?? 99, $1.order) }
         case .name:
             shown.sort { $0.family.localizedCaseInsensitiveCompare($1.family) == .orderedAscending }
+        case .lessCommon:
+            // Not on Google first; then the highest rank number (the least used) first. The engine's order breaks ties.
+            shown.sort { (($0.onGoogle ? 1 : 0), -($0.googleRank ?? 0), $0.order) < (($1.onGoogle ? 1 : 0), -($1.googleRank ?? 0), $1.order) }
         }
         return (shown, hidden)
     }

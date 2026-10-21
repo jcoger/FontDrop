@@ -159,3 +159,52 @@ A fresh reader (working brand designer, no plan) read the rendered strings. Find
 Landed and locked (reader said clear): the hidden-count line with Why, the Harmony and Superfamily descriptions, "Not scored. Your choice.", "License before you ship", "Pick a Display face first", "Name this brand", "Nothing here yet".
 
 Engine follow-up: source codes in `core/src/pairing.rs` stay codes; the UI maps them to the short titles in 7.15.
+
+## 8. Finding fonts (wave 3b, 2026-10-21)
+
+Strings for the filter bar, Saved, Hide and the Reading changes. Checked against sections 1 to 7: the designer's word wins over the engine's ("Your fonts", not "User"; "Mac system", not "System"), no em dashes, every label reads alone (Gate D). Keys live in `Lexicon.Finder` in `Lexicon.swift`.
+
+### 8.1 Filter bar (Display, UI and Mono grids)
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 8.1 | source.yours | **Your fonts** | Fonts in ~/Library/Fonts and /Library/Fonts. Never "User" (engine word) or "Installed" (system fonts are installed too) |
+| 8.2 | source.google | **Google Fonts** | The installed family is on Google's public list. Not "Web fonts": says where, not what |
+| 8.3 | source.system | **Mac system** | Fonts that ship with macOS. Not "System" alone: it reads as a setting |
+| 8.4 | chip.count | **Your fonts 376** | Quiet number after the label. It is what you get, with every other filter applied, so chips never read 0 just because another is on |
+| 8.5 | kind.* | **Serif · Sans · Script · Display · Mono** | Matches the categories designers use. "Sans", not "Sans serif": shorter, and the grid is already crowded |
+| 8.6 | more | **More** | Menu. Becomes **More · 2** when two style filters are on, so a hidden filter is never silent |
+| 8.7 | more.help | **Style filters and hidden families** | Tooltip |
+| 8.8 | traits.header | **Style** | Menu section: **Italic · Variable · Condensed · Wide · Trial**, each with its count. "Wide", not "Extended": the word the foundries' own specimens use |
+| 8.9 | showhidden | **Show hidden** | Toggle with a count (what it would add). Not "Show excluded": the old app's manager word |
+| 8.10 | search.prompt | **Search name, foundry or designer** | Display, UI, Mono. Says what it matches. Reading keeps **Search families** (it matches names only) |
+| 8.11 | clear | **Clear filters** | Same as 7.19 and 7.21. Also restores the new-user default: Your fonts + Google Fonts, junk hidden |
+| 8.12 | empty.nomatch | **No families match these filters.** + **Clear filters** | Grid empty state |
+| 8.13 | subtitle | "Acme set in each of 376 families. **Your fonts come first.**" | Replaces "User-installed fonts come first" |
+
+### 8.2 Saved, Hide, Unhide
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 8.14 | saved | **Saved** | Chip (with a star), sidebar item, inspector button state. One word for the global star. The per-brand list stays **Shortlist** (4.6): Saved is yours everywhere, a shortlist belongs to one brand and one job |
+| 8.15 | save | **Save** | Inspector button and card context menu when not saved. Tooltip on the card star |
+| 8.16 | save.remove | **Remove from Saved** | Context menu and star tooltip when saved. VoiceOver: **Remove [Family] from Saved** / **Save [Family]** |
+| 8.17 | saved.empty | **Nothing saved yet. Star a family to keep it here.** | Saved filter with no results. Same shape as 4.9 |
+| 8.18 | hide | **Hide** | Card context menu and inspector. Not "Exclude" or "Remove": nothing is deleted |
+| 8.19 | hide.help | **Hide this family from every list. Show it again from More.** | Tooltip. Says the way back (Gate E) |
+| 8.20 | unhide | **Unhide** | On a hidden family (visible when Show hidden is on) |
+| 8.21 | unhide.help | **Put this family back in the lists.** | Tooltip |
+| 8.22 | hidden.tag | **Hidden** | Pill on a card while Show hidden is on, same style as **Trial** |
+| 8.23 | source.fact | **Source** · "Your fonts · Google Fonts" | Inspector Facts row |
+
+### 8.3 Reading
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 8.24 | reading.longtext | **42 not made for long text** · **Show them** | Implements 7.20. The number is families removed by the long-text rule, from the core. With nothing removed the line reads **Showing faces made for long text** (6.10). Popover text unchanged (6.11) |
+| 8.25 | sort.lesscommon | **Less common first** | Sort option. Returns now that there is popularity data (2.4 said to hide it until then). Accurate: it orders by Google's popularity rank |
+| 8.26 | sort.lesscommon.help | **Faces fewer sites use. Families not on Google Fonts come first.** | Tooltip on the option and a quiet line beside the status while the sort is on. Says what "common" means and where unlisted families land (often paid or trial faces) |
+
+### Gates for section 8
+
+A pass (8.25 says Google, which is the data) · B pass · C pass (no em dashes; the numeric separator is a middle dot) · D pass (8.3, 8.8 read alone) · E pass (8.19 names the way back) · F pass · G n/a · H pending cold read · K pass (chips carry selection through fill and outline, and VoiceOver reads the selected state) · N pass · Q pass · R pass (no engine words: not "source", "kind", "trait", "facet")

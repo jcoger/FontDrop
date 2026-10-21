@@ -4,7 +4,8 @@ import QuartzCore
 
 // Developer tools, off unless a flag is passed:
 //   --screenshot <png> [--screen display|reading|set] [--appearance light|dark] [--brand <name>] [--select <family>]
-//       [--template article|hero|appui|poster] [--open-playground] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
+//       [--template article|hero|appui|poster] [--open-playground]
+//       [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
 //   --bench
 //       Measures load time and scroll frame times on the Display grid and Reading, prints "BENCH ..." lines, quits.
@@ -151,7 +152,7 @@ enum Bench {
 
         // Display grid: every family, fonts preloaded, 5 passes.
         model.screen = .display
-        model.category = .all
+        model.filter = .standard
         try? await Task.sleep(for: .seconds(1.5))
         for pass in 1...5 {
             let m0 = footprintMB()

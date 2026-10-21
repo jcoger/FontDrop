@@ -1,0 +1,13 @@
+)]}'
+{
+  "axisRegistry": [],
+  "familyMetadataList": [
+    { "family": "Open Sans", "category": "Sans Serif", "popularity": 1, "designers": ["Steve Matteson"] },
+    { "family": "Inter", "category": "Sans Serif", "popularity": 2, "designers": ["Rasmus Andersson"] },
+    { "family": "Roboto Condensed", "category": "Sans Serif", "popularity": 30, "designers": ["Christian Robertson"] },
+    { "family": "Fraunces", "category": "Serif", "popularity": 120, "designers": ["Undercase Type"] },
+    { "family": "Pacifico", "category": "Handwriting", "popularity": 90, "designers": ["Vernon Adams"] },
+    { "family": "Space Mono", "category": "Monospace", "popularity": 150, "designers": ["Colophon Foundry"] }
+  ],
+  "promotedScript": ""
+}

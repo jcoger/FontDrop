@@ -333,6 +333,7 @@ pub fn font_pairs(
         .ok_or_else(|| format!("Font {} not found", font_id))?;
 
     let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    excluded.extend(crate::finder::hidden_font_ids(conn)); // junk list and the user's hides
     if job == Some("reading") {
         excluded.extend(unfit_for_reading(&all));
     }
@@ -421,10 +422,42 @@ pub fn font_candidates(
         .find(|f| f.font_id == font_id)
         .ok_or_else(|| format!("Font {} not found", font_id))?;
     let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    excluded.extend(crate::finder::hidden_font_ids(conn)); // junk list and the user's hides
     if job == Some("reading") {
         excluded.extend(unfit_for_reading(&all));
     }
     Ok(ranked_candidates(primary, &all, &excluded, limit))
+}
+
+/// How many families the Reading rule (`unfit_for_reading`) removes from the candidate list:
+/// families that would rank without it and do not with it. Same other exclusions as
+/// `font_candidates` (the given ids, hidden families). Counts families, not files, and is
+/// not capped by the page size, so "N not made for long text" matches what "Show them" adds.
+pub fn unfit_family_count(
+    conn: &Connection,
+    font_id: &str,
+    excluded_ids: Vec<String>,
+) -> Result<u32, String> {
+    let all = load_all_fonts(conn)?;
+    let primary = all
+        .iter()
+        .find(|f| f.font_id == font_id)
+        .ok_or_else(|| format!("Font {} not found", font_id))?;
+    let mut base: HashSet<String> = excluded_ids.into_iter().collect();
+    base.extend(crate::finder::hidden_font_ids(conn));
+    let family_of: std::collections::HashMap<&str, &str> =
+        all.iter().map(|f| (f.font_id.as_str(), f.font_family.as_str())).collect();
+    let families = |excluded: &HashSet<String>| -> HashSet<String> {
+        rank_by_family(primary, &all, excluded)
+            .iter()
+            .filter_map(|s| family_of.get(s.font_id.as_str()).map(|f| f.to_string()))
+            .collect()
+    };
+    let without_rule = families(&base);
+    let mut with_rule = base;
+    with_rule.extend(unfit_for_reading(&all));
+    let kept = families(&with_rule);
+    Ok(without_rule.difference(&kept).count() as u32)
 }
 
 /// Score every non-hidden candidate against `primary` and fill the three buckets.
