@@ -1,7 +1,7 @@
 import React from "react";
 import { Grid, CellComponentProps } from "react-window";
 import { FontCard } from "./FontCard";
-import type { FontInfo } from "../hooks/useFonts";
+import type { FontInfo } from "../types/font";
 import type { Controls } from "../types/controls";
 
 const GAP = 16;

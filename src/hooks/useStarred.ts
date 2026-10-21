@@ -6,6 +6,7 @@ const LEGACY_KEYS = ["fontdrop:grid:starred", "fontdrop:explorer:starred"];
 export interface StarredState {
   starred: Set<string>;
   toggle: (id: string) => void;
+  clear: () => void;
   showStarred: boolean;
   setShowStarred: (v: boolean) => void;
 }
@@ -53,5 +54,7 @@ export function useStarred(): StarredState {
     });
   }, []);
 
-  return { starred, toggle, showStarred, setShowStarred };
+  const clear = useCallback(() => setStarred(new Set()), []);
+
+  return { starred, toggle, clear, showStarred, setShowStarred };
 }

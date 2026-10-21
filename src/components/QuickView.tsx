@@ -1,8 +1,8 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fontFamily } from "../lib/fontFace";
 import { easeOut, dur, springModal, useReducedMotion } from "../lib/motion";
-import type { FontInfo } from "../hooks/useFonts";
+import type { FontInfo } from "../types/font";
 import type { Controls } from "../types/controls";
 
 // Heights of top bars and controls bar
@@ -22,6 +22,8 @@ interface Props {
   onExclude: (fp: string) => void;
   onClose: () => void;
   onNavigate: (font: FontInfo) => void;
+  /** Opens Pair with this font as the Primary. */
+  onFindPairs?: (font: FontInfo) => void;
   topOffset?: number;
 }
 
@@ -38,10 +40,14 @@ export function QuickView({
   onExclude,
   onClose,
   onNavigate,
+  onFindPairs,
   topOffset = TOP_OFFSET,
 }: Props) {
   const reduced = useReducedMotion();
-  const currentIndex = font ? allFonts.findIndex((f) => f.file_path === font.file_path) : -1;
+  const currentIndex = useMemo(
+    () => (font ? allFonts.findIndex((f) => f.file_path === font.file_path) : -1),
+    [allFonts, font],
+  );
   const isStarred = font ? starred.has(font.file_path) : false;
 
   const goNext = useCallback(() => {
@@ -261,6 +267,18 @@ export function QuickView({
                 >
                   ↑↓ · Esc
                 </span>
+                {onFindPairs && (
+                  <button
+                    className="flex items-center gap-1.5 text-xs font-mono opacity-40 hover:opacity-80 transition-opacity cursor-pointer"
+                    style={{ color: controls.fgColor }}
+                    onClick={() => onFindPairs(font)}
+                  >
+                    Find pairs
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   className={[
                     "flex items-center gap-1.5 text-xs font-mono transition-all cursor-pointer",
