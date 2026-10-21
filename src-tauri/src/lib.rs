@@ -7,6 +7,7 @@ mod classifier;
 mod google_fonts;
 mod metrics;
 mod pairing;
+mod userdata;
 
 #[derive(Serialize, Clone)]
 pub struct Classification {
@@ -267,7 +268,16 @@ pub fn run() {
             db::refresh_google_fonts,
             db::set_google_api_key,
             db::get_google_api_key,
-            pairing::get_font_pairs
+            pairing::get_font_pairs,
+            userdata::brands_list,
+            userdata::brand_create,
+            userdata::brand_update,
+            userdata::brand_delete,
+            userdata::shortlist_get,
+            userdata::shortlist_set,
+            userdata::choice_set,
+            userdata::choices_get,
+            userdata::house_style_get
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

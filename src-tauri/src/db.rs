@@ -70,7 +70,7 @@ pub struct AppDataDir(pub PathBuf);
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
-const CREATE_TABLE: &str = "
+pub(crate) const CREATE_TABLE: &str = "
 CREATE TABLE IF NOT EXISTS fonts (
     font_id              TEXT PRIMARY KEY,
     name                 TEXT NOT NULL,
@@ -137,12 +137,16 @@ const MIGRATIONS: &[&str] = &[
     "ALTER TABLE fonts ADD COLUMN width_class TEXT;",
     "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
     "ALTER TABLE fonts ADD COLUMN vendor_id TEXT;",
+    // User data (userdata.rs): brands, a shortlist per job, chosen faces.
+    "CREATE TABLE IF NOT EXISTS brands (id INTEGER PRIMARY KEY, name TEXT NOT NULL, logo_svg TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));",
+    "CREATE TABLE IF NOT EXISTS shortlist (brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, job TEXT NOT NULL, font_family TEXT NOT NULL, added_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (brand_id, job, font_family));",
+    "CREATE TABLE IF NOT EXISTS choices (brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, job TEXT NOT NULL, font_family TEXT NOT NULL, chosen_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (brand_id, job));",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
 /// stamp user_version to MIGRATIONS.len(). Tolerates "duplicate column"
 /// (existing DBs already have these columns) but surfaces any other error.
-fn run_migrations(conn: &Connection) {
+pub(crate) fn run_migrations(conn: &Connection) {
     let current: i64 = conn
         .query_row("PRAGMA user_version;", [], |r| r.get(0))
         .unwrap_or(0);
