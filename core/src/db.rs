@@ -256,6 +256,11 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
             .unwrap_or(&file_name);
 
         let family = read_family_name(&path).unwrap_or_else(|| parse_family(stem));
+        // Apple's private system faces (".SF Arabic", ".LastResort") are hidden
+        // from Font Book and every font menu; hide them here too.
+        if family.starts_with('.') || family == "LastResort" {
+            continue;
+        }
         let meta = parse_font_meta(&path, &family);
 
         results.push(ScannedFont {
@@ -300,9 +305,28 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     }
 }
 
+/// Drop rows whose font file is gone (uninstalled since the last scan) and
+/// Apple's private system faces. The scan only ever added and updated rows, so
+/// removed fonts stayed in the library forever.
+fn prune_missing(conn: &Connection) {
+    let rows: Vec<(String, String, String)> = match conn.prepare("SELECT font_id, file_path, font_family FROM fonts") {
+        Ok(mut st) => st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .map(|it| it.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default(),
+        Err(_) => return,
+    };
+    for (id, path, family) in rows {
+        let hidden = family.starts_with('.') || family == "LastResort";
+        if hidden || !Path::new(&path).exists() {
+            conn.execute("DELETE FROM fonts WHERE font_id = ?1", params![id]).ok();
+        }
+    }
+}
+
 /// Bump when the classifier's rules change: every non-override font is then
 /// reclassified once on the next launch instead of only the 'unknown' ones.
-pub const CLASSIFIER_VERSION: i64 = 6;
+pub const CLASSIFIER_VERSION: i64 = 8;
 
 fn meta_get(conn: &Connection, key: &str) -> Option<String> {
     conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| r.get(0)).ok()
@@ -403,6 +427,37 @@ fn unify_family_skeletons(conn: &Connection) {
             "UPDATE fonts SET skeleton = ?1, flesh_contrast = ?2, classification_reason = ?3 \
              WHERE font_family = ?4 AND user_override = 0",
             params![skeleton, flesh, format!("family Regular: {}", reason.trim_start_matches("family Regular: ")), family],
+        )
+        .ok();
+    }
+    unify_family_serif(conn);
+}
+
+/// Serif or sans is a family trait too. Italics end in curves, not foot
+/// serifs, so an italic file of a serif family measured as sans. The upright
+/// face nearest weight 400 decides for the whole family.
+fn unify_family_serif(conn: &Connection) {
+    let rows: Vec<(String, String, i64, i32)> = match conn.prepare("SELECT font_family, file_name, weight, flesh_serif FROM fonts") {
+        Ok(mut stmt) => stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .map(|it| it.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default(),
+        Err(_) => return,
+    };
+    let mut best: std::collections::HashMap<String, (i64, i32)> = std::collections::HashMap::new();
+    for (family, file_name, weight, serif) in rows {
+        let lower = file_name.to_lowercase();
+        let slanted = lower.contains("italic") || lower.contains("oblique") || lower.contains("kursiv");
+        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+        let entry = best.entry(family).or_insert((i64::MAX, 0));
+        if dist < entry.0 {
+            *entry = (dist, serif);
+        }
+    }
+    for (family, (_, serif)) in best {
+        conn.execute(
+            "UPDATE fonts SET flesh_serif = ?1 WHERE font_family = ?2 AND user_override = 0",
+            params![serif, family],
         )
         .ok();
     }
@@ -556,6 +611,7 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
             }
         }
     }
+    prune_missing(conn);
 }
 
 // ── Queries the apps call ─────────────────────────────────────────────────────
