@@ -16,6 +16,7 @@ pub const JOBS: &[&str] = &["display", "reading", "ui", "mono"];
 // Tables: brands, shortlist, choices. Created by db::MIGRATIONS (append-only).
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Brand {
     pub id: i64,
     pub name: String,
@@ -23,6 +24,7 @@ pub struct Brand {
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Choice {
     pub job: String,
     pub font_family: String,
@@ -277,53 +279,3 @@ mod tests {
         assert!(h.statements.iter().any(|s| s.starts_with("Crossed hands")));
     }
 }
-
-// ── App commands (the same surface the SwiftUI app will call through the core) ─
-
-mod commands {
-    use super::*;
-    use crate::db::DbState;
-
-    fn with<T>(state: &tauri::State<'_, DbState>, f: impl FnOnce(&Connection) -> Result<T, String>) -> Result<T, String> {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
-        f(&conn)
-    }
-
-    #[tauri::command]
-    pub fn brands_list(state: tauri::State<'_, DbState>) -> Result<Vec<Brand>, String> {
-        with(&state, list_brands)
-    }
-    #[tauri::command]
-    pub fn brand_create(state: tauri::State<'_, DbState>, name: String) -> Result<Brand, String> {
-        with(&state, |c| create_brand(c, &name))
-    }
-    #[tauri::command]
-    pub fn brand_update(state: tauri::State<'_, DbState>, id: i64, name: String, logo_svg: Option<String>) -> Result<(), String> {
-        with(&state, |c| update_brand(c, id, &name, logo_svg.as_deref()))
-    }
-    #[tauri::command]
-    pub fn brand_delete(state: tauri::State<'_, DbState>, id: i64) -> Result<(), String> {
-        with(&state, |c| delete_brand(c, id))
-    }
-    #[tauri::command]
-    pub fn shortlist_get(state: tauri::State<'_, DbState>, brand: i64, job: String) -> Result<Vec<String>, String> {
-        with(&state, |c| shortlist(c, brand, &job))
-    }
-    #[tauri::command]
-    pub fn shortlist_set(state: tauri::State<'_, DbState>, brand: i64, job: String, family: String, on: bool) -> Result<(), String> {
-        with(&state, |c| if on { shortlist_add(c, brand, &job, &family) } else { shortlist_remove(c, brand, &job, &family) })
-    }
-    #[tauri::command]
-    pub fn choice_set(state: tauri::State<'_, DbState>, brand: i64, job: String, family: String) -> Result<(), String> {
-        with(&state, |c| choose(c, brand, &job, &family))
-    }
-    #[tauri::command]
-    pub fn choices_get(state: tauri::State<'_, DbState>, brand: i64) -> Result<Vec<Choice>, String> {
-        with(&state, |c| choices(c, brand))
-    }
-    #[tauri::command]
-    pub fn house_style_get(state: tauri::State<'_, DbState>) -> Result<HouseStyle, String> {
-        with(&state, house_style)
-    }
-}
-pub use commands::*;

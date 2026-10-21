@@ -762,7 +762,7 @@ mod tests {
     }
 
     // ── Skeleton answer set (system fonts with an established skeleton) ────
-    //   cargo test --lib skeleton_answer_set -- --ignored --nocapture
+    //   cd core && cargo test --lib skeleton_answer_set -- --ignored --nocapture
     const ANSWERS: &[(&str, &str, &str)] = &[
         ("/System/Library/Fonts/Supplemental/GillSans.ttc", "Gill Sans", "dynamic"),
         ("/System/Library/Fonts/Palatino.ttc", "Palatino", "dynamic"),

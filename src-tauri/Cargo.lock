@@ -1058,6 +1058,17 @@ dependencies = [
 name = "fontdrop"
 version = "0.1.0"
 dependencies = [
+ "fontdrop_core",
+ "rusqlite",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+]
+
+[[package]]
+name = "fontdrop_core"
+version = "0.1.0"
+dependencies = [
  "chrono",
  "dirs 5.0.1",
  "rusqlite",
@@ -1065,9 +1076,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "skrifa",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
  "ttf-parser",
  "ureq",
 ]

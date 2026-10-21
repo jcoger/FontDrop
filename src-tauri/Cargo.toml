@@ -20,13 +20,5 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-dirs = "5"
-ttf-parser = "0.24"
-skrifa = "0.26"
+fontdrop_core = { path = "../core" }
 rusqlite = { version = "0.31", features = ["bundled"] }
-sha2 = "0.10"
-chrono = "0.4"
-ureq = { version = "2", features = ["json"] }
-

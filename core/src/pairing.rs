@@ -1,9 +1,15 @@
-//! COPY of src-tauri/src/pairing.rs (scoring, unfit_for_reading, bucket_pairs),
-//! with the Tauri command, serde and the unit tests removed. Spike only: in the
-//! real port this file moves to core/ and src-tauri depends on core.
+//! Font pairing engine.
+//!
+//! Given a primary font, scores every other font in the SQLite
+//! database and returns the top matches ranked by structural
+//! compatibility using the Font Matrix skeleton/flesh model,
+//! supplemented by optical role, superfamily, metric harmony,
+//! and spacing personality signals.
 
 use rusqlite::Connection;
 use std::collections::HashSet;
+use serde::Serialize;
+
 /// Placeholder foundry assigned by Google Fonts enrichment when no specific
 /// foundry/designer is known (see google_fonts.rs). It marks a font as
 /// "enriched" but carries no real shared-origin signal, so the pairing scorer
@@ -12,11 +18,12 @@ const GENERIC_FOUNDRY: &str = "Google Fonts";
 
 // ── Output type ───────────────────────────────────────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct PairScore {
     pub font_id: String,
     pub score: u8,
     /// Unrounded score, used to rank so candidates don't tie.
+    #[serde(skip)]
     pub precise: f32,
     pub pair_type: String, // "harmonious" | "bold" | "conflict" | "uncertain" | "superfamily"
     pub reason: String,
@@ -26,7 +33,7 @@ pub struct PairScore {
 /// One piece of reasoning behind a score: which lens, what was measured, who
 /// says it matters and how strongly. Shown to the designer as "why", never as
 /// a verdict. Sources key: docs/research/pairing-from-books.md section 1.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Evidence {
     pub lens: String,
     pub detail: String,
@@ -37,8 +44,8 @@ pub struct Evidence {
     pub effect: i8,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct PairBucket {
+#[derive(Serialize, Clone, Debug)]
+pub struct PairBucket {
     pub label: String,
     pub description: String,
     pub pairs: Vec<PairScore>,
@@ -47,27 +54,27 @@ pub(crate) struct PairBucket {
 // ── Internal row for scoring ──────────────────────────────────────────────────
 
 #[allow(dead_code)] // loaded whole from the DB; not every column scores today
-pub(crate) struct FontData {
-    pub(crate) font_id: String,
-    pub(crate) font_family: String,
-    skeleton: String,
-    flesh_contrast: String,
-    flesh_serif: i32,
-    weight: u16,
-    x_height_ratio: Option<f64>,
-    cap_height_ratio: Option<f64>,
-    ascender_descender_ratio: Option<f64>,
-    foundry: Option<String>,
-    designer: Option<String>,
-    file_name: String,
-    optical_role: Option<String>,
-    superfamily_group: Option<String>,
-    superfamily_role: Option<String>,
-    weight_range_min: Option<i32>,
-    weight_range_max: Option<i32>,
-    spacing_personality: Option<String>,
-    width_class: Option<String>,
-    vendor_id: Option<String>,
+pub struct FontData {
+    pub font_id: String,
+    pub font_family: String,
+    pub skeleton: String,
+    pub flesh_contrast: String,
+    pub flesh_serif: i32,
+    pub weight: u16,
+    pub x_height_ratio: Option<f64>,
+    pub cap_height_ratio: Option<f64>,
+    pub ascender_descender_ratio: Option<f64>,
+    pub foundry: Option<String>,
+    pub designer: Option<String>,
+    pub file_name: String,
+    pub optical_role: Option<String>,
+    pub superfamily_group: Option<String>,
+    pub superfamily_role: Option<String>,
+    pub weight_range_min: Option<i32>,
+    pub weight_range_max: Option<i32>,
+    pub spacing_personality: Option<String>,
+    pub width_class: Option<String>,
+    pub vendor_id: Option<String>,
 }
 
 
@@ -262,7 +269,7 @@ fn score_pair(primary: &FontData, candidate: &FontData) -> Option<PairScore> {
 
 // ── Query + score ─────────────────────────────────────────────────────────────
 
-pub(crate) fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
+pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT font_id, font_family, skeleton, flesh_contrast, flesh_serif,
@@ -307,13 +314,37 @@ pub(crate) fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String>
     Ok(rows)
 }
 
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+/// `excluded_ids`: fonts the user has hidden. They never take a match slot.
+/// Browse filters (search, category, Starred) are deliberately NOT applied here:
+/// matches come from the whole visible library, not the left panel's current view.
+pub fn font_pairs(
+    conn: &Connection,
+    font_id: &str,
+    excluded_ids: Vec<String>,
+    job: Option<&str>,
+) -> Result<Vec<PairBucket>, String> {
+    let all = load_all_fonts(conn)?;
+
+    let primary = all
+        .iter()
+        .find(|f| f.font_id == font_id)
+        .ok_or_else(|| format!("Font {} not found", font_id))?;
+
+    let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    if job == Some("reading") {
+        excluded.extend(unfit_for_reading(&all));
+    }
+    Ok(bucket_pairs(primary, &all, &excluded))
+}
 
 /// Font ids whose family can't do the Reading job. Sources: a body face must
 /// ship regular, italic, bold and bold italic (Typewolf 18/19/36, Stocks);
 /// never a display cut in a text role (Typewolf 21, Reynolds); condensed and
 /// mono faces fail for long text (Typewolf 22/81, Refactoring UI).
 /// Italic here is "has an italic file", a proxy until true-italic is checked.
-pub(crate) fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
+pub fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
     #[derive(Default)]
     struct Cover { regular: bool, italic: bool, bold: bool, bold_italic: bool }
     let mut cover: std::collections::HashMap<&str, Cover> = Default::default();
@@ -344,7 +375,7 @@ pub(crate) fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
 }
 
 /// Score every non-hidden candidate against `primary` and fill the three buckets.
-pub(crate) fn bucket_pairs(
+pub fn bucket_pairs(
     primary: &FontData,
     all: &[FontData],
     excluded: &HashSet<String>,
@@ -384,3 +415,410 @@ pub(crate) fn bucket_pairs(
     .collect()
 }
 
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A neutral baseline font. Tests clone it and override individual fields
+    /// so each test isolates one rule.
+    fn font(id: &str, family: &str) -> FontData {
+        FontData {
+            font_id: id.to_string(),
+            font_family: family.to_string(),
+            skeleton: "geometric".to_string(),
+            flesh_contrast: "linear".to_string(),
+            flesh_serif: 0,
+            weight: 400,
+            x_height_ratio: None,
+            cap_height_ratio: None,
+            ascender_descender_ratio: None,
+            foundry: None,
+            designer: None,
+            file_name: "Test-Regular.ttf".to_string(),
+            optical_role: Some("general".to_string()),
+            superfamily_group: None,
+            superfamily_role: None,
+            weight_range_min: None,
+            weight_range_max: None,
+            spacing_personality: Some("normal".to_string()),
+            width_class: Some("normal".to_string()),
+            vendor_id: None,
+        }
+    }
+
+    // ── Bucketing: hidden fonts never take a match slot ────────────────────
+
+    /// Primary is geometric sans; every candidate is a geometric serif, so each
+    /// one scores as a harmonious pair and competes for bucket 1's four slots.
+    fn harmonious_pool(n: usize) -> (FontData, Vec<FontData>) {
+        let p = font("p", "Primary");
+        let mut all = vec![font("p", "Primary")];
+        for i in 0..n {
+            let mut c = font(&format!("c{i}"), &format!("Cand{i}"));
+            c.flesh_serif = 1;
+            all.push(c);
+        }
+        (p, all)
+    }
+
+    fn bucket_ids(buckets: &[PairBucket]) -> Vec<String> {
+        buckets.iter().flat_map(|b| b.pairs.iter().map(|p| p.font_id.clone())).collect()
+    }
+
+    #[test]
+    fn hidden_fonts_are_never_matches() {
+        let (p, all) = harmonious_pool(8);
+        let hidden: HashSet<String> = ["c0", "c1", "c2", "c3"].iter().map(|s| s.to_string()).collect();
+        let ids = bucket_ids(&bucket_pairs(&p, &all, &hidden));
+        assert!(ids.iter().all(|id| !hidden.contains(id)), "hidden font in results: {ids:?}");
+    }
+
+    // ── Ground-truth eval (real DB; run on demand) ─────────────────────────
+    //
+    // Pairings Jarrett actually shipped, scored both directions against the
+    // live font database. Not a pass/fail gate: it prints a hit-rate table.
+    //   (use a COPY: sqlite3 <live db> ".backup /tmp/fd-copy.db")
+    //   cd core && FONTDROP_DB=/tmp/fd-copy.db \
+    //     cargo test --lib eval_ground_truth -- --ignored --nocapture
+
+    /// (key a, key b, tokens that disqualify a family from matching key a / key b)
+    const GROUND_TRUTH: &[(&str, &str, &[&str], &[&str])] = &[
+        ("otjubileegolden", "ppmori", &[], &[]),
+        ("rhetorikserif", "brown", &[], &[]),
+        ("ppmuseum", "ppneuemontreal", &[], &["mono", "arabic", "text"]),
+        ("pprightslab", "ppneuemontreal", &[], &["mono", "arabic", "text"]),
+        ("pprightserif", "pprightgrotesk", &["mono"], &["mono"]),
+        ("ppframa", "ppframatext", &["text"], &[]),
+        ("otjubileeplatinum", "ppmuseum", &[], &[]),
+        // Gambarino + Satoshi retired from this set (2026-10): the brand moved to
+        // Timeless; skinny high-contrast serifs now read as a trend marker.
+        ("timelessserif", "timelesssans", &[], &[]),
+    ];
+
+    fn norm(s: &str) -> String {
+        s.to_lowercase().chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    fn matches(f: &FontData, key: &str, not: &[&str]) -> bool {
+        let n = norm(&f.font_family);
+        n.starts_with(key) && !not.iter().any(|t| n[key.len()..].contains(t))
+    }
+
+    /// The upright file nearest weight 400: what a person would click first.
+    fn pick_primary<'a>(all: &'a [FontData], key: &str, not: &[&str]) -> Option<&'a FontData> {
+        all.iter()
+            .filter(|f| matches(f, key, not) && !f.file_name.to_lowercase().contains("italic"))
+            .min_by_key(|f| (f.weight as i32 - 400).abs())
+    }
+
+    #[test]
+    #[ignore]
+    fn eval_ground_truth() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB");
+        let conn = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let all = load_all_fonts(&conn).unwrap();
+        let none = HashSet::new();
+        let (mut hits, mut runs) = (0, 0);
+        println!("\n{:<38} {:>6} {:>6} {:>9} {:>10}", "primary -> partner", "rank", "top11", "families", "skeleton");
+        for (a, b, na, nb) in GROUND_TRUTH {
+            for (pk, pn, ck, cn) in [(*a, *na, *b, *nb), (*b, *nb, *a, *na)] {
+                let Some(primary) = pick_primary(&all, pk, pn) else {
+                    println!("{:<38} primary not installed", format!("{pk} -> {ck}"));
+                    continue;
+                };
+                runs += 1;
+                let mut scores: Vec<PairScore> = all.iter().filter_map(|c| score_pair(primary, c)).filter(|s| s.score > 0).collect();
+                scores.sort_by(|x, y| y.precise.partial_cmp(&x.precise).unwrap_or(std::cmp::Ordering::Equal));
+                let by_id: std::collections::HashMap<&str, &FontData> = all.iter().map(|f| (f.font_id.as_str(), f)).collect();
+                let mut seen_fams: HashSet<String> = HashSet::new();
+                let rank = scores
+                    .iter()
+                    .filter(|s| seen_fams.insert(by_id[s.font_id.as_str()].font_family.clone()))
+                    .position(|s| matches(by_id[s.font_id.as_str()], ck, cn))
+                    .map(|i| i + 1);
+                let buckets = bucket_pairs(primary, &all, &none);
+                let shown: Vec<&FontData> = buckets.iter().flat_map(|b| b.pairs.iter()).map(|p| by_id[p.font_id.as_str()]).collect();
+                let hit = shown.iter().any(|f| matches(f, ck, cn));
+                let fams: HashSet<String> = shown.iter().map(|f| norm(&f.font_family)).collect();
+                if hit { hits += 1; }
+                println!("{:<38} {:>6} {:>6} {:>4} of {:<3} {:>10}",
+                    format!("{} -> {ck}", primary.font_family),
+                    rank.map(|r| r.to_string()).unwrap_or("0-score".into()),
+                    if hit { "HIT" } else { "-" }, fams.len(), shown.len(), primary.skeleton);
+            }
+        }
+        println!("\nreal partner shown in top 11: {hits} of {runs}  (rank = position among families)");
+    }
+
+    // ── Broad benchmark (Google Fonts pairs mined from real sites + books) ──
+    //   cd core && BENCH_DB=<bench.db> BENCH_PAIRS=../docs/research/benchmarks/web-pairs.csv \
+    //     cargo test --lib eval_benchmark -- --ignored --nocapture
+    // AUC = chance a real pair outscores a fake one (0.5 = coin flip).
+    // Negatives are popularity-matched, so popularity alone scores ~0.5.
+
+    fn auc(pos: &[f32], neg: &[f32]) -> f64 {
+        if pos.is_empty() || neg.is_empty() { return f64::NAN; }
+        let mut wins = 0.0;
+        for p in pos { for n in neg { wins += if p > n { 1.0 } else if p == n { 0.5 } else { 0.0 }; } }
+        wins / (pos.len() * neg.len()) as f64
+    }
+
+    #[test]
+    #[ignore]
+    fn eval_benchmark() {
+        let db = std::env::var("BENCH_DB").expect("set BENCH_DB");
+        let pairs = std::env::var("BENCH_PAIRS").expect("set BENCH_PAIRS");
+        let conn = Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let all = load_all_fonts(&conn).unwrap();
+        // Exact family first. Fallback: Google's CSS-API static files all claim
+        // their default instance as family ("Montserrat Thin" even for Bold),
+        // so match on the family with instance words stripped.
+        let rep = |fam: &str| -> Option<&FontData> {
+            let fam = fam.to_lowercase();
+            let upright = |f: &&FontData| !f.file_name.to_lowercase().contains("italic");
+            let exact = all.iter().filter(|f| f.font_family.to_lowercase() == fam).filter(upright)
+                .min_by_key(|f| (f.weight as i32 - 400).abs());
+            exact.or_else(|| {
+                all.iter()
+                    .filter(|f| crate::names::strip_instance_words(&f.font_family).to_lowercase() == fam)
+                    .filter(upright)
+                    .min_by_key(|f| (f.weight as i32 - 400).abs())
+            })
+        };
+        let text = std::fs::read_to_string(&pairs).unwrap();
+        let mut by_source: std::collections::BTreeMap<String, (Vec<f32>, Vec<f32>)> = Default::default();
+        let (mut used, mut missing) = (0, 0);
+        let mut types: std::collections::BTreeMap<String, (u32, u32)> = Default::default();
+        for line in text.lines().skip(1) {
+            let c: Vec<&str> = line.split(',').collect();
+            if c.len() < 4 { continue; }
+            let (a, b, label, source) = (c[0].trim(), c[1].trim(), c[2].trim() == "1", c[3].trim());
+            let (Some(fa), Some(fb)) = (rep(a), rep(b)) else { missing += 1; continue; };
+            used += 1;
+            let ab = score_pair(fa, fb);
+            let ba = score_pair(fb, fa);
+            let best = [ab, ba].into_iter().flatten().max_by(|x, y| x.precise.partial_cmp(&y.precise).unwrap());
+            let score = best.as_ref().map(|s| s.precise).unwrap_or(0.0);
+            let ty = best.map(|s| s.pair_type).unwrap_or_else(|| "none".into());
+            let t = types.entry(ty).or_default();
+            if label { t.0 += 1 } else { t.1 += 1 }
+            let group = if source == "books" { "books" } else { "github+neg" };
+            let e = by_source.entry(group.into()).or_default();
+            if label { e.0.push(score) } else { e.1.push(score) }
+        }
+        let (mut pos, mut neg) = (vec![], vec![]);
+        for (k, (p, n)) in &by_source {
+            println!("{k:<12} pos {:>4} neg {:>4} AUC {:.3}", p.len(), n.len(), auc(p, n));
+            pos.extend(p); neg.extend(n);
+        }
+        println!("pair types (pos, neg): {types:?}");
+        println!("pairs used {used}, missing fonts {missing}");
+        println!("OVERALL AUC {:.3}", auc(&pos, &neg));
+    }
+
+    // ── Base-score / pair_type matrix (scoring v2) ────────────────────────
+    #[test]
+    fn serif_with_sans_is_contrast() {
+        let p = font("p", "Primary");
+        let mut c = font("c", "Cand");
+        c.flesh_serif = 1;
+        assert_eq!(score_pair(&p, &c).unwrap().pair_type, "contrast");
+    }
+
+    #[test]
+    fn same_form_same_skeleton_is_uniform() {
+        let p = font("p", "Primary");
+        let c = font("c", "Cand");
+        assert_eq!(score_pair(&p, &c).unwrap().pair_type, "uniform");
+    }
+
+    #[test]
+    fn the_middle_scores_below_contrast_and_uniform() {
+        let p = font("p", "Primary"); // geometric sans
+        let mut middle = font("m", "Middle");
+        middle.skeleton = "rational".into(); // same form, different structure
+        let uniform = font("u", "Uniform");
+        let mut contrast = font("c", "Contrast");
+        contrast.flesh_serif = 1;
+        let m = score_pair(&p, &middle).unwrap();
+        assert_eq!(m.pair_type, "middle");
+        assert!(m.precise < score_pair(&p, &uniform).unwrap().precise);
+        assert!(m.precise < score_pair(&p, &contrast).unwrap().precise);
+    }
+
+    #[test]
+    fn superfamily_scores_below_an_equal_contrast_pair() {
+        let mut p = font("p", "Source Serif");
+        p.flesh_serif = 1;
+        let mut sf = font("s", "Source Sans");
+        p.superfamily_group = Some("Source".into());
+        sf.superfamily_group = Some("Source".into());
+        p.superfamily_role = Some("serif".into());
+        sf.superfamily_role = Some("sans".into());
+        let other = font("o", "Other Sans");
+        assert!(score_pair(&p, &sf).unwrap().precise < score_pair(&p, &other).unwrap().precise);
+    }
+
+    #[test]
+    fn results_show_one_file_per_family() {
+        let p = font("p", "Primary");
+        let mut all = vec![font("p", "Primary")];
+        for i in 0..6 {
+            let mut c = font(&format!("a{i}"), "Same Family");
+            c.flesh_serif = 1;
+            all.push(c);
+        }
+        let mut other = font("b", "Other Family");
+        other.flesh_serif = 1;
+        all.push(other);
+        let ids = bucket_ids(&bucket_pairs(&p, &all, &HashSet::new()));
+        assert_eq!(ids.len(), 2, "one per family: {ids:?}");
+    }
+
+
+    #[test]
+    fn self_pair_is_skipped() {
+        let a = font("x", "Alpha");
+        assert!(score_pair(&a, &a).is_none());
+    }
+
+    #[test]
+    fn same_family_is_skipped() {
+        let mut a = font("a", "Alpha");
+        let mut b = font("b", "Alpha"); // same family, different id
+        a.skeleton = "geometric".into();
+        b.skeleton = "rational".into();
+        assert!(score_pair(&a, &b).is_none());
+    }
+
+
+
+
+
+
+    // ── Same-flesh penalty ─────────────────────────────────────────────────
+
+
+    // ── Superfamily override ───────────────────────────────────────────────
+
+    #[test]
+    fn confirmed_superfamily_is_designed_together() {
+        let mut p = font("p", "Source Serif");
+        let mut c = font("c", "Source Sans");
+        p.superfamily_group = Some("Source".into());
+        c.superfamily_group = Some("Source".into());
+        p.superfamily_role = Some("serif".into());
+        c.superfamily_role = Some("sans".into());
+        let s = score_pair(&p, &c).expect("scores");
+        assert_eq!(s.pair_type, "superfamily");
+    }
+
+    #[test]
+    fn same_superfamily_same_role_is_not_superfamily() {
+        let mut p = font("p", "Source Sans");
+        let mut c = font("c", "Source Sans Caption");
+        p.superfamily_group = Some("Source".into());
+        c.superfamily_group = Some("Source".into());
+        p.superfamily_role = Some("sans".into());
+        c.superfamily_role = Some("sans".into());
+        let s = score_pair(&p, &c).expect("scores");
+        assert_ne!(s.pair_type, "superfamily");
+    }
+
+    // ── Additive modifiers (assert direction of the delta) ─────────────────
+
+
+
+
+    // ── Foundry catch-all (plan 002) ──────────────────────────────────────
+
+    #[test]
+    fn generic_google_foundry_grants_no_shared_foundry_bonus() {
+        // Generic placeholder foundry on both -> no shared-foundry reason.
+        let mut p = font("p", "Primary");
+        let mut generic = font("g", "GenericCand");
+        p.flesh_serif = 0;
+        generic.flesh_serif = 1; // keep flesh differing so base is stable
+        p.foundry = Some("Google Fonts".into());
+        generic.foundry = Some("Google Fonts".into());
+        let s_generic = score_pair(&p, &generic).expect("scores");
+        assert!(
+            !s_generic.reason.contains("shared foundry"),
+            "generic placeholder must not produce a shared-foundry reason: {}",
+            s_generic.reason
+        );
+
+        // Real shared foundry -> +4 and a correctly-labeled reason.
+        let mut p2 = font("p2", "Primary2");
+        let mut real2 = font("r2", "RealCand2");
+        p2.flesh_serif = 0;
+        real2.flesh_serif = 1;
+        p2.foundry = Some("Adobe".into());
+        real2.foundry = Some("Adobe".into());
+        let s_real = score_pair(&p2, &real2).expect("scores");
+        assert!(
+            s_real.reason.contains("shared foundry (Adobe)"),
+            "real shared foundry should be labeled: {}",
+            s_real.reason
+        );
+    }
+
+    // ── load_all_fonts error handling (plan 003) ──────────────────────────
+
+    #[test]
+    fn load_all_fonts_returns_ok_on_valid_schema() {
+        use rusqlite::Connection;
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        conn.execute_batch(
+            "CREATE TABLE fonts (
+                font_id TEXT, font_family TEXT, skeleton TEXT, flesh_contrast TEXT,
+                flesh_serif INTEGER, weight INTEGER, x_height_ratio REAL,
+                cap_height_ratio REAL, ascender_descender_ratio REAL, foundry TEXT,
+                designer TEXT, file_name TEXT, optical_role TEXT, superfamily_group TEXT,
+                superfamily_role TEXT, weight_range_min INTEGER, weight_range_max INTEGER,
+                spacing_personality TEXT, width_class TEXT, vendor_id TEXT
+            );
+            INSERT INTO fonts (font_id, font_family, skeleton, flesh_contrast, flesh_serif, weight, file_name)
+            VALUES ('a','Alpha','geometric','linear',0,400,'Alpha.ttf');",
+        )
+        .expect("create+insert");
+
+        let result = load_all_fonts(&conn);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn load_all_fonts_returns_err_on_missing_table() {
+        use rusqlite::Connection;
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        // No `fonts` table -> prepare fails -> Err, not panic.
+        assert!(load_all_fonts(&conn).is_err());
+    }
+
+    #[test]
+    fn closer_x_height_scores_at_least_as_high() {
+        let mut p = font("p", "Primary");
+        p.flesh_serif = 0;
+        p.x_height_ratio = Some(0.70);
+
+        let mut close = font("cl", "CloseCand");
+        close.flesh_serif = 1;
+        close.x_height_ratio = Some(0.70); // identical -> within 5%
+
+        let mut far = font("fa", "FarCand");
+        far.flesh_serif = 1;
+        far.x_height_ratio = Some(0.40); // far
+
+        let s_close = score_pair(&p, &close).expect("scores");
+        let s_far = score_pair(&p, &far).expect("scores");
+        assert!(
+            s_close.score >= s_far.score,
+            "close x-height {} should be >= far {}",
+            s_close.score,
+            s_far.score
+        );
+    }
+}
