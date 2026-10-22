@@ -125,9 +125,7 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func trailing(_ screen: Screen, chosen: String?) -> some View {
-        if screen == .reading, !model.shortlist("reading").isEmpty {
-            Text("\(model.shortlist("reading").count)").font(.caption).foregroundStyle(.secondary)
-        } else if chosen != nil {
+        if chosen != nil {
             Image(systemName: "checkmark").font(.caption).foregroundStyle(.secondary)
         } else if screen == .ui || screen == .mono {
             Image(systemName: "plus").font(.caption).foregroundStyle(.tertiary)

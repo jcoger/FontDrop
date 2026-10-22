@@ -161,6 +161,27 @@ final class AppModel {
     private(set) var candidatesError: String?
     var selectedCandidate: String?
     private var candidatesKey: String?
+    /// The stage shows the shortlisted faces side by side. Only counts while two or more are shortlisted.
+    var compareMode = false
+    /// How far the stage board is zoomed from Fit.
+    var stageZoom = StageZoom()
+    /// The designer opened or closed the inspector themselves, so the window size stops deciding.
+    var inspectorTouched = false
+    /// The window's width, for the inspector rule below.
+    var windowWidth: CGFloat = 0
+    private var inspectorAutoClosed = false
+
+    /// Reading needs room for its list and stage. When the window is too narrow for the inspector as well, the
+    /// inspector starts closed on Reading and comes back when you leave. Once the designer toggles it, their choice stands.
+    func applyInspectorRule() {
+        guard !inspectorTouched, windowWidth > 0 else { return }
+        if screen == .reading {
+            if !ReadingLayout.inspectorFits(windowWidth: windowWidth), showInspector { showInspector = false; inspectorAutoClosed = true }
+            else if ReadingLayout.inspectorFits(windowWidth: windowWidth), inspectorAutoClosed { showInspector = true; inspectorAutoClosed = false }
+        } else if inspectorAutoClosed {
+            showInspector = true; inspectorAutoClosed = false
+        }
+    }
 
     /// How many candidates Reading asked the core for. "Show more" adds a page.
     static let candidatePage = 40
@@ -252,7 +273,17 @@ final class AppModel {
     func isHidden(_ name: String) -> Bool { allEntries[name]?.hidden ?? false }
 
     var readingResult: (shown: [Candidate], hidden: Int) {
-        LensEngine.apply(candidates, lenses: lenses, search: search)
+        LensEngine.apply(candidates, lenses: effectiveLenses, search: search)
+    }
+
+    /// The lenses Reading really applies. With no Display face there is nothing to pair against, so the
+    /// Difference, Structure and Foundry questions are off and the list sorts by name or by how common a face is.
+    var effectiveLenses: Lenses {
+        guard displayFamily == nil else { return lenses }
+        var l = lenses
+        l.contrast = .any; l.structure = .any; l.foundry = .any
+        if !ReadingSort.withoutDisplay.contains(l.sort) { l.sort = .name }
+        return l
     }
 
     // MARK: background helper
@@ -527,7 +558,7 @@ final class AppModel {
     /// Asks the core for Reading partners of the chosen Display face. Fonts for every
     /// candidate are loaded before the list is shown, so the cards never write state.
     func loadCandidates() async {
-        guard let display = displayFamily else { candidates = []; candidatesKey = nil; return }
+        guard let display = displayFamily else { await loadStandaloneCandidates(); return }
         let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)/\(sourcesKey)"
         if key == candidatesKey { return }
         candidatesLoading = true
@@ -573,6 +604,39 @@ final class AppModel {
         candidatesLoading = false
     }
 
+    /// Reading as a starting point: no Display face yet, so the list is every family fit for long text
+    /// (or every family, after "Show them") in the current source scope. No pairing, so no evidence.
+    private func loadStandaloneCandidates() async {
+        let key = "\(brandID ?? 0)/none/\(includeUnfitFaces)/\(sourcesKey)"
+        if key == candidatesKey { return }
+        candidatesLoading = true
+        candidatesError = nil
+        let outside = idsOutsideSources(keeping: "")
+        let fitOnly = !includeUnfitFaces
+        do {
+            let found = try await background { try $0.readingFamilies(excludedIds: outside, onlyFit: fitOnly) }
+            guard displayFamily == nil else { return }       // a Display face was chosen while loading
+            var list: [Candidate] = []
+            for f in found.families {
+                guard let family = familyByName[f.family] else { continue }
+                list.append(Candidate(id: family.fontId, family: family.name, filePath: family.filePath,
+                                      pairType: "", evidence: [], order: list.count,
+                                      googleRank: allEntries[family.name]?.googleRank.map(Int.init), bodyStyle: nil))
+            }
+            candidates = list
+            notForLongText = Int(found.notForLongText)
+            candidatesHasMore = false
+            candidatesKey = key
+            fontTick += 1
+            if selectedCandidate == nil || !list.contains(where: { $0.id == selectedCandidate }) {
+                selectedCandidate = options.select.flatMap { s in list.first { $0.family == s }?.id } ?? readingResult.shown.first?.id
+            }
+        } catch {
+            candidatesError = "\(error)"
+        }
+        candidatesLoading = false
+    }
+
     /// The active source chips as one string, so a change reloads the Reading list.
     var sourcesKey: String { Source.all.filter(filter.sources.contains).map(\.key).joined(separator: ",") }
 
@@ -593,13 +657,50 @@ final class AppModel {
         await loadCandidates()
     }
 
-    func candidate(_ id: String?) -> Candidate? { candidates.first { $0.id == id } }
+    func candidate(_ id: String?) -> Candidate? {
+        candidates.first { $0.id == id } ?? (currentReadingCandidate.flatMap { $0.id == id ? $0 : nil })
+    }
+
+    /// The chosen Reading face as a candidate: the engine's own entry when it is loaded, else a plain one
+    /// without evidence. The list pins it at the top, so it never hides behind a filter or a page.
+    var currentReadingCandidate: Candidate? {
+        guard let name = choices["reading"], let family = familyByName[name] else { return nil }
+        if let hit = candidates.first(where: { $0.family == name }) { return hit }
+        return Candidate(id: family.fontId, family: name, filePath: family.filePath, pairType: "", evidence: [], order: -1)
+    }
+
+    /// Families side by side in Compare, in order. Empty unless Compare is on and two are shortlisted.
+    var comparedFamilies: [String] {
+        guard compareMode, Compare.isAvailable(shortlistCount: shortlist("reading").count) else { return [] }
+        return Compare.families(shortlist: shortlist("reading"), selected: candidate(selectedCandidate)?.family)
+    }
+
+    /// What a template draws for one Reading family next to the Display face. With no Display face yet the
+    /// family sets the whole template, headline included, so it is judged on its own.
+    func pairContext(reading name: String, fallbackPath: String? = nil) -> PairContext? {
+        let body: FaceSpec
+        if let family = familyByName[name] { body = face("reading", family) }
+        else if let fallbackPath { body = FaceSpec(path: fallbackPath, settings: .defaults(job: "reading")) }
+        else { return nil }
+        let headline: FaceSpec
+        if let display = displayFamily { headline = face("display", display) }
+        else if let family = familyByName[name] { headline = face("display", family) }
+        else { headline = FaceSpec(path: body.path, settings: .defaults(job: "display")) }
+        return PairContext(brand: brand?.name ?? "Brand Name", display: headline, body: body, tick: fontTick)
+    }
+
+    /// Loads every style file of these families, so a face set to a non-regular style draws at once.
+    func preloadStyles(of names: [String]) async {
+        let paths = names.flatMap { n in (fontsByFamily[n] ?? []).map(\.filePath) + [familyByName[n]?.filePath].compactMap { $0 } }
+        await FontLoader.shared.preload(paths: paths)
+        fontTick += 1
+    }
 
     // MARK: inspector detail
 
     func detail(for name: String) async -> FamilyDetail? {
         guard let fam = familyByName[name] else { return nil }
-        let styles = (fontsByFamily[name] ?? []).sorted { ($0.weight, $0.name) < ($1.weight, $1.name) }
+        let styles = StyleNames.sorted(fontsByFamily[name] ?? [], family: name)
         let paths = styles.map(\.filePath)
         return await Task.detached(priority: .userInitiated) {
             await FontLoader.shared.preload(paths: paths + [fam.filePath])

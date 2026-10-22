@@ -41,6 +41,22 @@ mod name_tests {
         assert!(!covers_latin(0, 0, 10), "figures alone are not Latin");
         assert!(!covers_latin(0, 1, 0));
     }
+    /// B3: the style name comes from the font's own name table (ID 17, then 2), not the file name.
+    #[test]
+    fn reads_the_fonts_own_style_name() {
+        use super::read_name_meta;
+        let dir = std::path::Path::new("/System/Library/Fonts/Supplemental");
+        let cases = [("Arial Bold Italic.ttf", "Bold Italic"), ("Arial.ttf", "Regular"), ("Arial Black.ttf", "Regular")];
+        let mut checked = 0;
+        for (file, want) in cases {
+            let path = dir.join(file);
+            if !path.exists() { continue; }
+            let meta = read_name_meta(&path).expect("readable font");
+            assert_eq!(meta.style_name.as_deref(), Some(want), "{file}");
+            checked += 1;
+        }
+        if checked == 0 { eprintln!("no system Arial found; style-name check skipped"); }
+    }
     #[test]
     fn strips_default_instance_words() {
         assert_eq!(strip_instance_words("Montserrat Thin"), "Montserrat");
@@ -132,6 +148,9 @@ pub struct NameMeta {
     pub variable: bool,
     /// Its cmap draws basic Latin (see `covers_latin`). Symbol and dingbat fonts do not.
     pub covers_latin: bool,
+    /// The font's own style name: typographic subfamily (ID 17), else subfamily (ID 2).
+    /// "Grand Heavy", "Text Book", "Regular". None when the file has neither.
+    pub style_name: Option<String>,
 }
 
 /// Counts outline commands; a glyph with none draws nothing.
@@ -215,7 +234,8 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
         .filter_map(text)
         .find(|u| u.starts_with("http"));
     let (u, l, d) = latin_coverage(&font);
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: font.axes().len() > 0, covers_latin: covers_latin(u, l, d) })
+    let style_name = [StringId::TYPOGRAPHIC_SUBFAMILY_NAME, StringId::SUBFAMILY_NAME].into_iter().find_map(text);
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: font.axes().len() > 0, covers_latin: covers_latin(u, l, d), style_name })
 }
 
 pub struct FontMeta {

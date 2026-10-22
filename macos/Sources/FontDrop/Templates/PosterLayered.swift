@@ -30,7 +30,7 @@ struct PosterLayered: View {
                 VStack {
                     Spacer()
                     HStack(alignment: .bottom) {
-                        ctx.display(TemplateCopy.layeredFoot, 30, lh: 1.07, italic: true)
+                        ctx.display(TemplateCopy.layeredFoot, 30, lh: 1.07, italic: true, width: 330)
                         Spacer()
                         ctx.label(TemplateCopy.layeredStation, color: p.accent, weight: 400)
                     }

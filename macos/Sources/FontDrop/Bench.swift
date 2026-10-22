@@ -7,6 +7,8 @@ import QuartzCore
 //       [--template article|hero|appui|poster] [--open-playground]
 //       [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
+//       FD_WINDOW=WxH sets the capture window size (default 1360x860). --inspector / --no-inspector force the inspector.
+//       Reading flags: --demo-shortlist, --compare, --zoom, --display-size, --reading-size, --pick-reading (see applyReadingFlags).
 //   --bench
 //       Measures load time and scroll frame times on the Display grid and Reading, prints "BENCH ..." lines, quits.
 
@@ -99,6 +101,44 @@ func applyStyleFlags(_ model: AppModel) {
     }
 }
 
+/// The window size for captures and the bench: 1360x860 unless `FD_WINDOW=WxH` says otherwise.
+@MainActor
+func captureSize() -> NSSize {
+    if let raw = ProcessInfo.processInfo.environment["FD_WINDOW"] {
+        let parts = raw.lowercased().split(separator: "x").compactMap { Double($0) }
+        if parts.count == 2, parts[0] >= 300, parts[1] >= 300 { return NSSize(width: parts[0], height: parts[1]) }
+    }
+    return NSSize(width: 1360, height: 860)
+}
+
+/// Reading flags for screenshots (each also reads FD_<NAME>):
+///   --demo-shortlist <a,b,c>   shortlist these families (in the DB copy)
+///   --compare                  turn Compare on
+///   --zoom <factor>            stage zoom, 0.5 to 4
+///   --display-size <pt>        the Display playground size, in memory only
+///   --reading-size <pt>        the Reading playground size of the selected candidate, in memory only
+///   --pick-reading <family>    choose this family for Reading (in the DB copy)
+@MainActor
+func applyReadingFlags(_ model: AppModel) async {
+    let args = CommandLine.arguments
+    func value(_ flag: String) -> String? {
+        if let i = args.firstIndex(of: flag), i + 1 < args.count { return args[i + 1] }
+        return ProcessInfo.processInfo.environment["FD_" + flag.dropFirst(2).uppercased().replacingOccurrences(of: "-", with: "_")]
+    }
+    if let list = value("--demo-shortlist") {
+        for name in list.split(separator: ",") { await model.setShortlist("reading", family: String(name), on: true) }
+    }
+    if let f = value("--pick-reading") { await model.choose("reading", family: f) }
+    if let size = value("--display-size").flatMap(Double.init), let d = model.displayFamily {
+        model.typeSettings.update(model.settingsKey("display", d.name), job: "display") { $0.size = size }
+    }
+    if let size = value("--reading-size").flatMap(Double.init), let c = model.candidate(model.selectedCandidate) {
+        model.typeSettings.update(model.settingsKey("reading", c.family), job: "reading") { $0.size = size }
+    }
+    if let z = value("--zoom").flatMap(Double.init) { while model.stageZoom.factor < z - 0.01 && model.stageZoom.canZoomIn { model.stageZoom.zoomIn() } }
+    if args.contains("--compare") || value("--compare") != nil { model.compareMode = true }
+}
+
 @MainActor
 enum ScreenshotRunner {
     static func runIfRequested(model: AppModel) async {
@@ -113,17 +153,21 @@ enum ScreenshotRunner {
         default: break
         }
         if let window = NSApp.windows.first(where: { $0.isVisible }) {
-            window.setContentSize(NSSize(width: 1360, height: 860))
+            window.setContentSize(captureSize())
         }
         model.screen = model.options.screen
         applyStyleFlags(model)
-        if CommandLine.arguments.contains("--no-inspector") { model.showInspector = false }
-        if model.screen == .reading && model.displayFamily == nil {
-            // Reading with no Display face: nothing to wait for.
-        } else if model.screen == .reading {
-            while model.candidates.isEmpty && model.candidatesError == nil && model.displayFamily != nil {
-                try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: .milliseconds(800))      // let the window settle at its new size before the inspector is forced
+        let args = CommandLine.arguments
+        let env = ProcessInfo.processInfo.environment
+        if args.contains("--no-inspector") || env["FD_NO_INSPECTOR"] != nil { model.inspectorTouched = true; model.showInspector = false }
+        if args.contains("--inspector") || env["FD_INSPECTOR"] != nil { model.inspectorTouched = true; model.showInspector = true }
+        if model.screen == .reading {
+            var waited = 0
+            while model.candidates.isEmpty && model.candidatesError == nil && waited < 300 {
+                try? await Task.sleep(for: .milliseconds(100)); waited += 1
             }
+            await applyReadingFlags(model)
         } else {
             model.selectedFamily = model.options.select ?? model.chosen(model.screen) ?? model.visibleFamilies.first?.name
         }
@@ -192,7 +236,7 @@ enum Bench {
             try? await Task.sleep(for: .milliseconds(100))
         }
         if let window = NSApp.windows.first(where: { $0.isVisible }) {
-            window.setContentSize(NSSize(width: 1360, height: 860))
+            window.setContentSize(captureSize())
         }
         try? await Task.sleep(for: .seconds(1))
         log("db=\(model.dbPath)")

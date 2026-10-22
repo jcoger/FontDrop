@@ -38,7 +38,7 @@ struct PosterBlocks: View {
         return VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(TemplateCopy.blocksSpring, id: \.self) { ctx.display($0, 34, lh: 1.06, italic: true, color: ink) }
+                ForEach(TemplateCopy.blocksSpring, id: \.self) { ctx.display($0, 34, lh: 1.06, italic: true, color: ink, width: 218) }
             }
         }
         .padding(16)
@@ -62,7 +62,7 @@ struct PosterBlocks: View {
 
     private func sign(_ color: HexColor) -> some View {
         VStack(alignment: .trailing, spacing: 0) {
-            ForEach(TemplateCopy.blocksSign, id: \.self) { ctx.display($0, 28, lh: 1.0, color: p.onColor(color)) }
+            ForEach(TemplateCopy.blocksSign, id: \.self) { ctx.display($0, 28, lh: 1.0, color: p.onColor(color), width: 262) }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .trailing)

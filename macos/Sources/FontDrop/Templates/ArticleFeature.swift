@@ -47,7 +47,7 @@ struct ArticleFeature: View {
             VStack(alignment: .leading, spacing: 14) {
                 ctx.reading(TemplateCopy.featureColumn, 15, lh: 1.53)
                 timetable
-                ctx.display(TemplateCopy.featureClosing, 18, lh: 1.33, italic: true)
+                ctx.display(TemplateCopy.featureClosing, 18, lh: 1.33, italic: true, width: 246)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

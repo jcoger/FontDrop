@@ -22,7 +22,7 @@ struct HeroProduct: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 22) {
                     badge
-                    ctx.display(TemplateCopy.productHeadline, 64, track: -0.035, lh: 0.97, width: 520, align: .center)
+                    ctx.display(TemplateCopy.productHeadline, 64, track: -0.035, lh: 0.97, width: 520, align: .center, maxHeight: 240)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 520)
                     ctx.reading(TemplateCopy.productSub, 16, lh: 1.5, color: p.secondary)
@@ -57,7 +57,7 @@ struct HeroProduct: View {
                 HStack(spacing: 0) {
                     if i > 0 { VLine(color: p.rule).padding(.trailing, 20) }
                     VStack(alignment: .leading, spacing: 4) {
-                        ctx.display(stat.0, 34, track: -0.02, lh: 1.24, figures: numberFigures).lineLimit(1)
+                        ctx.display(stat.0, 34, track: -0.02, lh: 1.24, figures: numberFigures).lineLimit(1).minimumScaleFactor(0.15)
                         ctx.reading(stat.1, 13, lh: 1.23, color: p.secondary).lineLimit(1).minimumScaleFactor(0.8)
                     }
                     Spacer(minLength: 0)

@@ -288,3 +288,62 @@ Strings for the layout menu, the Colors button and popover, the color field and 
 ### Gates for section 10
 
 A pass (10.9 is the WCAG 2 ratio, and 10.10 to 10.12 use its published bands) · B pass · C pass (no em dashes) · D pass (10.4, 10.7, 10.15 read alone) · E pass (10.16 says what works) · F pass · G n/a · H pending cold read · K pass (contrast bands carry an icon and a word, not color alone; selected preset says "selected" to VoiceOver) · N pass · Q pass · R pass (no engine words)
+
+## 11. Reading list and stage (wave 5a, 2026-10-22)
+
+Reading is a list of faces beside a stage. Default surfaces carry the type and at most two short reasons. Technical detail (sources, metrics) sits in hover help, the Why list and the inspector.
+
+### 11.1 List
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 11.1 | list.title | **Reading for PP Museum** | Head of the list. With no Display face: **Reading** |
+| 11.2 | list.count | **40** · **40 · 2 on shortlist** | Count of rows, then the shortlist count (moved here from the sidebar) |
+| 11.3 | lens.contrast.options | **Close · Distinct · Strong · Any** | **Clear** became **Distinct**: Clear read as a command next to **Clear filters** |
+| 11.4 | source.scope | **Source: Your fonts · + Google Fonts · All** | The Display filter's source chips, as three choices. **Custom** shows when the chips are set another way |
+| 11.5 | row.reasons | **Sans with serif · Same x-height** | At most two, joined by a middle dot. The full list is in the hover help and the inspector |
+| 11.6 | row.reasons.designer | **Same designer** | Shown alone when the foundry is just the designer's name |
+| 11.7 | row.tag.current | **Current** | The chosen Reading face, pinned at the top of the list even when filters would hide it |
+| 11.8 | row.tag.shortlist | **On shortlist** | |
+| 11.9 | row.tag.trial | **Trial** | Neutral tag, never a warning |
+| 11.10 | row.sameFamily | **Same family · Body in Regular** | |
+| 11.11 | foot.longText | **42 not made for long text** + **Show them** | Short form of 7.20. With them shown: **Showing every face** + **Only long-text faces** |
+| 11.12 | foot.hidden | **3 hidden by filters** + **Clear filters** | |
+| 11.13 | menu.shortlist | **Add to shortlist · Remove from shortlist** | Row context menu, with **Use for Reading** |
+
+### 11.2 Stage
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 11.14 | stage.title | **PP Museum + Timeless Sans** | The pair |
+| 11.15 | stage.layout | **Article · Essay** | One menu for template and layout, grouped by template |
+| 11.16 | stage.zoom | **− Fit +** | Tooltips: **Zoom out · Fit to window · Zoom in**. Keys: ⌘− ⌘0 ⌘+ |
+| 11.17 | decide.hint | **↑ ↓ flips candidates in place** | |
+| 11.18 | decide.shortlist | **Add to shortlist · On shortlist** | |
+| 11.19 | decide.compare | **Compare shortlist (2)** | Shows with two or more on the shortlist |
+| 11.20 | decide.use | **Use for Reading** | Unchanged. After it: **Reading face set** · **Undo** · **Next: sizes and spacing** |
+| 11.21 | compare.title | **Comparing 2 on your shortlist** | |
+| 11.22 | compare.use | **Use** | Above each board, next to the family name |
+| 11.23 | compare.back | **Back to one** | |
+| 11.24 | subtitle | **Reading · 2 on shortlist** | Was **Reading · 1 saved** |
+
+### 11.3 Inspector
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 11.25 | inspector.candidate | **Reading candidate** | Under the family name |
+| 11.26 | inspector.current | **Current Reading face** | Once it is the chosen face |
+
+### 11.4 Reading as a starting point
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 11.27 | alone.stage | **Timeless Sans on its own** | Stage title with no Display face. The face sets the headline and the body |
+| 11.28 | alone.link | **Pick a headline face to see pairs** | One quiet line in the list head. Goes to Display |
+| 11.29 | alone.next | **Find a Display face** | The next step after **Use for Reading** with no Display face. Goes to Display |
+
+Cut: the pair title and its explainer, the **Pick a Display face first** empty state, the Save, Hide and shortlist buttons in the Reading inspector.
+
+### Gates for section 11
+
+A pass · B pass · C pass (no em dashes) · D pass · E n/a · F pass · G n/a · H pending cold read · K pass (Current and On shortlist are words, not color alone) · N pass · Q pass · R pass (no engine words in labels; sources stay in hover help)
