@@ -184,6 +184,8 @@ final class AppModel {
 
     /// Playground settings per brand + job + family.
     let typeSettings: TypeSettingsStore
+    /// Template colors per brand, the variant showing per template, recent colors.
+    let brandStyle: BrandStyleStore
 
     /// An action that needs a brand and has none yet. The "Name this brand" sheet shows while this is set.
     enum PendingAction: Equatable {
@@ -202,6 +204,7 @@ final class AppModel {
     init(options: LaunchOptions) {
         self.options = options
         typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: options.screenshot == nil && !options.bench)
+        brandStyle = BrandStyleStore(dbPath: options.dbPath, persist: options.screenshot == nil && !options.bench)
         if let t = options.template { templateID = t }
         // Screenshot and bench runs start from the standard filter so they repeat.
         var f = options.screenshot == nil && !options.bench ? FinderFilter.load() : FinderFilter.standard
@@ -229,7 +232,9 @@ final class AppModel {
     }
     /// A face with the designer's playground settings for this job, ready for `FaceText`.
     func face(_ job: String, _ family: FamilySummary) -> FaceSpec {
-        FaceSpec(path: family.filePath, settings: typeSettings.settings(settingsKey(job, family.name), job: job))
+        FaceSpec(path: family.filePath, settings: typeSettings.settings(settingsKey(job, family.name), job: job),
+                 siblings: (fontsByFamily[family.name] ?? []).map(\.filePath),
+                 weights: Dictionary((fontsByFamily[family.name] ?? []).map { ($0.filePath, Int($0.weight)) }, uniquingKeysWith: { a, _ in a }))
     }
     var displayFace: FaceSpec? { displayFamily.map { face("display", $0) } }
 
