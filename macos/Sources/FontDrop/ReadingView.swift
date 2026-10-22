@@ -34,7 +34,7 @@ struct ReadingView: View {
         let chosen = model.chosen(.reading)
         let saved = Set(model.shortlist("reading"))
         let displayFace = model.face("display", display)
-        let template = Templates.descriptor(model.templateID)
+        let template = model.activeTemplate
 
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -51,6 +51,8 @@ struct ReadingView: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                     .help("Show the pair in a different layout")
+                    TemplateVariantPicker()
+                    ColorsButton()
                 }
                 statusRow(shown: result.shown.count, hidden: result.hidden)
 
