@@ -23,7 +23,7 @@ struct ArticleEssay: View {
         VStack(alignment: .leading, spacing: 16) {
             ctx.label(TemplateCopy.essayKicker, color: p.accent)
             ctx.display(TemplateCopy.essayHeadline, 44, track: -0.02, lh: 1.05, width: 472)
-            ctx.display(TemplateCopy.essayStandfirst, 20, lh: 1.4, italic: true, color: p.secondary)
+            ctx.display(TemplateCopy.essayStandfirst, 20, lh: 1.4, italic: true, color: p.secondary, width: 472)
             ctx.reading(TemplateCopy.essayByline, 13, lh: 1.4, color: p.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,7 +54,7 @@ struct ArticleEssay: View {
                 ctx.display("\u{201C}", 30, track: -0.015, lh: 1.2)
                     .fixedSize().frame(width: 0, alignment: .trailing)
                     .accessibilityHidden(true)
-                ctx.display(String(TemplateCopy.essayQuote.dropFirst()), 30, track: -0.015, lh: 1.2)
+                ctx.display(String(TemplateCopy.essayQuote.dropFirst()), 30, track: -0.015, lh: 1.2, width: 460)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(TemplateCopy.essayQuote)

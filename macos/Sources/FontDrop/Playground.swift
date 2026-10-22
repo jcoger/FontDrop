@@ -22,9 +22,7 @@ struct PlaygroundGroup: View {
 
     private var key: String { model.settingsKey(job, family.name) }
     private var store: TypeSettingsStore { model.typeSettings }
-    private var styles: [FontFile] {
-        (model.fontsByFamily[family.name] ?? []).sorted { ($0.weight, $0.filePath) < ($1.weight, $1.filePath) }
-    }
+    private var styles: [FontFile] { StyleNames.sorted(model.fontsByFamily[family.name] ?? [], family: family.name) }
 
     var body: some View {
         let s = store.settings(key, job: job)
@@ -93,7 +91,10 @@ struct PlaygroundGroup: View {
 
     private func stylePicker(_ s: TypeSettings) -> some View {
         let list = styles
-        let current = s.stylePath ?? family.filePath
+        // The saved or suggested file may not be in the list (the list keeps one file per style), so pick the nearest listed one.
+        let wanted = s.stylePath ?? family.filePath
+        let current = StyleNames.nearest(to: wanted, in: list, family: family.name,
+                                         weight: StyleTraits.of(path: wanted)?.weight)?.filePath ?? wanted
         return HStack {
             Text("Style").font(.callout)
             Spacer()
@@ -101,11 +102,11 @@ struct PlaygroundGroup: View {
                 Picker("Style", selection: Binding(
                     get: { current },
                     set: { new in store.update(key, job: job) { $0.stylePath = (new == family.filePath ? nil : new) } })) {
-                    ForEach(list, id: \.filePath) { Text(styleLabel($0)).tag($0.filePath) }
+                    ForEach(list, id: \.filePath) { Text(StyleNames.label($0, family: family.name)).tag($0.filePath) }
                 }
                 .labelsHidden().frame(maxWidth: 190)
             } else {
-                Text(list.first.map(styleLabel) ?? "Regular").font(.callout).foregroundStyle(.secondary)
+                Text(list.first.map { StyleNames.label($0, family: family.name) } ?? "Regular").font(.callout).foregroundStyle(.secondary)
             }
         }
     }
@@ -190,18 +191,6 @@ struct PlaygroundGroup: View {
     }
 
     // MARK: helpers
-
-    /// File name without extension and without the family prefix: "TimelessSerif-TextThin" -> "TextThin".
-    private func styleLabel(_ f: FontFile) -> String {
-        let stem = URL(fileURLWithPath: f.filePath).deletingPathExtension().lastPathComponent
-        let compactFamily = family.name.replacingOccurrences(of: " ", with: "").lowercased()
-        var label = stem
-        if stem.replacingOccurrences(of: " ", with: "").lowercased().hasPrefix(compactFamily), stem.count > family.name.count {
-            label = String(stem.dropFirst(min(stem.count, family.name.count)))
-                .trimmingCharacters(in: CharacterSet(charactersIn: "-_ "))
-        }
-        return label.isEmpty ? stem : label
-    }
 
     private func fmt(_ v: Double) -> String { v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v) }
 }

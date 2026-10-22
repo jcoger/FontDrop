@@ -68,6 +68,20 @@ pub struct FontFile {
     pub name: String,
     pub file_path: String,
     pub weight: u16,
+    /// The font's own style name from its name table ("Grand Heavy", "Text Book"). Empty when not read yet.
+    pub style_name: String,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ReadingFamily {
+    pub font_id: String,
+    pub family: String,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ReadingFamilies {
+    pub families: Vec<ReadingFamily>,
+    pub not_for_long_text: u32,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -215,12 +229,23 @@ impl Library {
         })
     }
 
+    /// Families for Reading when no Display face is chosen yet: one per family, with the same long-text
+    /// rule as pairs (`only_fit`) and the count of families that rule removes. Hidden families stay out.
+    pub fn reading_families(&self, excluded_ids: Vec<String>, only_fit: bool) -> Result<ReadingFamilies, CoreError> {
+        let conn = self.lock()?;
+        let (list, unfit) = pairing::reading_families(&conn, excluded_ids, only_fit).map_err(CoreError::Db)?;
+        Ok(ReadingFamilies {
+            families: list.into_iter().map(|(font_id, family)| ReadingFamily { font_id, family }).collect(),
+            not_for_long_text: unfit,
+        })
+    }
+
     /// Every font file, sorted by family then weight (flat list).
     pub fn list_fonts(&self) -> Result<Vec<FontFile>, CoreError> {
         let conn = self.lock()?;
         // .otf first so it wins the de-duplication below
         let mut stmt = conn.prepare(
-            "SELECT font_id, font_family, name, file_path, weight FROM fonts
+            "SELECT font_id, font_family, name, file_path, weight, COALESCE(style_name, '') FROM fonts
              ORDER BY CASE WHEN lower(file_name) LIKE '%.otf' THEN 0 ELSE 1 END",
         )?;
         let all: Vec<FontFile> = stmt
@@ -231,6 +256,7 @@ impl Library {
                     name: r.get(2)?,
                     file_path: r.get(3)?,
                     weight: r.get(4)?,
+                    style_name: r.get(5)?,
                 })
             })?
             .collect::<Result<_, _>>()?;

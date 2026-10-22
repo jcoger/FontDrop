@@ -276,6 +276,45 @@ enum Lexicon {
     static let licenseTrial = "Trial version \u{00B7} License before you ship"
     static let getLicense = "Get the license"
 
+    // MARK: Reading list and stage (11.x)
+
+    enum Reading {
+        static func title(_ display: String) -> String { "Reading for \(display)" }
+        static func onShortlist(_ n: Int) -> String { "\(n) on shortlist" }
+        static func subtitle(_ n: Int) -> String { "Reading \u{00B7} \(onShortlist(n))" }
+        static let current = "Current"
+        static let onShortlistTag = "On shortlist"
+        static let trialTag = "Trial"
+        static let mixedStructure = "Mixed structure"
+        static func sameFamilyRow(_ style: String?) -> String { style.map { "Same family \u{00B7} \(bodyIn($0))" } ?? "Same family" }
+        static let fit = "Fit"
+        static let zoomIn = "Zoom in", zoomOut = "Zoom out", zoomFit = "Fit to window"
+        static let layoutHelp = "Template and layout"
+        static let hint = "\u{2191} \u{2193} flips candidates in place"
+        static let addToShortlist = "Add to shortlist"
+        static let removeFromShortlist = "Remove from shortlist"
+        static let shortlistOn = "On shortlist"
+        static func compare(_ n: Int) -> String { "Compare shortlist (\(n))" }
+        static let backToOne = "Back to one"
+        static let use = "Use"
+        static func comparing(_ n: Int) -> String { "Comparing \(n) on your shortlist" }
+        static let candidateTitle = "Reading candidate"
+        static let currentTitle = "Current Reading face"
+        static let sourceLabel = "Source"
+        static let sourceYours = "Your fonts", sourceGoogle = "+ Google Fonts", sourceAll = "All", sourceMixed = "Custom"
+        static let foot = "Not made for long text"
+        static func footCount(_ n: Int) -> String { "\(n) not made for long text" }
+        static let findingNone = "No Reading partners found."
+        static func finding(_ display: String) -> String { "Finding partners for \(display)" }
+        static func onItsOwn(_ family: String) -> String { "\(family) on its own" }
+        static let pickHeadline = "Pick a headline face to see pairs"
+        static let findDisplay = "Find a Display face"
+        static let showingAll = "Showing every face"
+        static let onlyFit = "Only long-text faces"
+        static func hiddenByFilters(_ n: Int) -> String { "\(n) hidden by filters" }
+        static let pickOne = "Pick a candidate to see why it pairs."
+    }
+
     // MARK: Template colors and layouts (10.x)
 
     /// The readout poster's bar labels. They print the playground's real values.
