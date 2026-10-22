@@ -56,7 +56,7 @@ struct EvidenceChip: View {
     var warning = false      // "too close": an icon plus secondary colour, so it never reads as a plus
 
     private var label: Text {
-        let words = Text((effect < 0 ? "\u{2212} " : "") + text)
+        let words = Text((effect < 0 && !warning ? "\u{2212} " : "") + text)   // the icon already marks a warning
         return warning ? Text(Image(systemName: "exclamationmark.triangle")) + Text(" ") + words : words
     }
 
