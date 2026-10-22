@@ -53,17 +53,25 @@ struct Candidate: Identifiable, Hashable {
     let order: Int
     /// Google popularity rank, 1 = most used. Nil: Google does not list the family (often paid or trial faces).
     let googleRank: Int?
+    /// For a Same family pair: which style of the family to use for body text.
+    let bodyStyle: BodyStyle?
 
     init(_ m: PairCandidate, order: Int, googleRank: Int? = nil) {
         id = m.fontId; family = m.family; filePath = m.filePath
         pairType = m.pairType; evidence = m.evidence; self.order = order; self.googleRank = googleRank
+        bodyStyle = m.suggestedBodyStyle
     }
 
     /// For tests and previews.
-    init(id: String, family: String, filePath: String = "", pairType: String, evidence: [Evidence], order: Int, googleRank: Int? = nil) {
+    init(id: String, family: String, filePath: String = "", pairType: String, evidence: [Evidence], order: Int,
+         googleRank: Int? = nil, bodyStyle: BodyStyle? = nil) {
         self.id = id; self.family = family; self.filePath = filePath
         self.pairType = pairType; self.evidence = evidence; self.order = order; self.googleRank = googleRank
+        self.bodyStyle = bodyStyle
     }
+
+    /// The Display family offered as its own partner.
+    var isSameFamily: Bool { pairType == "same_family" }
 
     var onGoogle: Bool { googleRank != nil }
 
@@ -95,7 +103,7 @@ enum LensEngine {
         if !q.isEmpty { shown = shown.filter { $0.family.localizedCaseInsensitiveContains(q) } }
         switch lenses.sort {
         case .bestMatch:
-            shown.sort { $0.order < $1.order }
+            shown.sort { $0.order < $1.order }   // Same family is order 0: the engine puts it first
         case .xHeight:
             shown.sort { ($0.xHeightGap ?? 99, $0.order) < ($1.xHeightGap ?? 99, $1.order) }
         case .name:
@@ -108,6 +116,9 @@ enum LensEngine {
     }
 
     static func passes(_ c: Candidate, _ l: Lenses) -> Bool {
+        // Same family is its own group: it is not a serif-with-sans or a uniform pair, so the
+        // Difference, Structure and Foundry questions do not apply to it. It always shows.
+        if c.isSameFamily { return true }
         switch l.contrast {
         case .any: break
         case .close: if c.pairType != "uniform" { return false }

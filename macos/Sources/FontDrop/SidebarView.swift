@@ -100,6 +100,7 @@ struct SidebarView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(Lexicon.Finder.savedSidebarHelp)
         .listRowBackground(on ? RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)).padding(.horizontal, 6) : nil)
     }
 
