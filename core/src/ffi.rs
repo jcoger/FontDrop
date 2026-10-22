@@ -79,6 +79,14 @@ pub struct Evidence {
     pub effect: i8,
 }
 
+/// A style of a family to set body text in ("Regular", "Text"). Only set for a `same_family` pair.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct BodyStyle {
+    pub font_id: String,
+    pub file_path: String,
+    pub label: String,
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct PairMatch {
     pub font_id: String,
@@ -88,6 +96,7 @@ pub struct PairMatch {
     pub pair_type: String,
     pub reason: String,
     pub evidence: Vec<Evidence>,
+    pub suggested_body_style: Option<BodyStyle>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -107,6 +116,8 @@ pub struct PairCandidate {
     pub pair_type: String,
     pub evidence: Vec<Evidence>,
     pub rank: u32,
+    /// For `same_family`: the style of the Display family to use for body text.
+    pub suggested_body_style: Option<BodyStyle>,
 }
 
 /// What the designer's chosen Display + Reading pairs have in common.
@@ -272,6 +283,7 @@ impl Library {
                     .map(|p| {
                         let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
                         PairMatch {
+                            suggested_body_style: body_style(p.suggested_body_style, &paths),
                             family,
                             file_path,
                             font_id: p.font_id,
@@ -326,6 +338,7 @@ impl Library {
             .map(|(i, p)| {
                 let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
                 PairCandidate {
+                    suggested_body_style: body_style(p.suggested_body_style, &paths),
                     family,
                     file_path,
                     font_id: p.font_id,
@@ -407,6 +420,11 @@ impl Library {
             statements: h.statements,
         })
     }
+}
+
+/// The engine's body style with its file path filled in from the id.
+fn body_style(b: Option<pairing::BodyStyle>, paths: &HashMap<String, (String, String)>) -> Option<BodyStyle> {
+    b.map(|b| BodyStyle { file_path: paths.get(&b.font_id).map(|p| p.0.clone()).unwrap_or_default(), font_id: b.font_id, label: b.label })
 }
 
 impl Library {

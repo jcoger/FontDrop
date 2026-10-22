@@ -151,6 +151,9 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE IF NOT EXISTS hidden (family TEXT PRIMARY KEY COLLATE NOCASE, hidden INTEGER NOT NULL DEFAULT 1);",
     // Saved families (a star), global; separate from per-brand shortlists.
     "CREATE TABLE IF NOT EXISTS favorites (family TEXT PRIMARY KEY COLLATE NOCASE, added_at TEXT NOT NULL DEFAULT (datetime('now')));",
+    // Does the file's cmap cover basic Latin (A-Z, a-z, 0-9)? NULL = not read yet, so every existing
+    // row is read once on the next scan. To change the rule later, add a migration that sets it to NULL.
+    "ALTER TABLE fonts ADD COLUMN covers_latin INTEGER;",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -292,7 +295,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
 /// font (vendor_id NULL = not read yet; '' = read, no real vendor code). Foundry
 /// and designer only fill gaps; existing values (Google enrichment, edits) stay.
 pub fn enrich_from_name_tables(conn: &Connection) {
-    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL") {
+    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL") {
         Ok(mut st) => st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
@@ -301,15 +304,16 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     };
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
-        let (vendor, manufacturer, designer, trial, url, variable) = match meta {
-            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable),
-            None => (String::new(), None, None, false, None, false),
+        // A file we cannot open counts as covering Latin: never hide what we could not check.
+        let (vendor, manufacturer, designer, trial, url, variable, latin) = match meta {
+            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin),
+            None => (String::new(), None, None, false, None, false, true),
         };
         conn.execute(
             "UPDATE fonts SET vendor_id = ?1, \
              foundry = COALESCE(NULLIF(foundry, ''), ?2), \
-             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7 WHERE font_id = ?6",
-            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32], // '' = read, none
+             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8 WHERE font_id = ?6",
+            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32], // '' = read, none
         )
         .ok();
     }
@@ -968,6 +972,43 @@ mod tests {
         for row in st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))).unwrap().flatten() {
             println!("  skeleton {:<10} {}", row.0, row.1);
         }
+    }
+
+    /// Which families the Latin check newly hides, on a COPY of a real database:
+    ///   FONTDROP_DB=<copy> cargo test --lib latin_report -- --ignored --nocapture
+    /// Prints each family where no style covers basic Latin (not already junk-listed), its
+    /// A-Z / a-z / 0-9 counts, and the near misses that the rule keeps (partial coverage).
+    #[test]
+    #[ignore]
+    fn latin_report() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB to a copy");
+        assert!(!path.contains("Application Support"), "point FONTDROP_DB at a copy, not the live DB");
+        let conn = Connection::open(&path).unwrap();
+        run_migrations(&conn);
+        conn.execute("UPDATE fonts SET covers_latin = NULL", []).unwrap(); // measure with the current rule
+        enrich_from_name_tables(&conn);
+        let none = crate::finder::no_latin_families(&conn);
+        let mut st = conn.prepare("SELECT font_family, file_path, source, covers_latin FROM fonts").unwrap();
+        let rows: Vec<(String, String, String, Option<i64>)> =
+            st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).unwrap().flatten().collect();
+        let mut caught = 0;
+        let mut seen = std::collections::BTreeSet::new();
+        for (fam, file, source, _) in &rows {
+            let lower = fam.to_lowercase();
+            let Some(data) = std::fs::read(file).ok() else { continue };
+            let Ok(font) = skrifa::FontRef::from_index(&data, 0) else { continue };
+            let (u, l, d) = crate::names::latin_coverage(&font);
+            let full = crate::names::covers_latin(u, l, d);
+            let partial = !full && (u + l + d) > 0;
+            if none.contains(&lower) && seen.insert(("caught", fam.clone())) {
+                let junk = crate::finder::is_junk_family(fam);
+                println!("CAUGHT {fam:<40} [{source}] A-Z {u}/26 a-z {l}/26 0-9 {d}/10{}", if junk { "  (already junk-listed)" } else { "" });
+                if !junk { caught += 1; }
+            } else if partial && !none.contains(&lower) && seen.insert(("kept", fam.clone())) {
+                println!("PARTIAL-KEPT {fam:<34} [{source}] A-Z {u}/26 a-z {l}/26 0-9 {d}/10");
+            }
+        }
+        println!("newly hidden (not junk-listed): {caught}");
     }
 
     /// Build a fresh benchmark DB from a folder of fonts (one subfolder per family):

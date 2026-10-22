@@ -25,7 +25,8 @@ struct FilterBar: View {
                 }
             }
             FilterChip(title: Lexicon.Finder.saved, symbol: "star",
-                       count: counts.map { Int($0.saved) }, isOn: model.filter.savedOnly) {
+                       count: counts.map { Int($0.saved) }, isOn: model.filter.savedOnly,
+                       help: Lexicon.Finder.savedChipHelp) {
                 model.filter.savedOnly.toggle()
             }
             MoreMenu()
@@ -44,6 +45,7 @@ struct FilterChip: View {
     var symbol: String?
     var count: Int?
     let isOn: Bool
+    var help: String?
     let action: () -> Void
 
     var body: some View {
@@ -62,6 +64,7 @@ struct FilterChip: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .help(help ?? "")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
     }
