@@ -22,7 +22,7 @@ struct HeroProduct: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 22) {
                     badge
-                    ctx.display(TemplateCopy.productHeadline, 64, track: -0.035, lh: 0.97)
+                    ctx.display(TemplateCopy.productHeadline, 64, track: -0.035, lh: 0.97, width: 520, align: .center)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 520)
                     ctx.reading(TemplateCopy.productSub, 16, lh: 1.5, color: p.secondary)

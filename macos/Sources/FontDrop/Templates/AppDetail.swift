@@ -23,7 +23,7 @@ struct AppDetail: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 ctx.label(TemplateCopy.detailDates, color: p.secondary)
-                ctx.display(TemplateCopy.detailTitle, 34, track: -0.02, lh: 1.06)
+                ctx.display(TemplateCopy.detailTitle, 34, track: -0.02, lh: 1.06, width: 300)
                     .lineLimit(2).minimumScaleFactor(0.5)
             }
             VStack(spacing: 0) {

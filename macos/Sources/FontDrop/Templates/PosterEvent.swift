@@ -20,7 +20,7 @@ struct PosterEvent: View {
                 }
                 Spacer(minLength: 0)
                 VStack(alignment: .leading, spacing: 18) {
-                    ctx.display(TemplateCopy.eventLine, 30, lh: 1.13, italic: true)
+                    ctx.display(TemplateCopy.eventLine, 30, lh: 1.13, italic: true, width: 420)
                         .frame(maxWidth: 420, alignment: .leading)
                     HStack(alignment: .bottom) {
                         ctx.display(TemplateCopy.eventDate, 64, track: -0.03, lh: 0.88, figures: .proportional)

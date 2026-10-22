@@ -87,7 +87,9 @@ struct ColorsPopover: View {
         }
         .padding(14)
         .frame(width: 300)
+        .background(Color(nsColor: .windowBackgroundColor), ignoresSafeAreaEdges: .all)
         .background(MatchAppAppearance())
+        .preferredColorScheme(NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light)
     }
 
     // MARK: Presets

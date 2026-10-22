@@ -20,20 +20,26 @@ struct PairContext {
 
     /// Text in the Display face. `px` is the size on the board; `track` is the role's tracking in em,
     /// added to the playground's; `lh` is the role's line height as a multiple of the size.
+    /// `width` is the width the text is laid out in (board pixels). Give it for display type tighter than the font's
+    /// own spacing, so the lines can be set one by one. `align` is how those lines sit in that width.
     /// `weight` and `italic` ask for a style (a label in semibold, a standfirst in italic). Left alone,
     /// the playground's weight is what you see. `italic` is only real: no italic in the family, no slant.
     func display(_ text: String, _ px: CGFloat, track: Double = 0, lh: Double? = nil, weight: Double? = nil,
-                 italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil) -> some View {
+                 italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil,
+                 width: CGFloat? = nil, align: HorizontalAlignment = .leading) -> some View {
         FaceText(face: Self.styled(face ?? display, weight: weight, italic: italic, figures: figures), text: text,
-                 ratio: px / Self.displayBase, tick: tick, trackBias: track, leading: lh)
+                 ratio: px / Self.displayBase, tick: tick, trackBias: track, leading: lh,
+                 wrapWidth: width, lineAlignment: align)
             .foregroundStyle((color ?? palette.text).color)
     }
 
     /// Text in the Reading face. Same arguments as `display`.
     func reading(_ text: String, _ px: CGFloat, track: Double = 0, lh: Double? = nil, weight: Double? = nil,
-                 italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil) -> some View {
+                 italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil,
+                 width: CGFloat? = nil, align: HorizontalAlignment = .leading) -> some View {
         FaceText(face: Self.styled(face ?? body, weight: weight, italic: italic, figures: figures), text: text,
-                 ratio: px / Self.readingBase, tick: tick, trackBias: track, leading: lh)
+                 ratio: px / Self.readingBase, tick: tick, trackBias: track, leading: lh,
+                 wrapWidth: width, lineAlignment: align)
             .foregroundStyle((color ?? palette.text).color)
     }
 

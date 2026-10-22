@@ -11,7 +11,7 @@ struct HeroStatement: View {
                 nav
                 Spacer(minLength: 0)
                 VStack(alignment: .leading, spacing: 28) {
-                    ctx.display(TemplateCopy.statementHeadline, 88, track: -0.04, lh: 0.91)
+                    ctx.display(TemplateCopy.statementHeadline, 88, track: -0.04, lh: 0.91, width: 520)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(alignment: .bottom, spacing: 32) {
                         ctx.reading(TemplateCopy.statementSub, 16, lh: 1.5, color: p.secondary)

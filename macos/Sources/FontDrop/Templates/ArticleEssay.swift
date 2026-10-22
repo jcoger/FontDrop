@@ -22,7 +22,7 @@ struct ArticleEssay: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
             ctx.label(TemplateCopy.essayKicker, color: p.accent)
-            ctx.display(TemplateCopy.essayHeadline, 44, track: -0.02, lh: 1.05)
+            ctx.display(TemplateCopy.essayHeadline, 44, track: -0.02, lh: 1.05, width: 472)
             ctx.display(TemplateCopy.essayStandfirst, 20, lh: 1.4, italic: true, color: p.secondary)
             ctx.reading(TemplateCopy.essayByline, 13, lh: 1.4, color: p.secondary)
         }

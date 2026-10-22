@@ -25,7 +25,7 @@ struct ArticleFeature: View {
                 Spacer()
                 ctx.label(TemplateCopy.featureIssue, color: p.accent, weight: 400)
             }
-            ctx.display(TemplateCopy.featureHeadline, 76, track: -0.035, lh: 0.92, color: p.background)
+            ctx.display(TemplateCopy.featureHeadline, 76, track: -0.035, lh: 0.92, color: p.background, width: 520)
             ctx.reading(TemplateCopy.featureDeck, 15, lh: 1.47, color: deckColor)
                 .frame(maxWidth: 380, alignment: .leading)
         }

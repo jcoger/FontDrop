@@ -32,7 +32,7 @@ extension PairContext {
     /// the font's natural spacing, so each line is its own view with a fixed height.
     func posterLine(_ text: String, _ px: CGFloat, track: Double, lh: Double, italic: Bool = false,
                     color: HexColor? = nil) -> some View {
-        display(text, px, track: track, lh: lh, italic: italic, color: color)
+        display(text, px, track: track, italic: italic, color: color)
             .lineLimit(1).minimumScaleFactor(0.2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: points(px, display: true) * lh)
