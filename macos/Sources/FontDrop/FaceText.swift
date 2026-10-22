@@ -110,7 +110,7 @@ struct FaceText: View {
 /// word fits (and, with a height limit, until the lines fit), down to a floor. Past the floor it wraps
 /// between words and lets the longest one run wide rather than split it.
 enum FitWords {
-    static let floor: CGFloat = 0.35
+    static let floor: CGFloat = 0.1
 
     /// Width of the widest run between spaces at this font, with tracking.
     static func widestWord(_ text: String, font: CTFont, trackingEm: Double) -> CGFloat {

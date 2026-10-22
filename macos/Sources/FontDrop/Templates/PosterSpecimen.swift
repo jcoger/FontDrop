@@ -64,10 +64,10 @@ struct PosterSpecimen: View {
     private var glyphs: some View {
         HStack(alignment: .bottom) {
             ctx.display(TemplateCopy.specimenGlyphs, 320, track: -0.04, lh: 0.78)
-                .lineLimit(1).minimumScaleFactor(0.25)
+                .lineLimit(1).minimumScaleFactor(0.08)
             Spacer(minLength: 0)
             ctx.display(TemplateCopy.specimenAmp, 120, lh: 0.92, italic: true)
-                .lineLimit(1).minimumScaleFactor(0.25)
+                .lineLimit(1).minimumScaleFactor(0.08)
                 .padding(.bottom, 20)
         }
     }
@@ -79,7 +79,7 @@ struct PosterSpecimen: View {
                     ctx.reading(row.label, 12, lh: 1.33, color: p.secondary)
                         .frame(width: 104, alignment: .leading)
                     ctx.display(TemplateCopy.specimenLine, 30, lh: 1.2, face: row.face)
-                        .lineLimit(1).minimumScaleFactor(0.5)
+                        .lineLimit(1).minimumScaleFactor(0.15)
                     Spacer(minLength: 0)
                 }
             }

@@ -157,6 +157,7 @@ enum ScreenshotRunner {
         }
         model.screen = model.options.screen
         applyStyleFlags(model)
+        try? await Task.sleep(for: .milliseconds(800))      // let the window settle at its new size before the inspector is forced
         let args = CommandLine.arguments
         let env = ProcessInfo.processInfo.environment
         if args.contains("--no-inspector") || env["FD_NO_INSPECTOR"] != nil { model.inspectorTouched = true; model.showInspector = false }

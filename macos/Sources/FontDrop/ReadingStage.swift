@@ -17,7 +17,7 @@ struct ReadingStage: View {
             GeometryReader { geo in
                 canvas(size: geo.size, selected: selected, compared: compared)
             }
-            .background(Color(nsColor: .underPageBackgroundColor))
+            .background(Color.primary.opacity(0.07))
             Divider()
             DecideBar(selected: selected, comparing: !compared.isEmpty)
         }
@@ -62,7 +62,7 @@ struct ReadingStage: View {
                     .frame(height: label - 6)
                     if let ctx = model.pairContext(reading: name) {
                         StageCanvas(context: ctx, template: model.activeTemplate, zoom: 1,
-                                    size: CGSize(width: colW, height: max(size.height - pad * 2 - label, 80)), padding: 0)
+                                    size: CGSize(width: colW, height: max(size.height - pad * 2 - label, 80)), padding: 0, topAligned: true)
                     }
                 }
                 .frame(width: colW)
@@ -91,6 +91,7 @@ struct StageCanvas: View {
     var zoom: Double = 1
     let size: CGSize
     var padding: CGFloat = 24
+    var topAligned = false
     @State private var designHeight: CGFloat = 640
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -104,7 +105,7 @@ struct StageCanvas: View {
                 .onPreferenceChange(BoardHeightKey.self) { if $0 > 0 { designHeight = $0 } }
                 .shadow(color: .black.opacity(0.14), radius: 8, y: 2)
                 .padding(padding)
-                .frame(minWidth: size.width, minHeight: size.height)
+                .frame(minWidth: size.width, minHeight: size.height, alignment: topAligned ? .top : .center)
         }
         .scrollIndicators(zoom > 1.001 ? .automatic : .hidden)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: zoom)
@@ -137,9 +138,14 @@ struct StageBar: View {
                 LayoutMenu()
                 ZoomControls().disabled(comparing)
             }
+            HStack(spacing: 10) {
+                Spacer(minLength: 0)
+                ZoomControls().disabled(comparing)
+            }
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .frame(minWidth: 0, maxWidth: .infinity)
+        .clipped()
         .background(.bar)
     }
 }
@@ -237,6 +243,14 @@ struct DecideBar: View {
                   systemImage: on ? "checkmark.circle.fill" : "plus.circle")
         }
         .disabled(selected == nil)
+        let toggleIcon = Button {
+            if let c = selected { Task { await model.setShortlist("reading", family: c.family, on: !on) } }
+        } label: {
+            Image(systemName: on ? "checkmark.circle.fill" : "plus.circle")
+        }
+        .help(on ? Lexicon.Reading.removeFromShortlist : Lexicon.Reading.addToShortlist)
+        .accessibilityLabel(on ? Lexicon.Reading.removeFromShortlist : Lexicon.Reading.addToShortlist)
+        .disabled(selected == nil)
         let compare = Button(Lexicon.Reading.compare(shortlistCount)) { model.compareMode = true }
         let use = Button(Lexicon.useFor("reading")) {
             if let c = selected { Task { await model.choose("reading", family: c.family) } }
@@ -253,6 +267,12 @@ struct DecideBar: View {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 toggle
+                if Compare.isAvailable(shortlistCount: shortlistCount) { compare }
+                use
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                toggleIcon
                 if Compare.isAvailable(shortlistCount: shortlistCount) { compare }
                 use
             }

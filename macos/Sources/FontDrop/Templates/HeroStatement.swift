@@ -31,7 +31,7 @@ struct HeroStatement: View {
 
     private var nav: some View {
         HStack {
-            ctx.display(ctx.brand, 20, track: -0.01, lh: 1.2).lineLimit(1)
+            ctx.display(ctx.brand, 20, track: -0.01, lh: 1.2).lineLimit(1).minimumScaleFactor(0.15)
             Spacer()
             HStack(spacing: 24) {
                 ForEach(Array(TemplateCopy.nav.enumerated()), id: \.offset) { i, item in

@@ -57,7 +57,7 @@ struct HeroProduct: View {
                 HStack(spacing: 0) {
                     if i > 0 { VLine(color: p.rule).padding(.trailing, 20) }
                     VStack(alignment: .leading, spacing: 4) {
-                        ctx.display(stat.0, 34, track: -0.02, lh: 1.24, figures: numberFigures).lineLimit(1)
+                        ctx.display(stat.0, 34, track: -0.02, lh: 1.24, figures: numberFigures).lineLimit(1).minimumScaleFactor(0.15)
                         ctx.reading(stat.1, 13, lh: 1.23, color: p.secondary).lineLimit(1).minimumScaleFactor(0.8)
                     }
                     Spacer(minLength: 0)

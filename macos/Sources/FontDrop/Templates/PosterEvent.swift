@@ -24,7 +24,7 @@ struct PosterEvent: View {
                         .frame(maxWidth: 420, alignment: .leading)
                     HStack(alignment: .bottom) {
                         ctx.display(TemplateCopy.eventDate, 64, track: -0.03, lh: 0.88, figures: .proportional)
-                            .lineLimit(1).minimumScaleFactor(0.5)
+                            .lineLimit(1).minimumScaleFactor(0.12)
                         Spacer()
                         VStack(alignment: .trailing, spacing: 0) {
                             ForEach(TemplateCopy.eventPlace, id: \.self) { ctx.reading($0, 13, lh: 1.4) }

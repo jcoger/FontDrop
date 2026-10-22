@@ -162,6 +162,16 @@ final class ReadingStageTests: XCTestCase {
         XCTAssertNil(StyleNames.nearest(to: "/z/Other.otf", in: [], family: "Fam", weight: nil))
     }
 
+    /// A label in semibold must come from the same width as the text around it (PP Right Serif ships Compact, Wide, Tall...).
+    func testWeightedStaysInTheFacesWidth() {
+        let fam = "PP Right Serif"
+        XCTAssertEqual(StyleVariant.key(path: "/x/PP Right Serif - Compact Dark.otf", family: fam), "compact")
+        XCTAssertEqual(StyleVariant.key(path: "/x/PP Right Serif - Wide Medium.otf", family: fam), "wide")
+        XCTAssertEqual(StyleVariant.key(path: "/x/PP Right Serif - Medium.otf", family: fam), "")
+        XCTAssertEqual(StyleVariant.key(path: "/x/PP Right Serif - Light Italic.otf", family: fam), "")
+        XCTAssertEqual(StyleVariant.key(path: "/x/PPRightSerif-TallBlack.otf", family: fam), "tall")
+    }
+
     // MARK: No mid-word breaks (B2)
 
     /// Sizes 14 to 120 on the Display playground, every headline the templates set in a column.
