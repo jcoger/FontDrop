@@ -7,6 +7,23 @@ struct PosterBlocks: View {
     let ctx: PairContext
     private var p: TemplatePalette { ctx.palette }
 
+    /// The fit rule (PosterFit.swift): the big word shrinks so the blocks keep room, and the text in the
+    /// Spring and sign blocks shrinks until it fits its block.
+    init(ctx base: PairContext) {
+        let r = base.readingScale
+        let word = FitItem(text: TemplateCopy.blocksWord, px: 158, lh: 0.99, tracking: -0.055)
+        let spring = TemplateCopy.blocksSpring.map { FitItem(text: $0, px: 34, lh: 1.06, width: 218) }
+        let sign = TemplateCopy.blocksSign.map { FitItem(text: $0, px: 28, lh: 1.0, width: 262) }
+        // Padding 56, the label row, two gaps, and the least the right column needs (open block, sign, bar).
+        let above = 56 + 16 * r + 24
+        let first = base.fitted(height: 750, fixed: above + 300, items: [word],
+                                boxes: [FitBox(items: sign, height: 120 - 32)])
+        // The Spring block is whatever height is left under the word. Its text must fit that, with its padding.
+        let region = 750 - above - 158 * 0.99 * first.displayScale * first.fit
+        ctx = base.fitted(height: 750, fixed: above + 300, items: [word],
+                          boxes: [FitBox(items: sign, height: 120 - 32), FitBox(items: spring, height: max(region - 32, 40))])
+    }
+
     var body: some View {
         let blocks = p.blocks
         Board(background: p.background.color, height: 750) {

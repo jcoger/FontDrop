@@ -94,6 +94,13 @@ final class FontLoader: @unchecked Sendable {
 
     var cachedCount: Int { lock.lock(); defer { lock.unlock() }; return cache.count }
 
+    /// Drops cached failures so the next `preload` tries those files again (after a rescan finished writing them).
+    func forgetFailures() {
+        lock.lock()
+        cache = cache.filter { if case .success = $0.value { return true } else { return false } }
+        lock.unlock()
+    }
+
     func clear() { lock.lock(); cache.removeAll(); lock.unlock() }
 
     /// Loads every path with `workers` parallel tasks. Returns when all are cached.

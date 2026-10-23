@@ -231,3 +231,14 @@ enum StyleNames {
         }
     }
 }
+
+/// Which candidate is selected after the list is rebuilt. Font ids can change when the library is rescanned. The
+/// family name does not, so the selection follows the family.
+enum CandidateSelection {
+    static func pick(_ list: [(id: String, family: String)], current: String?, keeping family: String?,
+                     preferred: String?, first: String?) -> String? {
+        if let family, let hit = list.first(where: { $0.family == family }) { return hit.id }
+        if let current, list.contains(where: { $0.id == current }) { return current }
+        return preferred ?? first
+    }
+}

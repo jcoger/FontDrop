@@ -13,6 +13,19 @@ struct FontDropApp: App {
                 .frame(minWidth: 1000, minHeight: 640)
         }
         .defaultSize(width: 1360, height: 860)
+        .commands {
+            CommandMenu(Lexicon.typeMenu) {
+                ForEach(["display", "reading"], id: \.self) { job in
+                    Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }
+                        .disabled(!model.canClear(job))
+                }
+                Divider()
+                Button(Lexicon.undo) {
+                    Task { for job in ["display", "reading"] where model.canUndo(job) { await model.undo(job); break } }
+                }
+                .disabled(!(model.canUndo("display") || model.canUndo("reading")))
+            }
+        }
     }
 }
 

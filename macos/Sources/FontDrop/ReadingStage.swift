@@ -21,10 +21,18 @@ struct ReadingStage: View {
             Divider()
             DecideBar(selected: selected, comparing: !compared.isEmpty)
         }
-        .task(id: "\(selected?.family ?? "")/\(compared.joined(separator: ","))/\(model.displayFamily?.name ?? "")") {
+        .task(id: taskID(selected: selected, compared: compared)) {
             let names = ([selected?.family, model.displayFamily?.name].compactMap { $0 }) + compared
             await model.preloadStyles(of: names)
         }
+    }
+
+    private func taskID(selected: Candidate?, compared: [String]) -> String {
+        let family: String = selected?.family ?? ""
+        let others: String = compared.joined(separator: ",")
+        let display: String = model.displayFamily?.name ?? ""
+        let revision: Int = model.libraryRevision
+        return family + "/" + others + "/" + display + "/" + String(revision)
     }
 
     private func title(selected: Candidate?, compared: [String]) -> String {
@@ -303,6 +311,8 @@ struct DecideBar: View {
                 .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : model.choicePulse)
             Text(justChosen ? Lexicon.setDone("reading") : Lexicon.current("reading")).font(.callout.weight(.semibold)).lineLimit(1)
             if justChosen { Button(Lexicon.undo) { Task { await model.undo("reading") } }.buttonStyle(.link) }
+            Button(Lexicon.clearFace("reading")) { Task { await model.clear("reading") } }
+                .buttonStyle(.link).foregroundStyle(.secondary).font(.caption).lineLimit(1)
             Spacer(minLength: 8)
             Button {
                 model.screen = noDisplay ? .display : .set

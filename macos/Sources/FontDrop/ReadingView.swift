@@ -44,8 +44,9 @@ struct ReadingList: View {
 
     @ViewBuilder
     private func listBody(rows: [Candidate], result: (shown: [Candidate], hidden: Int)) -> some View {
-        if model.candidatesLoading && model.candidates.isEmpty {
-            ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? "").frame(maxWidth: .infinity, maxHeight: .infinity)
+        if model.readingIsLoading && model.candidates.isEmpty {
+            ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? Lexicon.Reading.findingFaces)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = model.candidatesError {
             ContentUnavailableView("Could not load candidates", systemImage: "exclamationmark.triangle", description: Text(error))
         } else if rows.isEmpty {
