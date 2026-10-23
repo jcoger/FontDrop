@@ -15,8 +15,13 @@ struct PairContext {
     var palette: TemplatePalette = .paper
     var variant: String = ""
 
+    /// The shrink factor a fixed-size board sets so its display type fits (PosterFit.swift). 1 when nothing needs to shrink.
+    var fit: CGFloat = 1
+
     private static let displayBase = CGFloat(TypeSettings.defaults(job: "display").size)
     private static let readingBase = CGFloat(TypeSettings.defaults(job: "reading").size)
+    static var displayBaseSize: CGFloat { displayBase }
+    static var readingBaseSize: CGFloat { readingBase }
 
     /// Text in the Display face. `px` is the size on the board; `track` is the role's tracking in em,
     /// added to the playground's; `lh` is the role's line height as a multiple of the size.
@@ -30,7 +35,7 @@ struct PairContext {
                  italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil,
                  width: CGFloat? = nil, align: HorizontalAlignment = .leading, maxHeight: CGFloat? = nil) -> some View {
         FaceText(face: Self.styled(face ?? display, weight: weight, italic: italic, figures: figures), text: text,
-                 ratio: px / Self.displayBase, tick: tick, trackBias: track, leading: lh,
+                 ratio: px * fit / Self.displayBase, tick: tick, trackBias: track, leading: lh,
                  wrapWidth: width, lineAlignment: align, maxHeight: maxHeight)
             .foregroundStyle((color ?? palette.text).color)
     }
@@ -65,7 +70,7 @@ struct PairContext {
 
     /// The size a board size becomes after the playground's Size slider, in points. For hanging punctuation and the like.
     func points(_ px: CGFloat, display isDisplay: Bool) -> CGFloat {
-        px / (isDisplay ? Self.displayBase : Self.readingBase) * CGFloat((isDisplay ? display : body).settings.size)
+        px * (isDisplay ? fit : 1) / (isDisplay ? Self.displayBase : Self.readingBase) * CGFloat((isDisplay ? display : body).settings.size)
     }
 
     private static func styled(_ face: FaceSpec, weight: Double?, italic: Bool, figures: Figures) -> FaceSpec {

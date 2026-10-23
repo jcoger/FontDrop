@@ -211,6 +211,8 @@ struct ChosenPanel: View {
                     Button(Lexicon.undo) { Task { await model.undo(job) } }
                         .buttonStyle(.link)
                 }
+                Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }
+                    .buttonStyle(.link).foregroundStyle(.secondary).font(.caption)
             }
             if let nextTitle, let next {
                 Button(action: next) {
