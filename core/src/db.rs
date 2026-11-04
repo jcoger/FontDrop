@@ -930,15 +930,30 @@ pub fn refresh_google_fonts(conn: &Connection, data_dir: &Path) -> Result<u32, S
 /// connection (WAL), so readers elsewhere are never blocked for long. Returns
 /// the number of font rows afterwards.
 pub fn refresh_library(db_path: &Path) -> Result<u32, String> {
+    refresh_library_in(db_path, None)
+}
+
+/// `refresh_library` with an optional list of folders to scan instead of the three macOS
+/// font folders. A scan of given folders is the test seam: the rows get source "user" and the
+/// Google steps (network) are skipped, so a test scans a fixture folder and nothing else.
+pub fn refresh_library_in(db_path: &Path, folders: Option<&[PathBuf]>) -> Result<u32, String> {
     let conn = try_open_db_at(db_path).map_err(|e| e.to_string())?;
-    populate_db(&conn);
+    match folders {
+        Some(dirs) => {
+            let targets: Vec<(PathBuf, &str)> = dirs.iter().map(|d| (d.clone(), "user")).collect();
+            populate_from(&conn, &targets);
+        }
+        None => populate_db(&conn),
+    }
     enrich_from_name_tables(&conn);
     classify_all(&conn);
     enrich_metrics(&conn);
-    let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
-    crate::google_fonts::enrich_from_google(&conn, data_dir, false);
-    // Google's public family list (no key). Last, and never fatal: offline keeps the last stored list.
-    crate::google_list::sync_catalog(&conn, data_dir);
+    if folders.is_none() {
+        let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
+        crate::google_fonts::enrich_from_google(&conn, data_dir, false);
+        // Google's public family list (no key). Last, and never fatal: offline keeps the last stored list.
+        crate::google_list::sync_catalog(&conn, data_dir);
+    }
     conn.query_row("SELECT COUNT(*) FROM fonts", [], |r| r.get(0)).map_err(|e| e.to_string())
 }
 

@@ -157,6 +157,13 @@ impl Library {
     pub fn refresh_library(&self) -> Result<u32, CoreError> {
         db::refresh_library(&self.db_path).map_err(CoreError::Db)
     }
+
+    /// `refresh_library` over the given folders only (source "user"), with no network step.
+    /// A test seam: a test scans a fixture folder instead of the real font folders.
+    pub fn refresh_library_folders(&self, folders: Vec<String>) -> Result<u32, CoreError> {
+        let dirs: Vec<PathBuf> = folders.into_iter().map(PathBuf::from).collect();
+        db::refresh_library_in(&self.db_path, Some(&dirs)).map_err(CoreError::Db)
+    }
     /// One row per family, sorted by name (case-insensitive). The family is
     /// the name the font file declares about itself (see `names::read_family_name`).
     pub fn list_families(&self) -> Result<Vec<FamilySummary>, CoreError> {
