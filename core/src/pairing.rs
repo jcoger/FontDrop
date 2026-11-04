@@ -507,7 +507,25 @@ pub fn reading_candidates(
     let horses = crate::workhorse::assess_all(&all, &crate::workhorse::popularity(conn));
     let family_of: std::collections::HashMap<&str, &str> = all.iter().map(|f| (f.font_id.as_str(), f.font_family.as_str())).collect();
     let is_horse = |id: &str| family_of.get(id).and_then(|f| horses.get(*f)).map_or(false, |h| h.is);
-    let ranked = rank_by_family(primary, &all, &excluded);
+    let mut ranked = rank_by_family(primary, &all, &excluded);
+    // Faces the published guides recommend for body text get the same small boost the other shortcuts get, and say why.
+    // Only here, in Reading: the pair score the eval measures is not touched.
+    for s in &mut ranked {
+        let Some(rec) = family_of.get(s.font_id.as_str()).and_then(|f| crate::recommendations::for_family(f)) else { continue };
+        let n = rec.sources.len();
+        let mut codes: Vec<&str> = rec.sources.iter().map(|x| crate::recommendations::source_code(x)).collect();
+        codes.dedup();
+        s.precise += crate::recommendations::BOOST;
+        s.score = s.precise.min(100.0).round() as u8;
+        s.evidence.push(Evidence {
+            lens: "Recommended for text".into(),
+            detail: format!("{n} source{}", if n == 1 { "" } else { "s" }),
+            source: codes.join("; "),
+            strength: if n >= 2 { "guideline" } else { "shortcut" }.into(),
+            effect: 1,
+        });
+    }
+    ranked.sort_by(|a, b| b.precise.partial_cmp(&a.precise).unwrap_or(std::cmp::Ordering::Equal)); // stable: ties keep their order
     let (mut first, mut second): (Vec<PairScore>, Vec<PairScore>) = ranked.into_iter().partition(|s| is_horse(&s.font_id));
     if character_first { std::mem::swap(&mut first, &mut second); }
     first.extend(second);
@@ -1085,9 +1103,16 @@ mod tests {
             println!("  AFTER (workhorses first, then best match)");
             for (i, s) in after.iter().enumerate() {
                 let f = fam(&s.font_id);
-                println!("   {:>2}. {:<34} {}", i + 1, f, if horses[&f].is { "workhorse" } else { "" });
+                let rec = crate::recommendations::for_family(&f).map(|r| format!(" | recommended ({})", r.sources.join(", "))).unwrap_or_default();
+                println!("   {:>2}. {:<34} {}{}", i + 1, f, if horses[&f].is { "workhorse" } else { "" }, rec);
             }
         }
+        let recommended: Vec<&str> = {
+            let mut v: Vec<&str> = families.iter().copied().filter(|f| crate::recommendations::for_family(f).is_some()).collect();
+            v.sort();
+            v
+        };
+        println!("\n{} of {} library families match a recommendation: {}", recommended.len(), families.len(), recommended.join(", "));
     }
 
     // ── Broad benchmark (Google Fonts pairs mined from real sites + books) ──
