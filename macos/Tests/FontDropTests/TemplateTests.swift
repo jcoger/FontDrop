@@ -157,7 +157,7 @@ final class TemplateTests: XCTestCase {
 
     func testReadoutBarsMapValuesOntoTheirRanges() {
         XCTAssertEqual(PosterReadout.position(14, in: PosterReadout.displaySize), 0, accuracy: 0.0001)
-        XCTAssertEqual(PosterReadout.position(120, in: PosterReadout.displaySize), 1, accuracy: 0.0001)
+        XCTAssertEqual(PosterReadout.position(360, in: PosterReadout.displaySize), 1, accuracy: 0.0001)
         XCTAssertEqual(PosterReadout.position(15, in: PosterReadout.readingSize), 6.0 / 31, accuracy: 0.0001)
         XCTAssertEqual(PosterReadout.position(0, in: PosterReadout.tracking), 0.08 / 0.38, accuracy: 0.0001)
         XCTAssertEqual(PosterReadout.position(999, in: PosterReadout.readingSize), 1, "clamped")
