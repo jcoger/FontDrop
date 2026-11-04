@@ -27,6 +27,9 @@ pub struct ClassificationResult {
     /// Serif detected from outlines ('l' foot vs stem). None = couldn't measure.
     pub serif: Option<bool>,
     pub stroke_contrast_ratio: Option<f64>,
+    /// Mean advance of "n", "o" and "H" over the em, at wght 400 for a variable font. A width measure: about 0.55 is
+    /// ordinary, under 0.5 narrow, over 0.65 wide. None = could not measure.
+    pub advance_ratio: Option<f64>,
     pub reason: String,
 }
 
@@ -466,6 +469,31 @@ fn measure_stroke_contrast(font: &FontRef) -> Option<f64> {
     Some((max_w / min_w) as f64)
 }
 
+// ── Signal 5: Width ───────────────────────────────────────────────────────────
+//
+// Mean advance of "n", "o" and "H" over the em, at Regular (wght 400) for a variable font. Read from the
+// glyph metrics (advance widths, with the variation applied), so a condensed or extended face reads as one
+// whatever its OS/2 width class says (most files leave that class empty or at 5).
+
+fn measure_advance(font: &FontRef) -> Option<f64> {
+    use skrifa::instance::Size;
+    use skrifa::MetadataProvider;
+    let location = font.axes().location([("wght", 400.0)]);
+    let upm = font.metrics(Size::unscaled(), &location).units_per_em as f64;
+    if upm < 1.0 { return None; }
+    let charmap = font.charmap();
+    let metrics = font.glyph_metrics(Size::unscaled(), &location);
+    let advances: Vec<f64> = ['n', 'o', 'H']
+        .iter()
+        .filter_map(|c| charmap.map(*c))
+        .filter_map(|gid| metrics.advance_width(gid))
+        .map(|a| a as f64)
+        .filter(|a| *a > 0.0)
+        .collect();
+    if advances.len() < 2 { return None; }
+    Some(advances.iter().sum::<f64>() / advances.len() as f64 / upm)
+}
+
 /// Cast a ray from (ox, oy) in direction (dx, dy) and find the closest
 /// intersection distance with the contour.
 fn ray_contour_distance(ox: f32, oy: f32, dx: f32, dy: f32, contour: &Contour) -> Option<f32> {
@@ -641,6 +669,7 @@ pub fn classify_font(file_path: &Path, family_name: &str) -> ClassificationResul
         flesh_serif: 0,
         stroke_contrast_ratio: None,
         serif: None,
+        advance_ratio: None,
         reason: "Could not parse font file".into(),
     };
 
@@ -659,6 +688,7 @@ pub fn classify_font(file_path: &Path, family_name: &str) -> ClassificationResul
             flesh_serif: 0,
             stroke_contrast_ratio: None,
             serif: None,
+            advance_ratio: None,
             reason: format!("Non-parseable format, name fallback → {}", skeleton),
         };
     }
@@ -739,6 +769,7 @@ pub fn classify_font(file_path: &Path, family_name: &str) -> ClassificationResul
         flesh_serif,
         stroke_contrast_ratio: contrast_ratio,
         serif: measure_serif(&font),
+        advance_ratio: measure_advance(&font),
         reason,
     }
 }
@@ -811,6 +842,30 @@ mod tests {
         ("~/Library/Fonts/Brown-Regular.otf", "geometric"),
         ("~/Library/Fonts/PlusJakartaSans-Regular.otf", "geometric"),
     ];
+
+    /// The cost of the width measure against the rest of classification, on every file of a DB copy:
+    ///   FONTDROP_DB=<copy> cargo test --lib advance_cost -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn advance_cost() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB to a copy");
+        let conn = rusqlite::Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let files: Vec<String> = conn.prepare("SELECT DISTINCT file_path FROM fonts").unwrap()
+            .query_map([], |r| r.get::<_, String>(0)).unwrap().flatten().filter(|p| Path::new(p).exists()).collect();
+        let datas: Vec<Vec<u8>> = files.iter().filter_map(|p| std::fs::read(p).ok()).collect();
+        let (mut width, mut contrast, mut measured) = (std::time::Duration::ZERO, std::time::Duration::ZERO, 0);
+        for d in &datas {
+            let Ok(f) = FontRef::from_index(d, 0) else { continue };
+            let t = std::time::Instant::now();
+            let a = measure_advance(&f);
+            width += t.elapsed();
+            if a.is_some() { measured += 1; }
+            let t = std::time::Instant::now();
+            let _ = measure_stroke_contrast(&f);
+            contrast += t.elapsed();
+        }
+        println!("{} files: width {:.3}s ({} measured), stroke contrast {:.3}s", datas.len(), width.as_secs_f64(), measured, contrast.as_secs_f64());
+    }
 
     #[test]
     #[ignore]
