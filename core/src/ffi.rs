@@ -111,6 +111,8 @@ pub struct PairCandidate {
     pub pair_type: String,
     pub evidence: Vec<Evidence>,
     pub rank: u32,
+    /// A dependable text face (workhorse.rs). Only set for the Reading job.
+    pub workhorse: bool,
     /// For `same_family`: the style of the Display family to use for body text.
     pub suggested_body_style: Option<BodyStyle>,
 }
@@ -273,13 +275,20 @@ impl Library {
         excluded_ids: Vec<String>,
         excluded_families: Vec<String>,
         job: Option<String>,
+        character_first: bool,
         limit: u32,
     ) -> Result<Vec<PairCandidate>, CoreError> {
         let conn = self.lock()?;
-        let scored = pairing::font_candidates(&conn, &font_id, excluded_ids, excluded_families, job.as_deref(), limit as usize)
-            .map_err(|m| {
-                if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
-            })?;
+        let (scored, horses) = if job.as_deref() == Some("reading") {
+            // Reading: dependable text faces first (or last, with `character_first`), the engine's order within each group.
+            pairing::reading_candidates(&conn, &font_id, excluded_ids, excluded_families, character_first, limit as usize)
+        } else {
+            pairing::font_candidates(&conn, &font_id, excluded_ids, excluded_families, job.as_deref(), limit as usize)
+                .map(|s| (s, std::collections::HashSet::new()))
+        }
+        .map_err(|m| {
+            if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
+        })?;
         let mut paths: HashMap<String, (String, String)> = HashMap::new();
         let mut stmt = conn.prepare("SELECT font_id, file_path, font_family FROM fonts")?;
         for r in stmt.query_map([], |r| {
@@ -294,6 +303,7 @@ impl Library {
             .map(|(i, p)| {
                 let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
                 PairCandidate {
+                    workhorse: horses.contains(&p.font_id),
                     suggested_body_style: body_style(p.suggested_body_style, &paths),
                     family,
                     file_path,

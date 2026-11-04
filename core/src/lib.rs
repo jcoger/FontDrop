@@ -22,6 +22,7 @@ pub mod names;
 pub mod pairing;
 pub mod same_family;
 pub mod userdata;
+pub mod workhorse;
 
 pub use names::{
     looks_trial, parse_family, parse_font_meta, read_family_name, read_name_meta,

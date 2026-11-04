@@ -375,6 +375,12 @@ pub fn font_pairs(
 /// a proxy until true-italic is checked. A variable file counts for what its axes reach:
 /// a `wght` axis that tops out at 600 or more is a bold, an `ital` or `slnt` axis is an italic.
 pub fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
+    unfit_ids(all, true)
+}
+
+/// `unfit_for_reading`, with the name rule (Compressed, Condensed, Schmal) switched on or off. Off is how it was before
+/// that rule: the eval prints both.
+fn unfit_ids(all: &[FontData], name_rule: bool) -> HashSet<String> {
     #[derive(Default)]
     struct Cover { regular: bool, italic: bool, bold: bool, bold_italic: bool }
     let mut cover: std::collections::HashMap<&str, Cover> = Default::default();
@@ -399,7 +405,13 @@ pub fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
             let c = &cover[f.font_family.as_str()];
             let incomplete = !(c.regular && c.italic && c.bold && c.bold_italic);
             let display_cut = ["display", "poster", "headline", "deck", "banner"].iter().any(|k| fam.contains(k));
-            let narrow = matches!(width_str(f), "condensed" | "compressed");
+            // Most files carry no measured width class, so the names count too: "Compressed", "Condensed", and the
+            // German "Schmal" (narrow), in the family or in the file's own name.
+            let narrow_name = |s: &str| {
+                let s = s.to_lowercase();
+                ["compressed", "condensed", "schmal"].iter().any(|k| s.contains(k))
+            };
+            let narrow = matches!(width_str(f), "condensed" | "compressed") || (name_rule && (narrow_name(&f.font_family) || narrow_name(&f.file_name)));
             let mono = fam.contains("mono") || f.optical_role.as_deref() == Some("mono");
             incomplete || display_cut || narrow || mono
         })
@@ -462,6 +474,40 @@ pub fn font_candidates(
         excluded.extend(unfit_for_reading(&all));
     }
     Ok(crate::same_family::put_first(ranked_candidates(primary, &all, &excluded, limit), same_family, limit))
+}
+
+/// `font_candidates` for the Reading list: workhorses (dependable text faces, see `workhorse.rs`) first, the rest
+/// after, each group in the engine's own order (best match first). `character_first` flips the groups.
+/// Returns the page and the font ids of its workhorses, so the app can tell them apart without a badge.
+/// The grouping happens before the page is cut, so a first page of 40 is the 40 best workhorses.
+pub fn reading_candidates(
+    conn: &Connection,
+    font_id: &str,
+    excluded_ids: Vec<String>,
+    excluded_families: Vec<String>,
+    character_first: bool,
+    limit: usize,
+) -> Result<(Vec<PairScore>, HashSet<String>), String> {
+    let all = load_all_fonts(conn)?;
+    let primary = all
+        .iter()
+        .find(|f| f.font_id == font_id)
+        .ok_or_else(|| format!("Font {} not found", font_id))?;
+    let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    excluded.extend(crate::finder::hidden_font_ids(conn));
+    excluded.extend(ids_of_families(&all, &excluded_families));
+    let same_family = crate::same_family::offer(primary, &all, &excluded);
+    excluded.extend(unfit_for_reading(&all));
+    let horses = crate::workhorse::assess_all(&all, &crate::workhorse::popularity(conn));
+    let family_of: std::collections::HashMap<&str, &str> = all.iter().map(|f| (f.font_id.as_str(), f.font_family.as_str())).collect();
+    let is_horse = |id: &str| family_of.get(id).and_then(|f| horses.get(*f)).map_or(false, |h| h.is);
+    let ranked = rank_by_family(primary, &all, &excluded);
+    let (mut first, mut second): (Vec<PairScore>, Vec<PairScore>) = ranked.into_iter().partition(|s| is_horse(&s.font_id));
+    if character_first { std::mem::swap(&mut first, &mut second); }
+    first.extend(second);
+    first.truncate(limit);
+    let ids: HashSet<String> = first.iter().filter(|s| is_horse(&s.font_id)).map(|s| s.font_id.clone()).collect();
+    Ok((crate::same_family::put_first(first, same_family, limit), ids))
 }
 
 /// How many families the Reading rule (`unfit_for_reading`) removes from the candidate list:
@@ -759,6 +805,32 @@ mod tests {
         assert!(unfit_for_reading(&[light]).contains("v3"));
     }
 
+    /// A complete family (regular, italic, bold, bold italic) under this family name.
+    fn complete(family: &str) -> Vec<FontData> {
+        vec![
+            styled("a", family, "Face-Regular.otf", 400),
+            styled("b", family, "Face-Italic.otf", 400),
+            styled("c", family, "Face-Bold.otf", 700),
+            styled("d", family, "Face-BoldItalic.otf", 700),
+        ]
+    }
+
+    /// Most files have no measured width class, so the family name decides: Compressed, Condensed and the German
+    /// Schmal (narrow) are not for long text. A complete family with an ordinary name is fine.
+    #[test]
+    fn compressed_condensed_and_schmal_names_are_not_for_long_text() {
+        for name in ["Test National 2 Compressed", "Test Söhne Schmal", "Acme Condensed"] {
+            let fam = complete(name);
+            assert_eq!(unfit_for_reading(&fam).len(), 4, "{name}");
+        }
+        assert!(unfit_for_reading(&complete("Acme Text")).is_empty());
+        // A narrow cut among ordinary files drops only that file.
+        let mut mixed = complete("Acme Sans");
+        mixed.push(styled("e", "Acme Sans", "Acme-CondensedRegular.otf", 400));
+        let unfit = unfit_for_reading(&mixed);
+        assert!(unfit.contains("e") && unfit.len() == 1);
+    }
+
     impl FontData {
         fn clone_for_test(&self) -> FontData {
             let mut f = font(&self.font_id, &self.font_family);
@@ -936,6 +1008,53 @@ mod tests {
             }
         }
         println!("\nreal partner shown in top 11: {hits} of {runs}  (rank = position among families)");
+    }
+
+    // Workhorses and the Reading list, on a DB copy:
+    //   FONTDROP_DB=<copy> cargo test --lib eval_workhorse_reading -- --ignored --nocapture
+    // Prints, for the Reading face of each shipped pair, whether it counts as a workhorse and why not; then the top 10
+    // Reading candidates for three Display faces, before (the old rules, engine order) and after (workhorses first).
+    #[test]
+    #[ignore]
+    fn eval_workhorse_reading() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB");
+        let conn = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let all = load_all_fonts(&conn).unwrap();
+        let horses = crate::workhorse::assess_all(&all, &crate::workhorse::popularity(&conn));
+        println!("\nReading faces of the shipped pairs");
+        let (mut yes, mut total) = (0, 0);
+        for (_, b, _, nb) in GROUND_TRUTH {
+            let Some(f) = pick_primary(&all, b, nb) else { println!("  {b}: not installed"); continue };
+            let w = &horses[&f.font_family];
+            total += 1;
+            if w.is { yes += 1; }
+            println!("  {:<24} {}  passed: {}  | failed: {}", f.font_family, if w.is { "WORKHORSE" } else { "no       " }, w.passed.join(", "), w.failed.join(", "));
+        }
+        println!("  {yes} of {total} are workhorses");
+        let families: HashSet<&str> = all.iter().map(|f| f.font_family.as_str()).collect();
+        let hidden = crate::finder::hidden_font_ids(&conn);
+        let horse_count = families.iter().filter(|f| horses[**f].is).count();
+        println!("\n{horse_count} of {} families are workhorses", families.len());
+        let old_unfit = unfit_ids(&all, false);
+        for key in ["agrandir", "ppmuseum", "timelessserif"] {
+            let Some(primary) = pick_primary(&all, key, &[]) else { println!("{key}: not installed"); continue };
+            let mut before_excl: HashSet<String> = hidden.clone();
+            before_excl.extend(old_unfit.iter().cloned());
+            let before = ranked_candidates(primary, &all, &before_excl, 10);
+            let fam = |id: &str| all.iter().find(|f| f.font_id == id).map(|f| f.font_family.clone()).unwrap_or_default();
+            println!("\nDisplay = {}: top 10 Reading candidates", primary.font_family);
+            println!("  BEFORE (best match only)");
+            for (i, s) in before.iter().enumerate() {
+                let f = fam(&s.font_id);
+                println!("   {:>2}. {:<34} {}", i + 1, f, if horses[&f].is { "workhorse" } else { "" });
+            }
+            let (after, _) = reading_candidates(&conn, &primary.font_id, vec![], vec![], false, 10).unwrap();
+            println!("  AFTER (workhorses first, then best match)");
+            for (i, s) in after.iter().enumerate() {
+                let f = fam(&s.font_id);
+                println!("   {:>2}. {:<34} {}", i + 1, f, if horses[&f].is { "workhorse" } else { "" });
+            }
+        }
     }
 
     // ── Broad benchmark (Google Fonts pairs mined from real sites + books) ──
