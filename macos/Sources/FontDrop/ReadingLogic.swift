@@ -71,7 +71,8 @@ enum ReadingRows {
     /// "Same designer" reason says the same name (the library falls back to the designer for the foundry).
     static func reasons(_ candidate: Candidate, xHeightNote: String?, limit: Int = 2) -> [String] {
         var out: [String] = []
-        for e in dedupedEvidence(candidate.evidence) {
+        // "Recommended for text" lives on the card, not in the list: the vibe stays first.
+        for e in dedupedEvidence(candidate.evidence) where e.lens != "Recommended for text" {
             let text = Lexicon.chip(e, xHeightNote: e.lens == "x-height" ? xHeightNote : nil)
             if !out.contains(text) { out.append(text) }
         }

@@ -426,3 +426,18 @@ Plain words. No em dashes.
 ### Gates for section 15
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass
+
+## 16. Recommended for text (2026-11-04)
+
+Some faces are named for body text by published type guides (core/data/text-recommendations.csv: Typewolf, Butterick's Practical Typography). The Why it pairs card says so and names the guides. Nothing shows in the list rows.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 16.1 | why.recommended | **Type guides** (row title) · **Recommended for text · 2 sources** (detail) | A row in Why it pairs. The count is guides by publisher, each once: **1 source**, **2 sources**. The strength line reads Common advice for 2 or more, Rule of thumb for 1. The sources line under it names them |
+| 16.2 | why.recommended.help | **Recommended for body text by Typewolf** | Hover on the detail. Lists the guides |
+
+The two sources named today are **Typewolf** and **Butterick's Practical Typography**. Plain words. No em dashes.
+
+### Gates for section 16
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass

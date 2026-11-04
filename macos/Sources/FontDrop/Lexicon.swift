@@ -104,6 +104,8 @@ enum Lexicon {
         "BRO": "Flexible Typesetting",
         "BON": "Smashing (Bonneville)", "MAY": "Smashing (Mayer)",
         "REY": "Smashing (Reynolds)", "RUI": "Refactoring UI", "RFR": "Refactoring UI",
+        // The type guides behind "Recommended for text" (core/data/text-recommendations.csv).
+        "TYW": "Typewolf", "BPT": "Butterick's Practical Typography",
     ]
 
     /// "LAT ch.5; TWC 69-70; BON p.145; MAY" -> "Better Web Typography, Typewolf checklist, Smashing (Bonneville), Smashing (Mayer)".
@@ -136,6 +138,7 @@ enum Lexicon {
             let n = Double(e.detail.filter { $0.isNumber || $0 == "." }) ?? 0
             return n < 1 ? "Same x-height" : "x-height within \(Int(n))% of Display"
         case "Texture": return strokeSentence(e.detail)
+        case "Recommended for text": return "Recommended for text \u{00B7} \(e.detail)"
         case "Foundry": return "Same foundry"
         case "Designer": return "Same designer"
         case "Near-duplicate": return "Too close to Display"
@@ -165,6 +168,7 @@ enum Lexicon {
         case "Designed together": "Superfamily"
         case "The middle", "Near-duplicate": "Too close"
         case "Texture": "Stroke contrast"
+        case "Recommended for text": "Type guides"
         case "Same family": "Same family"
         case "Foundry": "Foundry"
         case "Designer": "Designer"
@@ -180,6 +184,9 @@ enum Lexicon {
         default: chip(e)
         }
     }
+
+    /// 16.2: the hover on the "Recommended for text" row: who recommends it.
+    static func recommendedBy(_ sources: String) -> String { "Recommended for body text by \(sources)" }
 
     // MARK: Same family (9.x)
 

@@ -34,6 +34,29 @@ final class ReadingSafeTests: XCTestCase {
         XCTAssertFalse(ReadingSort.withoutDisplay.contains(.characterFirst), "nothing to rank against before a Display face")
     }
 
+    func testTheRecommendedForTextRowReadsLikeTheOtherEvidence() {
+        let e = Evidence(lens: "Recommended for text", detail: "2 sources", source: "TYW; BPT", strength: "guideline", effect: 1)
+        XCTAssertEqual(Lexicon.chip(e), "Recommended for text \u{00B7} 2 sources")
+        XCTAssertEqual(Lexicon.whyTitle(e), "Type guides")
+        XCTAssertEqual(Lexicon.whyDetail(e), "Recommended for text \u{00B7} 2 sources")
+        XCTAssertEqual(Lexicon.sources(e.source), "Typewolf, Butterick's Practical Typography")
+        XCTAssertEqual(Lexicon.strength(e.strength), "Common advice")
+        XCTAssertEqual(Lexicon.recommendedBy("Typewolf"), "Recommended for body text by Typewolf")
+        for s in [Lexicon.chip(e), Lexicon.whyTitle(e), Lexicon.recommendedBy("Typewolf")] {
+            XCTAssertFalse(s.contains("\u{2014}") || s.contains("\u{2013}"), s)
+        }
+    }
+
+    /// The list keeps the vibe: the recommendation shows on the card only.
+    func testTheRecommendationIsNotAListRowReason() {
+        let rec = Evidence(lens: "Recommended for text", detail: "1 source", source: "TYW", strength: "shortcut", effect: 1)
+        let xh = Evidence(lens: "x-height", detail: "within 2%", source: "LAT", strength: "guideline", effect: 1)
+        let c = Candidate(id: "a", family: "A", pairType: "contrast", evidence: [rec, xh], order: 0, workhorse: true)
+        let reasons = ReadingRows.reasons(c, xHeightNote: nil)
+        XCTAssertFalse(reasons.contains { $0.contains("Recommended") }, "\(reasons)")
+        XCTAssertTrue(reasons.contains { $0.contains("x-height") }, "\(reasons)")
+    }
+
     /// With no Display face the sort falls back to Name, as before.
     @MainActor
     func testWithoutADisplayFaceTheSortStaysNameOrLessCommon() {

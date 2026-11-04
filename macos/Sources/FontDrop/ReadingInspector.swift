@@ -56,7 +56,10 @@ struct ReadingInspector: View {
                         Spacer()
                     }
                     let detail = e.lens == "x-height" ? (inspectorXHeightNote(c) ?? Lexicon.whyDetail(e)) : Lexicon.whyDetail(e)
-                    if !detail.isEmpty { Text(detail).font(.callout) }
+                    if !detail.isEmpty {
+                        Text(detail).font(.callout)
+                            .help(e.lens == "Recommended for text" ? Lexicon.recommendedBy(Lexicon.sources(e.source)) : "")
+                    }
                     if e.effect == 0 {
                         Text(Lexicon.notScored).font(.caption2).foregroundStyle(.secondary)
                     } else {
