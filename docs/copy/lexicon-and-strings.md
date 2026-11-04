@@ -384,3 +384,28 @@ Plain words. No em dashes. The ellipsis is the single character.
 ### Gates for section 13
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass
+
+## 14. Scale, Ratio, Lock and Trim (2026-11-04)
+
+Template type is sized from the font by default ("Fit"). A brand can lock one body size and one ratio instead. Each face keeps a small Trim on top. The words "modular scale" do not appear in the UI.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 14.1 | scale.title | **Scale** | Section at the top of the Reading inspector, shared by both faces, saved per brand |
+| 14.2 | scale.lock | **Lock** | Switch in the section header |
+| 14.3 | scale.lockHelp | **Lock sizes to the ratio** | Help text on 14.2 |
+| 14.4 | scale.body | **Body** | Slider, 9 to 24 pt. Readout: **15 pt** |
+| 14.5 | scale.ratio | **Ratio** | Picker: 1.2, 1.25, 1.333, 1.5, 1.618 |
+| 14.6 | scale.fitNote | **Sizes fit each font** | Quiet line while unlocked. Its help (hover) says how Fit works |
+| 14.7 | scale.readout.headline | **Headline 64 pt · 4.3× body** | Quiet caption under the controls, for the template on stage |
+| 14.8 | scale.readout.body | **Body 15 pt** | Same caption, second line |
+| 14.9 | scale.controlsOff | **Lock sizes to set the body size and ratio** | Help on the two controls while unlocked |
+| 14.10 | trim.group | **Scale and spacing** | Heading of the numbers group in a face's playground. Was "Size and spacing" |
+| 14.11 | trim.label | **Trim** | Slider, 75% to 135%. Readout: **+8%**, **0%**, **-12%** |
+| 14.12 | trim.help | **Nudges every size this face gets in the templates** | Help on 14.11 |
+
+Plain words. No em dashes. "pt" is the unit, and the sizes are the board's points.
+
+### Gates for section 14
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass

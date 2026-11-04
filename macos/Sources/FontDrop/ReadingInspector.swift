@@ -12,6 +12,7 @@ struct ReadingInspector: View {
             VStack(alignment: .leading, spacing: 14) {
                 if let c = selected {
                     header(c)
+                    ScaleSection(family: c.family, fallbackPath: c.filePath)
                     if model.displayFamily != nil { why(c) }
                     playgrounds(c)
                 } else {

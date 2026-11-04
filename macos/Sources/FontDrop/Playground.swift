@@ -80,7 +80,7 @@ struct PlaygroundGroup: View {
     // MARK: pieces
 
     private func specimen(_ face: FaceSpec) -> some View {
-        FaceText(face: face, text: preview, tick: model.fontTick + loaded)
+        FaceText(face: face, text: preview, ratio: CGFloat(face.settings.trim), tick: model.fontTick + loaded)
             .lineLimit(job == "display" ? 2 : 4)
             .minimumScaleFactor(job == "display" ? 0.3 : 1)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -126,9 +126,10 @@ struct PlaygroundGroup: View {
 
     private func numbers(_ s: TypeSettings) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Size and spacing").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            slider("Size", value: Binding(get: { s.size }, set: { v in store.update(key, job: job) { $0.size = v } }),
-                   range: job == "display" ? 14...120 : 9...40, readout: "\(Int(s.size.rounded())) pt")
+            Text(Lexicon.Scale.sectionFace).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            slider(Lexicon.Scale.trim, value: Binding(get: { s.trim }, set: { v in store.update(key, job: job) { $0.trim = v } }),
+                   range: TypeSettings.trimRange, readout: Lexicon.Scale.trimReadout(s.trim))
+                .help(Lexicon.Scale.trimHelp)
             slider("Tracking", value: Binding(get: { s.tracking }, set: { v in store.update(key, job: job) { $0.tracking = v } }),
                    range: -0.08...0.3, readout: String(format: "%+.3f em", s.tracking))
             slider("Line height", value: Binding(get: { s.lineHeight }, set: { v in store.update(key, job: job) { $0.lineHeight = v } }),
