@@ -4,6 +4,9 @@ import SwiftUI
 /// The big figure is proportional. The table is tabular and right-aligned, so the amounts line up.
 struct AppDashboard: View {
     let ctx: PairContext
+
+    /// The big number: 48px on the board, one line.
+    static let headline = HeadlineSpec(text: TemplateCopy.dashboardRevenue, px: 48, track: -0.03, lh: 1.04)
     private var p: TemplatePalette { ctx.palette }
 
     var body: some View {
@@ -56,7 +59,7 @@ struct AppDashboard: View {
             VStack(alignment: .leading, spacing: 4) {
                 ctx.reading(TemplateCopy.dashboardLabel, 13, lh: 1.23, color: p.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    ctx.display(TemplateCopy.dashboardRevenue, 48, track: -0.03, lh: 1.04, figures: .proportional)
+                    ctx.headline(Self.headline, figures: .proportional)
                         .lineLimit(1).minimumScaleFactor(0.12)
                     ctx.reading(TemplateCopy.dashboardDelta, 13, lh: 1.23, weight: 500, figures: .tabular)
                 }

@@ -45,21 +45,21 @@ enum PosterFit {
 }
 
 extension PairContext {
-    /// Playground Display size as a multiple of the size the boards were drawn at (40).
-    var displayScale: CGFloat { CGFloat(display.settings.size) / Self.displayBaseSize }
-    /// Playground Reading size as a multiple of the size the boards were drawn at (15).
-    var readingScale: CGFloat { CGFloat(body.settings.size) / Self.readingBaseSize }
+    /// What a Display role at `px` really draws at, as a multiple of its board size (Fit or the scale, and Trim).
+    func displayScale(_ px: CGFloat) -> CGFloat { displayFactor(px) }
+    /// The same for Reading text. Poster boxes are sized with the 13px small text.
+    var readingScale: CGFloat { readingFactor(13) }
 
     /// Height of `item` on the board at the current playground size, shrunk by `s`, with its wrapped line count.
     private func height(of item: FitItem, at s: CGFloat) -> CGFloat {
         var lines = 1
-        if let width = item.width, let font = FontLoader.shared.styledFont(display, ratio: item.px * s / Self.displayBaseSize) {
+        if let width = item.width, let font = FontLoader.shared.styledFont(display, ratio: item.px * s * displayScale(item.px) / CGFloat(display.settings.size)) {
             lines = TightLines.lines(item.text, font: font,
                                      tracking: CGFloat(display.settings.tracking + item.tracking) * CTFontGetSize(font),
                                      width: width).count
         }
         if let cap = item.maxLines { lines = min(lines, cap) }
-        return item.px * CGFloat(item.lh) * CGFloat(lines) * displayScale * s
+        return item.px * CGFloat(item.lh) * CGFloat(lines) * displayScale(item.px) * s
     }
 
     /// This context with `fit` set so a fixed-height board holds its content.
@@ -76,7 +76,7 @@ extension PairContext {
             for item in items {
                 // The width rule: a line that cannot wrap shrinks until its widest word fits.
                 guard let limit = item.fitWidth,
-                      let font = FontLoader.shared.styledFont(display, ratio: item.px / Self.displayBaseSize) else { continue }
+                      let font = FontLoader.shared.styledFont(display, ratio: item.px * displayScale(item.px) / CGFloat(display.settings.size)) else { continue }
                 let w = FitWords.widestWord(item.text, font: font, trackingEm: display.settings.tracking + item.tracking)
                 if w > 0 { next = min(next, max(PosterFit.floor, limit / w * PosterFit.margin)) }
             }

@@ -3,6 +3,10 @@ import SwiftUI
 /// Hero A, Statement. Tests: display type at 88px, tracked tight, beside 14px nav and buttons.
 struct HeroStatement: View {
     let ctx: PairContext
+
+    /// 88px on the board, 2 lines in a 520 column (as drawn for PP Museum), never taller than 380.
+    static let headline = HeadlineSpec(text: TemplateCopy.statementHeadline, px: 88, track: -0.04, lh: 0.91, width: 520,
+                                       lines: 2...2, maxHeight: 380)
     private var p: TemplatePalette { ctx.palette }
 
     var body: some View {
@@ -11,7 +15,7 @@ struct HeroStatement: View {
                 nav
                 Spacer(minLength: 0)
                 VStack(alignment: .leading, spacing: 28) {
-                    ctx.display(TemplateCopy.statementHeadline, 88, track: -0.04, lh: 0.91, width: 520, maxHeight: 380)
+                    ctx.headline(Self.headline)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(alignment: .bottom, spacing: 32) {
                         ctx.reading(TemplateCopy.statementSub, 16, lh: 1.5, color: p.secondary)

@@ -6,8 +6,8 @@ struct PosterReadout: View {
     let ctx: PairContext
     private var p: TemplatePalette { ctx.palette }
 
-    // The ranges the playground's sliders use (Playground.swift). Bars map a value onto its range.
-    static let displaySize: ClosedRange<Double> = 14...120
+    // The ranges the bars map a size onto: a poster word is far bigger than a headline. Reading matches the 9 to 40 pt body range.
+    static let displaySize: ClosedRange<Double> = 14...360
     static let readingSize: ClosedRange<Double> = 9...40
     static let tracking: ClosedRange<Double> = -0.08...0.3
 
@@ -31,19 +31,19 @@ struct PosterReadout: View {
         let displayItalic = ctx.display.italic() ?? ctx.display
         Board(background: p.field.color, height: 750) {
             VStack(alignment: .leading, spacing: 0) {
-                band(face: ctx.display, size: ctx.display.settings.size, sizeRange: Self.displaySize, tracking: nil,
+                band(face: ctx.display, size: Double(ctx.points(320, display: true)), sizeRange: Self.displaySize, tracking: nil,
                      name: Lexicon.Readout.display) {
                     ctx.posterLine(TemplateCopy.readoutWord, 320, track: -0.05, lh: 0.82)
                 }
                 Spacer(minLength: 0)
-                band(face: displayItalic, size: displayItalic.settings.size, sizeRange: Self.displaySize, tracking: nil,
+                band(face: displayItalic, size: Double(ctx.points(72, display: true, italic: true)), sizeRange: Self.displaySize, tracking: nil,
                      name: Lexicon.Readout.displayItalic) {
                     ctx.display(TemplateCopy.readoutLine, 72, track: -0.02, lh: 1.0, italic: true, width: 552)
                         .lineLimit(2).minimumScaleFactor(0.15)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer(minLength: 0)
-                band(face: ctx.body, size: ctx.body.settings.size, sizeRange: Self.readingSize,
+                band(face: ctx.body, size: Double(ctx.points(15, display: false)), sizeRange: Self.readingSize,
                      tracking: ctx.body.settings.tracking, name: Lexicon.Readout.reading) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(TemplateCopy.readoutBody, id: \.self) {

@@ -64,6 +64,8 @@ struct FaceText: View {
     var lineAlignment: HorizontalAlignment = .leading
     /// With `wrapWidth`: the most height the text may take. The size shrinks until it fits (a hero headline on a fixed board).
     var maxHeight: CGFloat?
+    /// A headline: always set line by line, so the lines break exactly where the size was solved for them.
+    var exactLines = false
 
     /// The font, smaller when a word is wider than `wrapWidth` or the lines are taller than `maxHeight`.
     /// A word is never broken: the size comes down first (to a floor), then the text wraps between words.
@@ -78,9 +80,9 @@ struct FaceText: View {
 
     /// Space added between lines. A template's own line height may tighten below the font's natural spacing;
     /// the playground's may not (as before).
-    private func extraLeading(size: CGFloat, natural: CGFloat) -> CGFloat {
-        let wanted = CGFloat(leading ?? face.settings.lineHeight) * size - natural
-        return max(0, wanted)
+    private func extraLeading(size: CGFloat, natural: CGFloat, wanted: CGFloat?) -> CGFloat {
+        let pitch = wanted ?? CGFloat(face.settings.lineHeight) * size
+        return max(0, pitch - natural)
     }
 
     var body: some View {
@@ -89,16 +91,26 @@ struct FaceText: View {
             let size = CTFontGetSize(font)
             let natural = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
             let tracking = CGFloat(face.settings.tracking + trackBias) * size
-            if let leading, let wrapWidth, CGFloat(leading) * size < natural {
-                // Tighter than the font's own spacing: lay the lines out one by one.
+            // A template's line height is a target. It is raised until the ink of the real lines clears.
+            let wanted = leading.map { CGFloat($0) * size }
+            if let wrapWidth, let wanted, wanted < natural || exactLines {
+                // Tighter than the font's own spacing, or a headline: lay the lines out one by one.
+                let lines = TightLines.lines(text, font: font, tracking: tracking, width: wrapWidth)
+                let pitch = TypeFit.pitch(lines: lines, font: font, tracking: tracking, wanted: wanted)
                 TightLines(text: text, font: font, tracking: tracking, width: wrapWidth,
-                           pitch: CGFloat(leading) * size, natural: natural, alignment: lineAlignment)
+                           pitch: pitch, natural: natural, alignment: lineAlignment)
             } else {
+                // Lines wrap wherever the container says, so the check uses the tallest letters of the whole text.
+                // Only a tight line height on text long enough to wrap can need it.
+                let safe = wanted.map { w -> CGFloat in
+                    guard w < size * 1.3, text.count > 28 else { return w }
+                    return max(w, TypeFit.pitchNeed(wrapped: text, font: font, tracking: tracking))
+                }
                 Text(text)
                     .font(Font(font))
                     .tracking(tracking)
-                    .exactLineHeight(leading.map { CGFloat($0) * size }, natural: natural,
-                                     fallbackSpacing: useLineHeight ? extraLeading(size: size, natural: natural) : 0)
+                    .exactLineHeight(safe, natural: natural,
+                                     fallbackSpacing: useLineHeight ? extraLeading(size: size, natural: natural, wanted: safe) : 0)
             }
         } else {
             let size = CGFloat(face.settings.size) * ratio

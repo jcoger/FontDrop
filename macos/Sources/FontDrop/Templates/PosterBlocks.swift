@@ -19,7 +19,7 @@ struct PosterBlocks: View {
         let first = base.fitted(height: 750, fixed: above + 300, items: [word],
                                 boxes: [FitBox(items: sign, height: 120 - 32)])
         // The Spring block is whatever height is left under the word. Its text must fit that, with its padding.
-        let region = 750 - above - 158 * 0.99 * first.displayScale * first.fit
+        let region = 750 - above - 158 * 0.99 * first.displayScale(158) * first.fit
         ctx = base.fitted(height: 750, fixed: above + 300, items: [word],
                           boxes: [FitBox(items: sign, height: 120 - 32), FitBox(items: spring, height: max(region - 32, 40))])
     }

@@ -4,6 +4,9 @@ import SwiftUI
 /// hanging punctuation, a small-caps heading, figures in running text, and inline italic, bold and a link.
 struct ArticleEssay: View {
     let ctx: PairContext
+
+    /// 44px on the board, 2 lines in a 472 column (as drawn for PP Museum).
+    static let headline = HeadlineSpec(text: TemplateCopy.essayHeadline, px: 44, track: -0.02, lh: 1.05, width: 472, lines: 2...2)
     private var p: TemplatePalette { ctx.palette }
 
     var body: some View {
@@ -22,7 +25,7 @@ struct ArticleEssay: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
             ctx.label(TemplateCopy.essayKicker, color: p.accent)
-            ctx.display(TemplateCopy.essayHeadline, 44, track: -0.02, lh: 1.05, width: 472)
+            ctx.headline(Self.headline)
             ctx.display(TemplateCopy.essayStandfirst, 20, lh: 1.4, italic: true, color: p.secondary, width: 472)
             ctx.reading(TemplateCopy.essayByline, 13, lh: 1.4, color: p.secondary)
         }
