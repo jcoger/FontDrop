@@ -169,9 +169,9 @@ pub(crate) fn run_migrations(conn: &Connection) {
 
 /// Same as `run_migrations`, but reports failure instead of panicking.
 pub fn try_run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let current: i64 = conn
-        .query_row("PRAGMA user_version;", [], |r| r.get(0))
-        .unwrap_or(0);
+    // A failed read is an error, not "version 0": treating it as 0 would re-run
+    // every migration and then stamp the version down.
+    let current: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0))?;
 
     for (i, stmt) in MIGRATIONS.iter().enumerate() {
         if (i as i64) < current {
@@ -188,10 +188,15 @@ pub fn try_run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
         }
     }
 
-    // Stamp the new version. PRAGMA doesn't accept bound params, so format it
-    // (the value is MIGRATIONS.len(), not user input).
+    // Stamp the new version, never lower. A DB written by a newer build carries
+    // a higher number; an older build must leave it alone, or the newer build
+    // re-runs migrations it already applied. PRAGMA doesn't accept bound
+    // params, so format it (the value is MIGRATIONS.len(), not user input).
     let target = MIGRATIONS.len();
-    conn.execute_batch(&format!("PRAGMA user_version = {};", target))
+    if current < target as i64 {
+        conn.execute_batch(&format!("PRAGMA user_version = {};", target))?;
+    }
+    Ok(())
 }
 
 // ── DB init ───────────────────────────────────────────────────────────────────
@@ -233,7 +238,9 @@ struct ScannedFont {
     width: String,
 }
 
-fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) {
+/// `private` collects the paths of Apple's private system faces the scan skipped,
+/// so rows an older scan stored under their file-name family can be dropped.
+fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>, private: &mut Vec<String>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -242,7 +249,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            scan_dir_for_db(&path, source, results);
+            scan_dir_for_db(&path, source, results, private);
             continue;
         }
 
@@ -275,6 +282,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
         // Apple's private system faces (".SF Arabic", ".LastResort") are hidden
         // from Font Book and every font menu; hide them here too.
         if family.starts_with('.') || family == "LastResort" {
+            private.push(path.to_string_lossy().to_string());
             continue;
         }
         let meta = parse_font_meta(&path, &family);
@@ -325,19 +333,76 @@ pub fn enrich_from_name_tables(conn: &Connection) {
 /// Drop rows whose font file is gone (uninstalled since the last scan) and
 /// Apple's private system faces. The scan only ever added and updated rows, so
 /// removed fonts stayed in the library forever.
-fn prune_missing(conn: &Connection) {
-    let rows: Vec<(String, String, String)> = match conn.prepare("SELECT font_id, file_path, font_family FROM fonts") {
+///
+/// A row the user classified by hand (`user_override = 1`) is kept even when its
+/// file is missing: a font manager that turns a font off and on again, or an
+/// unmounted volume, must not erase the correction.
+fn prune_missing(conn: &Connection, private_paths: &[String]) {
+    let private: std::collections::HashSet<&str> = private_paths.iter().map(|p| p.as_str()).collect();
+    let rows: Vec<(String, String, String, i64)> = match conn.prepare("SELECT font_id, file_path, font_family, user_override FROM fonts") {
         Ok(mut st) => st
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
     };
-    for (id, path, family) in rows {
+    for (id, path, family, user_override) in rows {
         let hidden = family.starts_with('.') || family == "LastResort";
-        if hidden || !Path::new(&path).exists() {
+        // A private face stored under its file name by an older scan ("SFCompact"
+        // for ".SF Compact"): the file is there, but the scan now skips it.
+        let now_private = private.contains(path.as_str());
+        let missing = !Path::new(&path).exists();
+        if hidden || ((missing || now_private) && user_override == 0) {
             conn.execute("DELETE FROM fonts WHERE font_id = ?1", params![id]).ok();
         }
+    }
+}
+
+/// A font file replaced in place gets a new font_id (the id hashes the file's
+/// first 64 KB), so the scan inserts a new row and leaves the old one with the
+/// same path. The path is the identity of an installed font: for every scanned
+/// path, drop the other rows that share it. A hand classification on the old
+/// row moves to the new one first.
+fn drop_stale_twins(conn: &Connection, scanned: &[ScannedFont]) {
+    let live: std::collections::HashSet<&str> = scanned.iter().map(|f| f.font_id.as_str()).collect();
+    // path -> the id the scan just wrote for it
+    let current: std::collections::HashMap<&str, &str> =
+        scanned.iter().map(|f| (f.file_path.as_str(), f.font_id.as_str())).collect();
+    let rows: Vec<(String, String, i64)> =
+        match conn.prepare("SELECT font_id, file_path, user_override FROM fonts ORDER BY updated_at") {
+            Ok(mut st) => st
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .map(|it| it.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default(),
+            Err(_) => return,
+        };
+    for (id, path, user_override) in &rows {
+        if live.contains(id.as_str()) {
+            continue;
+        }
+        let Some(new_id) = current.get(path.as_str()) else { continue };
+        if *user_override == 1 {
+            let new_overridden: i64 = conn
+                .query_row("SELECT user_override FROM fonts WHERE font_id = ?1", params![new_id], |r| r.get(0))
+                .unwrap_or(0);
+            if new_overridden == 0 {
+                conn.execute(
+                    "UPDATE fonts SET \
+                       foundry = old.foundry, designer = old.designer, skeleton = old.skeleton, \
+                       flesh_contrast = old.flesh_contrast, flesh_serif = old.flesh_serif, \
+                       x_height_ratio = old.x_height_ratio, cap_height_ratio = old.cap_height_ratio, \
+                       stroke_contrast_ratio = old.stroke_contrast_ratio, \
+                       classification_source = old.classification_source, user_override = 1, \
+                       google_category = old.google_category, category = old.category, \
+                       classification_reason = old.classification_reason \
+                     FROM (SELECT * FROM fonts WHERE font_id = ?2) AS old \
+                     WHERE fonts.font_id = ?1",
+                    params![new_id, id],
+                )
+                .ok();
+            }
+        }
+        conn.execute("DELETE FROM fonts WHERE font_id = ?1", params![id]).ok();
     }
 }
 
@@ -566,8 +631,9 @@ pub fn populate_db(conn: &Connection) {
 /// downloaded Google Fonts.
 pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
     let mut scanned: Vec<ScannedFont> = Vec::new();
+    let mut private: Vec<String> = Vec::new();
     for (dir, source) in scan_targets {
-        scan_dir_for_db(dir, source, &mut scanned);
+        scan_dir_for_db(dir, source, &mut scanned, &mut private);
     }
 
     let now = now_iso();
@@ -628,7 +694,8 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
             }
         }
     }
-    prune_missing(conn);
+    drop_stale_twins(conn, &scanned);
+    prune_missing(conn, &private);
 }
 
 // ── Queries the apps call ─────────────────────────────────────────────────────
@@ -835,6 +902,9 @@ pub fn refresh_library(db_path: &Path) -> Result<u32, String> {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+mod scan_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use rusqlite::Connection;
@@ -964,9 +1034,17 @@ mod tests {
         assert!(!path.contains("Application Support"), "point FONTDROP_DB at a copy, not the live DB");
         let conn = Connection::open(&path).unwrap();
         run_migrations(&conn);
+        let dup_paths = |c: &Connection| -> i64 {
+            c.query_row("SELECT COUNT(*) FROM (SELECT file_path FROM fonts GROUP BY file_path HAVING COUNT(*) > 1)", [], |r| r.get(0)).unwrap()
+        };
+        println!("paths with two rows before: {}", dup_paths(&conn));
+        let t = std::time::Instant::now();
         populate_db(&conn);
+        println!("populate_db: {:.2}s", t.elapsed().as_secs_f64());
         enrich_from_name_tables(&conn);
         classify_all(&conn);
+        println!("full rescan (scan, name tables, classify): {:.2}s", t.elapsed().as_secs_f64());
+        println!("paths with two rows after: {}", dup_paths(&conn));
         let fams: i64 = conn.query_row("SELECT COUNT(DISTINCT font_family) FROM fonts WHERE source='user'", [], |r| r.get(0)).unwrap();
         let singles: i64 = conn.query_row(
             "SELECT COUNT(*) FROM (SELECT font_family FROM fonts WHERE source='user' GROUP BY font_family HAVING COUNT(*)=1)",
