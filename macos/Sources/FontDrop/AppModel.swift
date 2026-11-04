@@ -213,7 +213,7 @@ final class AppModel {
         await loadCandidates()
     }
 
-    /// Which presentation template Reading draws (Templates/Registry.swift).
+    /// Which presentation template Reading draws (`TemplateDescriptor.all` in Templates/Template.swift).
     var templateID: String = UserDefaults.standard.string(forKey: "readingTemplate") ?? "article" {
         didSet { UserDefaults.standard.set(templateID, forKey: "readingTemplate") }
     }

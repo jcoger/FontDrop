@@ -352,7 +352,7 @@ struct Acc {
 }
 
 /// File name without extension, lowercased: ".otf" and ".ttf" copies are the same style.
-fn file_stem(file_name: &str) -> String {
+pub(crate) fn file_stem(file_name: &str) -> String {
     let lower = file_name.to_lowercase();
     match lower.rfind('.') {
         Some(i) => lower[..i].to_string(),

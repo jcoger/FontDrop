@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::names::{is_slanted, parse_family, parse_font_meta, read_family_name, read_name_meta, upright_distance, Classification};
+use crate::names::{is_private_face, is_slanted, parse_family, parse_font_meta, read_family_name, read_name_meta, upright_distance, Classification};
 use crate::classifier;
 use crate::metrics;
 
@@ -111,14 +111,10 @@ fn hash_font_file(path: &Path) -> Option<String> {
     Some(format!("{:x}", hasher.finalize()))
 }
 
-fn now_iso() -> String {
+pub(crate) fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
-/// Public alias for other modules.
-pub fn now_iso_pub() -> String {
-    now_iso()
-}
 
 // ── Schema migrations ─────────────────────────────────────────────────────────
 
@@ -289,7 +285,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>, 
         let family = read_family_name(&path).unwrap_or_else(|| parse_family(stem));
         // Apple's private system faces (".SF Arabic", ".LastResort") are hidden
         // from Font Book and every font menu; hide them here too.
-        if family.starts_with('.') || family == "LastResort" {
+        if is_private_face(&family) {
             private.push(path.to_string_lossy().to_string());
             continue;
         }
@@ -360,7 +356,7 @@ fn prune_missing(conn: &Connection, private_paths: &[String]) {
         Err(_) => return,
     };
     for (id, path, family, user_override) in rows {
-        let hidden = family.starts_with('.') || family == "LastResort";
+        let hidden = is_private_face(&family);
         // A private face stored under its file name by an older scan ("SFCompact"
         // for ".SF Compact"): the file is there, but the scan now skips it.
         let now_private = private.contains(path.as_str());

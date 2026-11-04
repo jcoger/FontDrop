@@ -11,6 +11,12 @@ pub struct Classification {
     pub width: String,    // "condensed" | "normal" | "extended"
 }
 
+/// Apple's private system faces (".SF Arabic", ".LastResort") are hidden from Font Book and every
+/// font menu; the library hides them too. One rule for the scan and for pruning.
+pub fn is_private_face(family: &str) -> bool {
+    family.starts_with('.') || family == "LastResort"
+}
+
 /// Is this file a slanted (italic or oblique) style? The one rule for the whole core:
 /// the file's own style flag (the `style` column), or italic, oblique, kursiv or
 /// slanted in its file name. Reading, Display, the finder and the classifier all call this.

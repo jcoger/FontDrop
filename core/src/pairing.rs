@@ -25,7 +25,8 @@ pub struct PairScore {
     /// Unrounded score, used to rank so candidates don't tie.
     #[serde(skip)]
     pub precise: f32,
-    pub pair_type: String, // "harmonious" | "bold" | "conflict" | "uncertain" | "superfamily"
+    /// "contrast" | "uniform" | "middle" | "uncertain" | "superfamily" | "same_family"
+    pub pair_type: String,
     pub reason: String,
     pub evidence: Vec<Evidence>,
     /// Only for `same_family`: the style of that family to set the body text in.
@@ -340,7 +341,7 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-/// `excluded_ids`: fonts the user has hidden. They never take a match slot.
+/// Matches for one font, in buckets. `excluded_ids`: fonts the user has hidden; they never take a match slot.
 /// Browse filters (search, category, Starred) are deliberately NOT applied here:
 /// matches come from the whole visible library, not the left panel's current view.
 pub fn font_pairs(
@@ -542,7 +543,7 @@ fn ids_of_families(all: &[FontData], families: &[String]) -> HashSet<String> {
     all.iter().filter(|f| names.contains(f.font_family.as_str())).map(|f| f.font_id.clone()).collect()
 }
 
-/// Score every non-hidden candidate against `primary` and fill the three buckets.
+/// Score every non-hidden candidate against `primary` and fill the Contrast, Uniform and Designed together buckets.
 pub fn bucket_pairs(
     primary: &FontData,
     all: &[FontData],
