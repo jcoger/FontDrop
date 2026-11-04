@@ -44,7 +44,10 @@ struct ReadingList: View {
 
     @ViewBuilder
     private func listBody(rows: [Candidate], result: (shown: [Candidate], hidden: Int)) -> some View {
-        if model.readingIsLoading && model.candidates.isEmpty {
+        if model.scanningEmptyLibrary && model.candidates.isEmpty {
+            ProgressView(Lexicon.Scan.scanningFonts)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if model.readingIsLoading && model.candidates.isEmpty {
             ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? Lexicon.Reading.findingFaces)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = model.candidatesError {

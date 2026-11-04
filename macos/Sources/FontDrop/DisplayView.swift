@@ -59,7 +59,10 @@ struct FamilyPickerView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if model.filter.savedOnly && model.search.isEmpty && model.filter.kinds.isEmpty && model.filter.traits.isEmpty {
+        if model.scanningEmptyLibrary {
+            ProgressView(Lexicon.Scan.scanningFonts)
+                .frame(maxWidth: .infinity, minHeight: 240)
+        } else if model.filter.savedOnly && model.search.isEmpty && model.filter.kinds.isEmpty && model.filter.traits.isEmpty {
             ContentUnavailableView(Lexicon.Finder.savedEmpty, systemImage: "star")
         } else {
             ContentUnavailableView {

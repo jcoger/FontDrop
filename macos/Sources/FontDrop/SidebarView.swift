@@ -44,7 +44,7 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            Text("\(model.fontCount.formatted()) fonts \u{00B7} \(model.families.count.formatted()) families")
+            libraryFooter
                 .font(.caption).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16).padding(.vertical, 10)
@@ -58,6 +58,28 @@ struct SidebarView: View {
             TextField("Name", text: $renameText)
             Button("Rename") { if let b = renaming { Task { await model.renameBrand(b, to: renameText) } } }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    /// The library's counts, or where the rescan stands: updating (with a spinner) or failed (with Retry).
+    @ViewBuilder
+    private var libraryFooter: some View {
+        switch model.scanState {
+        case .idle:
+            Text("\(model.fontCount.formatted()) fonts \u{00B7} \(model.families.count.formatted()) families")
+        case .running:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(Lexicon.Scan.updating)
+            }
+            .accessibilityElement(children: .combine)
+        case .failed:
+            HStack(spacing: 8) {
+                Text(Lexicon.Scan.failed)
+                Button(Lexicon.Scan.retry) { Task { await model.retryScan() } }
+                    .buttonStyle(.link)
+                    .help(Lexicon.Scan.retryHelp)
+            }
         }
     }
 
