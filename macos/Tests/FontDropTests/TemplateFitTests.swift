@@ -332,7 +332,11 @@ final class TemplateFitTests: XCTestCase {
         let list = await samples(db)
         var lockedScale = TypeScale(body: 15, ratio: 1.333, locked: true)
         lockedScale.locked = true
-        for (id, variant, cellHeight) in [("hero", "statement", 330.0), ("article", "essay", 560.0)] {
+        // Every variant, Fit and locked. Cell heights follow the boards: hero 640, poster 750 to 800, the rest grow with their text.
+        let all: [(String, String, CGFloat)] = Templates.all.flatMap { t in
+            t.variants.map { v in (t.id, v.id, t.id == "hero" ? 352 : t.id == "poster" ? 440 : 560) }
+        }
+        for (id, variant, cellHeight) in all {
             for (suffix, scale) in [("", TypeScale()), ("-locked", lockedScale)] {
                 let template = Templates.descriptor(id).configured(palette: .paper, variant: variant)
                 let cell: CGFloat = 330
