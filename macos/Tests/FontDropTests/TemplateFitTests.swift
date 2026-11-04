@@ -280,6 +280,14 @@ final class TemplateFitTests: XCTestCase {
                         // 0. a poster word fills the sheet: inside its inner width, and at least half of it
                         if r.fillWord, let width = r.width, let w = r.lineWidths.first {
                             if w > width + 1 { check.failures.append("\(tag): poster word \"\(r.text)\" is \(Int(w)) wide in \(Int(width))") }
+                            // The word's box holds its ink, so a descender never reaches the line under it and the top never
+                            // reaches the bars above it; and the stack of fill words fits the board (narrow faces too).
+                            if let ink = r.inkHeight, let frame = r.frameHeight, frame < ink - 0.01 {
+                                check.failures.append("\(tag): poster word \"\(r.text)\" box \(Int(frame)) is shorter than its ink \(Int(ink))")
+                            }
+                            if let frame = r.frameHeight, frame > 800 {
+                                check.failures.append("\(tag): poster word \"\(r.text)\" is \(Int(frame)) tall on an 800 board")
+                            }
                             if w < width * 0.5 {
                                 if strictFaces.contains(sample.name) {
                                     check.failures.append("\(tag): poster word \"\(r.text)\" fills only \(Int(w / width * 100))%")

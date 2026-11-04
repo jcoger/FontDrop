@@ -315,6 +315,9 @@ struct FitRecord {
     var charsPerLine: CGFloat? = nil
     /// A poster word set to fill its width (`PairContext.posterWord`).
     var fillWord = false
+    /// For a fill word: the ink's height and the box it sits in, in points. The box always holds the ink.
+    var inkHeight: CGFloat? = nil
+    var frameHeight: CGFloat? = nil
 }
 
 /// Collects every `FitRecord` a template's views solve while they render. Tests only; nil in the app.
