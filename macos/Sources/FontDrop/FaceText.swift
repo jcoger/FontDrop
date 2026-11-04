@@ -190,7 +190,7 @@ struct TightLines: View {
 
     var body: some View {
         let list = Self.lines(text, font: font, tracking: tracking, width: width)
-        VStack(alignment: alignment, spacing: pitch - natural) {
+        LinePitchStack(pitch: pitch, alignment: alignment) {
             ForEach(Array(list.enumerated()), id: \.offset) { _, line in
                 Text(line).font(Font(font)).tracking(tracking).lineLimit(1).fixedSize()
             }
@@ -198,6 +198,34 @@ struct TightLines: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
         .frame(width: width, alignment: Alignment(horizontal: alignment, vertical: .top))
+    }
+}
+
+/// Stacks single-line texts exactly `pitch` apart, top to top, whatever height SwiftUI gives each line.
+/// A `VStack` with a negative gap relies on every line's box being as tall as Core Text says; when SwiftUI's box
+/// is shorter (a font whose OS/2 and hhea metrics differ), the lines land closer than asked and touch.
+struct LinePitchStack: Layout {
+    var pitch: CGFloat
+    var alignment: HorizontalAlignment
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let width = sizes.map(\.width).max() ?? 0
+        let height = CGFloat(max(subviews.count - 1, 0)) * pitch + (sizes.last?.height ?? 0)
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (i, view) in subviews.enumerated() {
+            let size = view.sizeThatFits(.unspecified)
+            let x: CGFloat
+            switch alignment {
+            case .center: x = bounds.minX + (bounds.width - size.width) / 2
+            case .trailing: x = bounds.maxX - size.width
+            default: x = bounds.minX
+            }
+            view.place(at: CGPoint(x: x, y: bounds.minY + CGFloat(i) * pitch), anchor: .topLeading, proposal: .unspecified)
+        }
     }
 }
 

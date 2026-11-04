@@ -22,6 +22,10 @@ struct PairContext {
     /// Tests only: keeps every size a view solves, so a test can check them without reading pixels.
     var recorder: FitRecorder?
 
+    /// The share of its full "fill the width" size that a poster's fill words keep, after the height the rest of the
+    /// board leaves them (PosterFit.swift). 1 when they fit at full size.
+    var fillFit: CGFloat = 1
+
     /// The shrink factor a fixed-size board sets so its display type fits (PosterFit.swift). 1 when nothing needs to shrink.
     var fit: CGFloat = 1
 
@@ -45,10 +49,11 @@ struct PairContext {
     func display(_ text: String, _ px: CGFloat, track: Double = 0, lh: Double? = nil, weight: Double? = nil,
                  italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil,
                  width: CGFloat? = nil, align: HorizontalAlignment = .leading, maxHeight: CGFloat? = nil,
-                 lines: ClosedRange<Int>? = nil, step: Int? = nil) -> some View {
+                 lines: ClosedRange<Int>? = nil, step: Int? = nil, exactSize: CGFloat? = nil) -> some View {
         let spec = Self.styled(face ?? display, weight: weight, italic: italic, figures: figures)
-        let size = solve(text, spec, px: px, isDisplay: true, track: track, lh: lh, step: step,
-                         width: width, lines: lines, maxHeight: maxHeight)
+        // `exactSize` is a size the caller solved itself (a poster word that fills its width).
+        let size = exactSize ?? solve(text, spec, px: px, isDisplay: true, track: track, lh: lh, step: step,
+                                      width: width, lines: lines, maxHeight: maxHeight)
         return FaceText(face: spec, text: text, ratio: size / CGFloat(spec.settings.size), tick: tick, trackBias: track, leading: lh,
                         wrapWidth: width, lineAlignment: align, maxHeight: maxHeight, exactLines: lines != nil)
             .foregroundStyle((color ?? palette.text).color)
@@ -114,6 +119,46 @@ struct PairContext {
 
     func readingFactor(_ px: CGFloat, step: Int? = nil) -> CGFloat {
         px > 0 ? roleSize(body, px: px, isDisplay: false, step: step).size * CGFloat(body.settings.trim) / px : 1
+    }
+
+    // MARK: Poster words
+
+    /// The size, in points, at which the widest of `fill.words` sets `fill.share` of `fill.width` on one line. A locked
+    /// scale sets it by step instead. Includes Trim; never past a third of the board size above or below.
+    func fillSize(_ fill: FillSpec, px: CGFloat, track: Double, italic: Bool) -> CGFloat {
+        let face = Self.styled(display, weight: nil, italic: italic, figures: .inherit)
+        let trim = CGFloat(face.settings.trim)
+        if scale.locked { return roleSize(face, px: px, isDisplay: true, step: nil).size * trim }
+        guard let font = FontLoader.shared.styledFont(face, ratio: 100 / CGFloat(face.settings.size)) else { return px * trim }
+        let tracking = CGFloat(face.settings.tracking + track) * 100
+        let widest = fill.words.map { TypeFit.lineWidth($0, font: font, tracking: tracking) }.max() ?? 0
+        guard widest > 0 else { return px * trim }
+        return min(max(fill.width * fill.share / widest * 100, px * 0.4), px * 3) * trim
+    }
+
+    /// One poster word, set to fill its width, on one line that is never scaled down by SwiftUI (a speck or a clipped
+    /// edge in place of the word). The board has already shrunk `fillFit` and `fit` to the height it has.
+    @ViewBuilder
+    func posterWord(_ text: String, _ px: CGFloat, track: Double, lh: Double, fill: FillSpec, italic: Bool = false,
+                    color: HexColor? = nil) -> some View {
+        let spec = Self.styled(display, weight: nil, italic: italic, figures: .inherit)
+        let size = scale.locked
+            ? roleSize(spec, px: px, isDisplay: true, step: nil).size * CGFloat(spec.settings.trim) * fit
+            : fillSize(fill, px: px, track: track, italic: italic) * fillFit * fit
+        let _ = recordFill(text, spec, px: px, size: size, track: track, fill: fill)
+        display(text, px, track: track, italic: italic, color: color, exactSize: size)
+            .lineLimit(1).fixedSize()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: size * CGFloat(lh), alignment: .leading)
+    }
+
+    private func recordFill(_ text: String, _ face: FaceSpec, px: CGFloat, size: CGFloat, track: Double, fill: FillSpec) {
+        guard let recorder, let font = FontLoader.shared.styledFont(face, ratio: size / CGFloat(face.settings.size)) else { return }
+        let w = TypeFit.lineWidth(text, font: font, tracking: CGFloat(face.settings.tracking + track) * size)
+        recorder.add(FitRecord(kind: .display, text: text, px: px, size: size, clamped: false, width: fill.width, lines: [text],
+                               lineWidths: [w], fill: w / fill.width, heightLimited: fillFit < 0.999, capped: false,
+                               xTarget: nil, xActual: nil, tracking: face.settings.tracking + track, pitch: nil, need: nil,
+                               charsPerLine: nil, fillWord: true))
     }
 
     // MARK: Solving

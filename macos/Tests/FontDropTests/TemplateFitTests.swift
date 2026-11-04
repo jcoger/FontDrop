@@ -1,4 +1,5 @@
 import CoreText
+import FontDropCore
 import SQLite3
 import SwiftUI
 import XCTest
@@ -86,8 +87,13 @@ final class TemplateFitTests: XCTestCase {
 
     struct Sample {
         let name: String
-        let face: FaceSpec
+        let face: FaceSpec          // the Display face
+        /// The Reading face, when it is not the Display face itself.
+        let body: FaceSpec?
     }
+
+    /// Families the core's built-in junk list hides (picture fonts, symbol sets), so they are not in a real Display or Reading list.
+    private static let hiddenFamilies: Set<String> = ["apple symbols", "bodoni ornaments", "webdings", "wingdings", "wingdings 2", "wingdings 3", "zapf dingbats", "apple chancery"]
 
     private struct Row { let family: String; let path: String; let weight: Int; let category: String; let name: String }
 
@@ -111,7 +117,7 @@ final class TemplateFitTests: XCTestCase {
         while sqlite3_step(stmt) == SQLITE_ROW {
             out.append(Row(family: text(0), path: text(1), weight: Int(sqlite3_column_int(stmt, 2)), category: text(3), name: text(4)))
         }
-        return out
+        return out.filter { !Self.hiddenFamilies.contains($0.family.lowercased()) }
     }
 
     /// Wide, narrow, heavy, hairline and script faces, plus Agrandir (regular and GrandHeavy), PP Museum and Timeless,
@@ -144,7 +150,7 @@ final class TemplateFitTests: XCTestCase {
         var picked: [String: Sample] = [:]
         func add(_ name: String, _ family: String, _ r: Row, style: Row? = nil) {
             guard picked[name] == nil, case .success? = FontLoader.shared.cached((style ?? r).path) else { return }
-            picked[name] = Sample(name: name, face: face(r, family: family, style: style))
+            picked[name] = Sample(name: name, face: face(r, family: family, style: style), body: nil)
         }
         // Forced: the reference faces and the face that showed the problem.
         for fam in ["PP Museum", "Timeless Sans", "Timeless Serif", "Agrandir"] {
@@ -181,11 +187,44 @@ final class TemplateFitTests: XCTestCase {
             add(others[i].family, others[i].family, others[i].row)
             i += step
         }
-        return picked.values.sorted { $0.name < $1.name }
+        // A display face is never the Reading face in real use: every one is paired with Timeless Sans as body.
+        let body = picked["Timeless Sans"]?.face
+        return picked.values.sorted { $0.name < $1.name }.map { Sample(name: $0.name, face: $0.face, body: body) }
     }
 
-    private func context(_ face: FaceSpec, recorder: FitRecorder? = nil, scale: TypeScale = TypeScale()) -> PairContext {
-        var body = face
+    /// Real Reading candidates: the families the core's Reading list keeps (junk list out, not unfit for long text),
+    /// each as the body face under PP Museum as the Display face. Evenly spaced, 22 of them.
+    private func readingSamples(_ dbFile: String, museum: FaceSpec) async throws -> [Sample] {
+        let lib = try Library.open(path: dbFile)
+        let ok = Set(try lib.readingFamilies(excludedIds: [], excludedFamilies: [], onlyFit: true).families.map(\.family))
+        let all = rows(dbFile).filter { ok.contains($0.family) }
+        let byFamily = Dictionary(grouping: all, by: \.family)
+        func isItalic(_ r: Row) -> Bool { r.name.lowercased().contains("italic") || r.path.lowercased().contains("italic") }
+        var reps: [String: Row] = [:]
+        for (f, list) in byFamily {
+            reps[f] = list.filter { !isItalic($0) }.min { abs($0.weight - 400) < abs($1.weight - 400) } ?? list.first
+        }
+        await FontLoader.shared.preload(paths: reps.values.map(\.path))
+        let usable = reps.keys.sorted().filter { f in
+            if case .success(let l)? = FontLoader.shared.cached(reps[f]!.path) { return l.canDraw("Hamburgefonstiv") }
+            return false
+        }
+        var names = Array(Set(usable.enumerated().filter { $0.offset % max(usable.count / 20, 1) == 0 }.map(\.element)))
+        for f in ["Timeless Sans", "Agrandir"] where usable.contains(f) && !names.contains(f) { names.append(f) }
+        return names.sorted().map { f in
+            let r = reps[f]!
+            let files = byFamily[f] ?? []
+            var s = TypeSettings.defaults(job: "reading")
+            s.stylePath = nil
+            let body = FaceSpec(path: r.path, settings: s, siblings: files.map(\.path),
+                                weights: Dictionary(files.map { ($0.path, $0.weight) }, uniquingKeysWith: { a, _ in a }))
+            return Sample(name: "reading · \(f)", face: museum, body: body)
+        }
+    }
+
+    private func context(_ sample: Sample, recorder: FitRecorder? = nil, scale: TypeScale = TypeScale()) -> PairContext {
+        let face = sample.face
+        var body = sample.body ?? face
         body.settings = TypeSettings.defaults(job: "reading")
         body.settings.stylePath = nil
         var c = PairContext(brand: "Acme", display: face, body: body, tick: 0, scale: scale)
@@ -218,8 +257,12 @@ final class TemplateFitTests: XCTestCase {
     /// Renders each template variant for each sample and checks what the views solved.
     func testEveryVariantFitsEverySample() async throws {
         let db = try dbPath()
-        let list = await samples(db)
-        XCTAssertGreaterThanOrEqual(list.count, 20, "need 20 families to test")
+        let stress = await samples(db)
+        XCTAssertGreaterThanOrEqual(stress.count, 20, "need 20 families to test")
+        // And the other direction: real Reading candidates under PP Museum.
+        let museum = try XCTUnwrap(stress.first { $0.name == "PP Museum" }, "PP Museum is in the library").face
+        let list = stress + (try await readingSamples(db, museum: museum))
+        let strictFaces: Set<String> = ["PP Museum", "Timeless Sans", "Timeless Serif", "Agrandir", "Agrandir GrandHeavy"]
         var check = Check()
         var museumRatios: [String: CGFloat] = [:]
         for sample in list {
@@ -227,13 +270,25 @@ final class TemplateFitTests: XCTestCase {
                 for variant in template.variants {
                     let recorder = FitRecorder()
                     let d = template.configured(palette: .paper, variant: variant.id)
-                    var ctx = context(sample.face, recorder: recorder)
+                    var ctx = context(sample, recorder: recorder)
                     ctx.palette = .paper
                     _ = render(d.make(ctx), size: CGSize(width: 600, height: 900))
                     let tag = "\(sample.name) | \(template.id).\(variant.id)"
                     var seen = Set<String>()
                     for r in recorder.records {
                         guard seen.insert("\(r.kind)|\(r.text)|\(r.px)|\(r.size)").inserted else { continue }
+                        // 0. a poster word fills the sheet: inside its inner width, and at least half of it
+                        if r.fillWord, let width = r.width, let w = r.lineWidths.first {
+                            if w > width + 1 { check.failures.append("\(tag): poster word \"\(r.text)\" is \(Int(w)) wide in \(Int(width))") }
+                            if w < width * 0.5 {
+                                if strictFaces.contains(sample.name) {
+                                    check.failures.append("\(tag): poster word \"\(r.text)\" fills only \(Int(w / width * 100))%")
+                                } else {
+                                    check.limited.append("\(tag): poster word \"\(r.text)\" fill \(Int(w / width * 100))% (height)")
+                                }
+                            }
+                            check.rows.append("\(sample.name) | \(template.id).\(variant.id) | poster word \"\(r.text)\" \(Int(r.px)) -> \(String(format: "%.0f", r.size)) | fill \(Int(w / width * 100))%")
+                        }
                         // 1. no word is split
                         if let width = r.width, !r.lines.isEmpty {
                             let joined = r.lines.joined(separator: " ").split(separator: " ").joined(separator: " ")
@@ -297,7 +352,7 @@ final class TemplateFitTests: XCTestCase {
                 for variant in template.variants {
                     let recorder = FitRecorder()
                     let d = template.configured(palette: .paper, variant: variant.id)
-                    _ = render(d.make(context(sample.face, recorder: recorder, scale: locked)), size: CGSize(width: 600, height: 900))
+                    _ = render(d.make(context(sample, recorder: recorder, scale: locked)), size: CGSize(width: 600, height: 900))
                     for r in recorder.records where r.kind == .reading {
                         let expect = locked.size(step: TypeScale.defaultStep(px: r.px))
                         if abs(Double(r.size) - expect) > 0.01 { failures.append("\(sample.name) \(template.id).\(variant.id): \(r.px) -> \(r.size), want \(expect)") }
@@ -322,6 +377,43 @@ final class TemplateFitTests: XCTestCase {
         print("FIT PICTORIAL \(hits.count) of \(families.count) families: \(hits.joined(separator: ", "))")
     }
 
+    /// Draws a two-line headline and reads the pixels: there must be a blank row between the lines. This checks what is
+    /// on screen, not the numbers the solver used, so a mismatch between Core Text's line height and SwiftUI's shows up.
+    func testHeadlineLinesHaveAirOnScreen() async throws {
+        let db = try dbPath()
+        let list = await samples(db)
+        var failures: [String] = []
+        var report: [String] = []
+        let black = HexColor(r: 0, g: 0, b: 0)
+        for name in ["PP Museum", "Timeless Sans", "Agrandir", "Agrandir GrandHeavy", "FREE FAT FONT", "ABC Repro Unlicensed Trial (heavy)", "Monument Extended (wide)", "Humane (narrow)"] {
+            guard let sample = list.first(where: { $0.name == name }) else { continue }
+            for (label, spec) in [("feature", ArticleFeature.headline), ("essay", ArticleEssay.headline), ("product", HeroProduct.headline)] {
+                let recorder = FitRecorder()
+                let ctx = context(sample, recorder: recorder)
+                let view = ctx.headline(spec, color: black).frame(width: spec.width, alignment: .leading).fixedSize().padding(24).background(Color.white)
+                let r = ImageRenderer(content: view)
+                r.scale = 1
+                guard let image = r.cgImage, let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { continue }
+                let (w, h, bpr) = (image.width, image.height, image.bytesPerRow)
+                var inkRows: [Bool] = []
+                for y in 0..<h {
+                    var ink = false
+                    for x in stride(from: 0, to: w, by: 1) where bytes[y * bpr + x * 4] < 128 { ink = true; break }
+                    inkRows.append(ink)
+                }
+                guard let first = inkRows.firstIndex(of: true), let last = inkRows.lastIndex(of: true) else { continue }
+                // The blank bands between ink: one for every pair of lines, each at least a pixel tall.
+                var bands: [Int] = [], gap = 0
+                for y in first...last { if inkRows[y] { if gap > 0 { bands.append(gap) }; gap = 0 } else { gap += 1 } }
+                let expected = max((recorder.records.last { $0.kind == .headline }?.lines.count ?? 1) - 1, 0)
+                report.append("\(name) | \(label) | \(expected) gaps, bands \(bands) px")
+                if bands.count < expected { failures.append("\(name) \(label): \(expected) gaps wanted, \(bands.count) found: lines touch") }
+            }
+        }
+        print("FIT AIR\n" + report.joined(separator: "\n"))
+        XCTAssertEqual(failures, [])
+    }
+
     // MARK: Contact sheets
 
     /// Landing hero . Statement and Article . Essay for every sample, in a grid. Written when a folder is given.
@@ -329,15 +421,22 @@ final class TemplateFitTests: XCTestCase {
         let db = try dbPath()
         guard let dir = ProcessInfo.processInfo.environment["FONTDROP_CONTACT_DIR"] else { throw XCTSkip("set TEST_RUNNER_FONTDROP_CONTACT_DIR to write the sheets") }
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        let list = await samples(db)
-        var lockedScale = TypeScale(body: 15, ratio: 1.333, locked: true)
-        lockedScale.locked = true
+        let stress = await samples(db)
+        let museum = try XCTUnwrap(stress.first { $0.name == "PP Museum" }, "PP Museum is in the library").face
+        let reading = try await readingSamples(db, museum: museum)
+        // Set 1: each Display stress face under Timeless Sans. Set 2: each real Reading candidate under PP Museum.
+        let sets: [(String, [Sample], [(String, TypeScale)])] = [
+            ("", stress, [("", TypeScale()), ("-locked", TypeScale(body: 15, ratio: 1.333, locked: true))]),
+            ("reading-", reading, [("", TypeScale())]),
+        ]
+
+
         // Every variant, Fit and locked. Cell heights follow the boards: hero 640, poster 750 to 800, the rest grow with their text.
         let all: [(String, String, CGFloat)] = Templates.all.flatMap { t in
             t.variants.map { v in (t.id, v.id, t.id == "hero" ? 352 : t.id == "poster" ? 440 : 560) }
         }
         for (id, variant, cellHeight) in all {
-            for (suffix, scale) in [("", TypeScale()), ("-locked", lockedScale)] {
+            for (prefix, list, scales) in sets { for (suffix, scale) in scales {
                 let template = Templates.descriptor(id).configured(palette: .paper, variant: variant)
                 let cell: CGFloat = 330
                 let cols = 5
@@ -345,7 +444,7 @@ final class TemplateFitTests: XCTestCase {
                     ForEach(list, id: \.name) { s in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(s.name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                            template.make(self.context(s.face, scale: scale))
+                            template.make(self.context(s, scale: scale))
                                 .frame(width: cell, height: cellHeight, alignment: .top).clipped()
                                 .overlay(Rectangle().strokeBorder(Color.black.opacity(0.15)))
                         }
@@ -355,10 +454,10 @@ final class TemplateFitTests: XCTestCase {
                 let r = ImageRenderer(content: sheet)
                 r.scale = 1
                 let image = try XCTUnwrap(r.cgImage)
-                let url = URL(fileURLWithPath: dir).appendingPathComponent("contact-\(id)-\(variant)\(suffix).png")
+                let url = URL(fileURLWithPath: dir).appendingPathComponent("contact-\(prefix)\(id)-\(variant)\(suffix).png")
                 let rep = NSBitmapImageRep(cgImage: image)
                 try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: url)
-            }
+            } }
         }
     }
 }

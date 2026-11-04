@@ -5,13 +5,16 @@ import SwiftUI
 /// On the Bone preset this is the Paper board.
 struct PosterBlocks: View {
     let ctx: PairContext
+
+    /// The big word fills 90% of the sheet's inner width (600 less two 28 margins), as big as the height allows.
+    static let wordFill = FillSpec(width: 544, words: [TemplateCopy.blocksWord])
     private var p: TemplatePalette { ctx.palette }
 
     /// The fit rule (PosterFit.swift): the big word shrinks so the blocks keep room, and the text in the
     /// Spring and sign blocks shrinks until it fits its block.
     init(ctx base: PairContext) {
         let r = base.readingScale
-        let word = FitItem(text: TemplateCopy.blocksWord, px: 158, lh: 0.99, tracking: -0.055)
+        let word = FitItem(text: TemplateCopy.blocksWord, px: 158, lh: 0.99, tracking: -0.055, fill: Self.wordFill)
         let spring = TemplateCopy.blocksSpring.map { FitItem(text: $0, px: 34, lh: 1.06, width: 218) }
         let sign = TemplateCopy.blocksSign.map { FitItem(text: $0, px: 28, lh: 1.0, width: 262) }
         // Padding 56, the label row, two gaps, and the least the right column needs (open block, sign, bar).
@@ -19,7 +22,7 @@ struct PosterBlocks: View {
         let first = base.fitted(height: 750, fixed: above + 300, items: [word],
                                 boxes: [FitBox(items: sign, height: 120 - 32)])
         // The Spring block is whatever height is left under the word. Its text must fit that, with its padding.
-        let region = 750 - above - 158 * 0.99 * first.displayScale(158) * first.fit
+        let region = 750 - above - 158 * 0.99 * first.drawFactor(word) * first.fit
         ctx = base.fitted(height: 750, fixed: above + 300, items: [word],
                           boxes: [FitBox(items: sign, height: 120 - 32), FitBox(items: spring, height: max(region - 32, 40))])
     }
@@ -34,7 +37,7 @@ struct PosterBlocks: View {
                         Spacer()
                         ctx.reading("\(ctx.display.familyName) with \(ctx.body.familyName)", 12, lh: 1.33).lineLimit(1)
                     }
-                    ctx.posterLine(TemplateCopy.blocksWord, 158, track: -0.055, lh: 0.99)
+                    ctx.posterWord(TemplateCopy.blocksWord, 158, track: -0.055, lh: 0.99, fill: Self.wordFill)
                 }
                 HStack(spacing: 0) {
                     spring(blocks[0])

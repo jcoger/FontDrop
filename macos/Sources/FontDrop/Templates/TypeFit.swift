@@ -36,6 +36,8 @@ enum TypeFit {
     static let minFill: CGFloat = 0.8
     /// Air kept between the ink of one line and the next, in em.
     static let lineGap: CGFloat = 0.02
+    /// The gap for the heaviest faces. Between the two, the gap follows how thick the stems are (see `gap`).
+    static let heavyLineGap: CGFloat = 0.08
 
     // MARK: Metrics
 
@@ -134,6 +136,22 @@ enum TypeFit {
         return (max(bounds.maxY, 0), max(-bounds.minY, 0))
     }
 
+    /// The air kept between the ink of two lines, in points. A heavy face needs more than a light one: the black
+    /// of the lines reads closer than the outlines are. From 0.02 em up to 0.08 em as the stem of a capital I
+    /// goes from about 0.08 em to 0.22 em wide.
+    static func gap(_ font: CTFont) -> CGFloat {
+        let size = CTFontGetSize(font)
+        var glyph = CGGlyph(0)
+        var stem: CGFloat = 0.08
+        if CTFontGetGlyphsForCharacters(font, [UniChar(0x49)], &glyph, 1) {      // "I"
+            var rect = CGRect.zero
+            CTFontGetBoundingRectsForGlyphs(font, .horizontal, [glyph], &rect, 1)
+            stem = rect.width / max(size, 0.0001)
+        }
+        let density = min(max((stem - 0.08) / (0.22 - 0.08), 0), 1)
+        return (lineGap + (heavyLineGap - lineGap) * density) * size
+    }
+
     /// The line pitch (distance between baselines) these lines need so their ink does not touch, plus a small gap.
     /// Counts the real letters: a line with no descenders over a line with no ascenders needs very little.
     static func pitchNeed(lines: [String], font: CTFont, tracking: CGFloat) -> CGFloat {
@@ -141,7 +159,7 @@ enum TypeFit {
         let inks = lines.map { ink($0, font: font, tracking: tracking) }
         var need: CGFloat = 0
         for i in 0..<(inks.count - 1) { need = max(need, inks[i].below + inks[i + 1].above) }
-        return need + lineGap * CTFontGetSize(font)
+        return need + gap(font)
     }
 
     /// The pitch to use: the template's own when the ink clears, else just enough. Never tighter than asked.
@@ -153,7 +171,7 @@ enum TypeFit {
     /// as the tallest letters in the whole text. A little stricter than the real lines, never looser.
     static func pitchNeed(wrapped text: String, font: CTFont, tracking: CGFloat) -> CGFloat {
         let i = ink(text, font: font, tracking: tracking)
-        return i.above + i.below + lineGap * CTFontGetSize(font)
+        return i.above + i.below + gap(font)
     }
 
     // MARK: Headlines
@@ -173,7 +191,7 @@ enum TypeFit {
         var capped = false
     }
 
-    private static func lineWidth(_ text: String, font: CTFont, tracking: CGFloat) -> CGFloat {
+    static func lineWidth(_ text: String, font: CTFont, tracking: CGFloat) -> CGFloat {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font, .kern: tracking]))
         return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
     }
@@ -295,6 +313,8 @@ struct FitRecord {
     let need: CGFloat?
     /// Reading with a column: characters on an average line at the drawn size and column.
     var charsPerLine: CGFloat? = nil
+    /// A poster word set to fill its width (`PairContext.posterWord`).
+    var fillWord = false
 }
 
 /// Collects every `FitRecord` a template's views solve while they render. Tests only; nil in the app.
