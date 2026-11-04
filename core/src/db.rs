@@ -101,10 +101,13 @@ CREATE TABLE IF NOT EXISTS fonts (
 
 /// Hash the first 64 KB of a font file with SHA-256 to get a stable font_id.
 fn hash_font_file(path: &Path) -> Option<String> {
-    let data = std::fs::read(path).ok()?;
-    let chunk = if data.len() > 65_536 { &data[..65_536] } else { &data };
+    use std::io::Read;
+    // Read only the 64 KB that is hashed, not the whole file (some are 190 MB).
+    // The bytes hashed are the same as before, so every font_id stays the same.
+    let mut chunk = Vec::with_capacity(65_536);
+    std::fs::File::open(path).ok()?.take(65_536).read_to_end(&mut chunk).ok()?;
     let mut hasher = Sha256::new();
-    hasher.update(chunk);
+    hasher.update(&chunk);
     Some(format!("{:x}", hasher.finalize()))
 }
 
@@ -313,6 +316,7 @@ pub fn enrich_from_name_tables(conn: &Connection) {
             .unwrap_or_default(),
         Err(_) => return,
     };
+    let tx = conn.unchecked_transaction().ok(); // one commit for the loop
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
         // A file we cannot open counts as covering Latin: never hide what we could not check.
@@ -327,6 +331,9 @@ pub fn enrich_from_name_tables(conn: &Connection) {
             params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32, style], // '' = read, none
         )
         .ok();
+    }
+    if let Some(tx) = tx {
+        tx.commit().ok();
     }
 }
 
@@ -443,6 +450,7 @@ pub fn classify_all(conn: &Connection) {
         .collect();
 
     let now = now_iso();
+    let tx = conn.unchecked_transaction().ok(); // one commit for the loop
 
     for (font_id, file_path, family_name, category) in &rows {
         let result = classifier::classify_font(Path::new(file_path), family_name);
@@ -474,6 +482,9 @@ pub fn classify_all(conn: &Connection) {
     unify_family_skeletons(conn);
     if rerun_all {
         meta_set(conn, "classifier_version", &CLASSIFIER_VERSION.to_string());
+    }
+    if let Some(tx) = tx {
+        tx.commit().ok();
     }
 }
 
@@ -564,6 +575,7 @@ pub fn enrich_metrics(conn: &Connection) {
         .collect();
 
     let now = now_iso();
+    let tx = conn.unchecked_transaction().ok(); // one commit for the loop
 
     for (font_id, file_path, family_name, stroke_contrast, x_height) in &rows {
         let m = metrics::extract_extended_metrics(
@@ -610,6 +622,9 @@ pub fn enrich_metrics(conn: &Connection) {
             WHERE f2.font_family = fonts.font_family AND f2.weight_range_max IS NOT NULL
          ) WHERE weight_range_min IS NOT NULL;"
     ).ok();
+    if let Some(tx) = tx {
+        tx.commit().ok();
+    }
 }
 
 pub fn populate_db(conn: &Connection) {
@@ -638,18 +653,33 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
 
     let now = now_iso();
 
+    // What the table holds now, read once: the loop below then touches only rows
+    // that are new or changed (about 6,000 UPDATEs on every launch otherwise).
+    type Stored = (i32, String, String, String, String, u16, String, String, String);
+    let mut stored: std::collections::HashMap<String, Stored> = std::collections::HashMap::new();
+    if let Ok(mut st) = conn.prepare(
+        "SELECT font_id, user_override, file_path, file_name, source, font_family, weight, category, style, width FROM fonts",
+    ) {
+        if let Ok(it) = st.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, (r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?, r.get(8)?, r.get(9)?)))
+        }) {
+            stored.extend(it.flatten());
+        }
+    }
+
+    // One transaction for the whole loop, as google_list.rs does: one commit
+    // instead of one per row. If it cannot start, the writes run unbatched.
+    let tx = conn.unchecked_transaction().ok();
+
     for font in &scanned {
-        // Check if row exists and whether it has a user override
-        let existing: Option<i32> = conn
-            .query_row(
-                "SELECT user_override FROM fonts WHERE font_id = ?1",
-                params![font.font_id],
-                |row| row.get(0),
-            )
-            .ok();
+        let existing: Option<i32> = stored.get(&font.font_id).map(|s| s.0);
 
         match existing {
             Some(1) => {
+                let s = &stored[&font.font_id];
+                if s.1 == font.file_path && s.2 == font.file_name && s.4 == font.font_family {
+                    continue;
+                }
                 // User override — keep their classification; refresh path and family name
                 conn.execute(
                     "UPDATE fonts SET file_path = ?1, file_name = ?2, font_family = ?3, updated_at = ?4 WHERE font_id = ?5",
@@ -658,6 +688,18 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
                 .ok();
             }
             Some(_) => {
+                let s = &stored[&font.font_id];
+                if s.1 == font.file_path
+                    && s.2 == font.file_name
+                    && s.3 == font.source
+                    && s.4 == font.font_family
+                    && s.5 == font.weight
+                    && s.6 == font.category
+                    && s.7 == font.style
+                    && s.8 == font.width
+                {
+                    continue;
+                }
                 // Exists, no override — update classification + path
                 conn.execute(
                     "UPDATE fonts SET file_path = ?1, file_name = ?2, source = ?3, \
@@ -696,6 +738,9 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
     }
     drop_stale_twins(conn, &scanned);
     prune_missing(conn, &private);
+    if let Some(tx) = tx {
+        tx.commit().ok();
+    }
 }
 
 // ── Queries the apps call ─────────────────────────────────────────────────────

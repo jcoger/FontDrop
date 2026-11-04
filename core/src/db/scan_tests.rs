@@ -128,6 +128,46 @@ fn twin_cleanup_leaves_other_paths_alone() {
 }
 
 #[test]
+fn font_id_is_the_hash_of_the_first_64_kb() {
+    let fx = Fixture::new("hash");
+    let big: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+    let small = b"short file".to_vec();
+    for bytes in [&big, &small] {
+        let p = fx.write("x.woff", bytes);
+        let chunk = &bytes[..bytes.len().min(65_536)];
+        let want = format!("{:x}", Sha256::digest(chunk));
+        assert_eq!(hash_font_file(&p).unwrap(), want);
+    }
+    // bytes past 64 KB do not change the id
+    let mut other = big.clone();
+    other[150_000] ^= 0xff;
+    let p = fx.write("y.woff", &other);
+    assert_eq!(hash_font_file(&p).unwrap(), format!("{:x}", Sha256::digest(&big[..65_536])));
+}
+
+/// On a COPY of a real database: every row whose file exists must still have
+/// the id the new 64 KB read produces. Run on demand:
+///   FONTDROP_DB=<copy> cargo test --lib ids_match_on_copy -- --ignored --nocapture
+#[test]
+#[ignore]
+fn ids_match_on_copy() {
+    let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB to a copy");
+    assert!(!path.contains("Application Support"), "point FONTDROP_DB at a copy, not the live DB");
+    let conn = Connection::open(&path).unwrap();
+    let mut st = conn.prepare("SELECT font_id, file_path FROM fonts").unwrap();
+    let rows: Vec<(String, String)> = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap().flatten().collect();
+    let (mut same, mut differ, mut gone) = (0, 0, 0);
+    for (id, p) in &rows {
+        match hash_font_file(Path::new(p)) {
+            Some(h) if &h == id => same += 1,
+            Some(_) => differ += 1, // an in-place update or a twin row
+            None => gone += 1,
+        }
+    }
+    println!("rows {}: id matches {same}, differs {differ}, file missing {gone}", rows.len());
+}
+
+#[test]
 fn user_version_never_goes_down() {
     let conn = Connection::open_in_memory().unwrap();
     conn.execute_batch(CREATE_TABLE).unwrap();
