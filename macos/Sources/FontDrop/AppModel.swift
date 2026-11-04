@@ -24,7 +24,7 @@ struct LaunchOptions {
     var showHidden = false       // finder: include hidden families
     var savedOnly = false        // finder: only Saved
     var sources: String?         // finder: comma list of yours,google,system
-    var sort: String?            // Reading sort: less-common
+    var sort: String?            // Reading sort: less-common, character-first
     var demoSave: String?        // comma list of families to star (on the DB copy), for screenshots
     var search: String?          // start with this in the search box
     var bgRefresh = false        // debug: run the background rescan in screenshot mode too (FD_BG_REFRESH=1)
@@ -285,6 +285,7 @@ final class AppModel {
         if options.savedOnly { f.savedOnly = true }
         filter = f
         if options.sort == "less-common" { lenses.sort = .lessCommon }
+        if options.sort == "character-first" { lenses.sort = .characterFirst }
         if let q = options.search { search = q }
     }
 
@@ -668,19 +669,20 @@ final class AppModel {
     /// candidate are loaded before the list is shown, so the cards never write state.
     func loadCandidates() async {
         guard let display = displayFamily else { await loadStandaloneCandidates(); return }
-        let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)/\(sourcesKey)"
+        let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)/\(sourcesKey)/\(lenses.sort == .characterFirst)"
         if key == candidatesKey { return }
         let generation = beginCandidateLoad()
         // The loading flag always comes down, unless a newer load or a reset owns it now.
         defer { if generation == candidateGeneration { candidatesLoading = false } }
         let keepFamily = candidate(selectedCandidate)?.family
         let id = display.fontId, limit = UInt32(candidateLimit)
+        let characterFirst = lenses.sort == .characterFirst      // the core flips its two groups, so the page holds the right ones
         let job: String? = includeUnfitFaces ? nil : "reading"
         // Reading browses the same sources as the Display filter; the long-text count follows it too.
         let outside = familiesOutsideSources(keeping: display.name)
         do {
             let ranked = try await background {
-                try $0.fontCandidates(fontId: id, excludedIds: [], excludedFamilies: outside, job: job, limit: limit)
+                try $0.fontCandidates(fontId: id, excludedIds: [], excludedFamilies: outside, job: job, characterFirst: characterFirst, limit: limit)
             }
             let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: [], excludedFamilies: outside) }
             var seen = Set<String>()
@@ -691,7 +693,7 @@ final class AppModel {
                 list.append(Candidate(id: p.fontId, family: p.family, filePath: path,
                                       pairType: p.pairType, evidence: p.evidence, order: list.count,
                                       googleRank: allEntries[p.family]?.googleRank.map(Int.init),
-                                      bodyStyle: p.suggestedBodyStyle))
+                                      bodyStyle: p.suggestedBodyStyle, workhorse: p.workhorse))
             }
             let allPaths = list.flatMap { c in (fontsByFamily[c.family] ?? []).map(\.filePath) + [c.filePath] }
             await FontLoader.shared.preload(paths: allPaths)

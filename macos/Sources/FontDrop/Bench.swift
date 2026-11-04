@@ -5,7 +5,7 @@ import QuartzCore
 // Developer tools, off unless a flag is passed:
 //   --screenshot <png> [--screen display|reading|set] [--appearance light|dark] [--brand <name>] [--select <family>]
 //       [--template article|hero|appui|poster] [--open-playground]
-//       [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
+//       [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common|character-first] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
 //       FD_WINDOW=WxH sets the capture window size (default 1360x860). --inspector / --no-inspector force the inspector.
 //       Reading flags: --demo-shortlist, --compare, --zoom, --trim-display, --trim-reading, --body-size, --ratio, FD_LOCK=1, --pick-reading (see applyReadingFlags).

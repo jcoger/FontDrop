@@ -18,7 +18,7 @@ struct ReadingView: View {
                     .frame(minWidth: 0, maxWidth: .infinity)
             }
         }
-        .task(id: "\(model.brandID ?? 0)/\(model.displayFamily?.fontId ?? "none")/\(model.sourcesKey)") { await model.loadCandidates() }
+        .task(id: "\(model.brandID ?? 0)/\(model.displayFamily?.fontId ?? "none")/\(model.sourcesKey)/\(model.lenses.sort == .characterFirst)") { await model.loadCandidates() }
     }
 }
 

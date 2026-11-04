@@ -278,6 +278,9 @@ enum Lexicon {
         /// 7.20: the long-text rule's count, with its own control.
         static func notForLongText(_ n: Int) -> String { "\(n) not made for long text" }
         static let lessCommon = "Less common first"
+        /// 15.1: Sort option that flips Reading's two groups: personality first, the dependable text faces after.
+        static let moreCharacter = "More character first"
+        static let moreCharacterHelp = "Faces with more personality come first. The dependable text faces follow."
         static let lessCommonHelp = "Faces fewer sites use. Families not on Google Fonts come first."
         /// "Your fonts \u{00B7} Google Fonts", for the inspector.
         static func sources(_ list: [Source]) -> String { list.map(sourceLabel).joined(separator: " \u{00B7} ") }
