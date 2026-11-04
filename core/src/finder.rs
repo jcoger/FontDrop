@@ -360,11 +360,6 @@ fn file_stem(file_name: &str) -> String {
     }
 }
 
-fn is_slanted(file_name: &str, style: &str) -> bool {
-    let l = file_name.to_lowercase();
-    style == "italic" || l.contains("italic") || l.contains("oblique") || l.contains("kursiv")
-}
-
 fn name_tokens(name: &str) -> Vec<String> {
     name.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).map(String::from).collect()
 }
@@ -441,7 +436,7 @@ pub fn load_families(conn: &Connection) -> Result<Vec<FamilyAgg>, rusqlite::Erro
         });
         if trial != 0 { acc.traits.insert(Trait::Trial); }
         if variable != 0 { acc.traits.insert(Trait::Variable); }
-        let slanted = is_slanted(&file_name, &style);
+        let slanted = crate::names::is_slanted(&file_name, &style);
         if slanted { acc.traits.insert(Trait::Italic); }
         if width == "condensed" || width_class.as_deref() == Some("condensed") { acc.traits.insert(Trait::Condensed); }
         if width == "extended" || width_class.as_deref() == Some("expanded") { acc.traits.insert(Trait::Wide); }
@@ -454,7 +449,7 @@ pub fn load_families(conn: &Connection) -> Result<Vec<FamilyAgg>, rusqlite::Erro
         for text in [foundry.as_deref(), designer.as_deref(), vendor.as_deref()].into_iter().flatten() {
             if !text.is_empty() { acc.hay.insert(text.to_lowercase()); }
         }
-        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+        let dist = crate::names::upright_distance(weight, slanted);
         if acc.best.as_ref().map_or(true, |b| dist < b.dist) {
             acc.best = Some(Best { id, path, dist, skeleton, serif: serif != 0, url, vendor, category });
         }
@@ -942,10 +937,10 @@ mod tests {
         let family_of = |id: &str| -> String {
             conn.query_row("SELECT font_family FROM fonts WHERE font_id = ?1", [id], |r| r.get(0)).unwrap()
         };
-        let before: Vec<String> = font_candidates(&conn, "p", vec![], None, 20).unwrap().iter().map(|s| family_of(&s.font_id)).collect();
+        let before: Vec<String> = font_candidates(&conn, "p", vec![], vec![], None, 20).unwrap().iter().map(|s| family_of(&s.font_id)).collect();
         assert!(before.contains(&"Beta Sans".to_string()), "setup: Beta Sans should be a candidate, got {before:?}");
         hide_family(&conn, "Beta Sans").unwrap();
-        let after: Vec<String> = font_candidates(&conn, "p", vec![], None, 20).unwrap().iter().map(|s| family_of(&s.font_id)).collect();
+        let after: Vec<String> = font_candidates(&conn, "p", vec![], vec![], None, 20).unwrap().iter().map(|s| family_of(&s.font_id)).collect();
         assert!(!after.contains(&"Beta Sans".to_string()));
         assert_eq!(after.len(), before.len() - 1);
         let pairs = font_pairs(&conn, "p", vec![], None).unwrap();
@@ -1010,13 +1005,13 @@ mod tests {
         measured("hid", "Hidden Sans", "Regular.otf", 400, 0, "normal");
         hide_family(&conn, "Hidden Sans").unwrap();
 
-        let reading: Vec<String> = font_candidates(&conn, "p", vec![], Some("reading"), 50).unwrap().iter().map(|s| s.font_id.clone()).collect();
-        let all: Vec<String> = font_candidates(&conn, "p", vec![], None, 50).unwrap().iter().map(|s| s.font_id.clone()).collect();
+        let reading: Vec<String> = font_candidates(&conn, "p", vec![], vec![], Some("reading"), 50).unwrap().iter().map(|s| s.font_id.clone()).collect();
+        let all: Vec<String> = font_candidates(&conn, "p", vec![], vec![], None, 50).unwrap().iter().map(|s| s.font_id.clone()).collect();
         assert_eq!(reading.len(), 1, "only Text Sans is made for long text: {reading:?}");
         assert_eq!(all.len(), 3, "Text Sans, Single Sans, Narrow Sans: {all:?}");
-        assert_eq!(unfit_family_count(&conn, "p", vec![]).unwrap(), 2);
-        assert_eq!(unfit_family_count(&conn, "p", vec!["one".into()]).unwrap(), 1, "an excluded file is not counted");
-        assert!(unfit_family_count(&conn, "nope", vec![]).is_err());
+        assert_eq!(unfit_family_count(&conn, "p", vec![], vec![]).unwrap(), 2);
+        assert_eq!(unfit_family_count(&conn, "p", vec!["one".into()], vec![]).unwrap(), 1, "an excluded file is not counted");
+        assert!(unfit_family_count(&conn, "nope", vec![], vec![]).is_err());
     }
 
     #[test]
@@ -1037,7 +1032,7 @@ mod tests {
         }
         measured("o", "Other Sans", "Regular.otf", 400);
         for job in [Some("reading"), None] {
-            let list = font_candidates(&conn, "d0", vec![], job, 10).unwrap();
+            let list = font_candidates(&conn, "d0", vec![], vec![], job, 10).unwrap();
             assert_eq!(list[0].pair_type, "same_family", "{job:?}: {list:?}");
             assert!(list[0].suggested_body_style.is_some());
             assert!(list[0].evidence.iter().any(|e| e.lens == "Long text"), "caveat, not removal");
@@ -1046,6 +1041,6 @@ mod tests {
         assert_eq!(buckets[0].label, "Same family");
         // A hidden Display family offers nothing.
         hide_family(&conn, "Acme").unwrap();
-        assert!(font_candidates(&conn, "d0", vec![], None, 10).unwrap().iter().all(|c| c.pair_type != "same_family"));
+        assert!(font_candidates(&conn, "d0", vec![], vec![], None, 10).unwrap().iter().all(|c| c.pair_type != "same_family"));
     }
 }

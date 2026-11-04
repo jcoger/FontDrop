@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::names::{parse_family, parse_font_meta, read_family_name, read_name_meta, Classification};
+use crate::names::{is_slanted, parse_family, parse_font_meta, read_family_name, read_name_meta, upright_distance, Classification};
 use crate::classifier;
 use crate::metrics;
 
@@ -160,6 +160,11 @@ const MIGRATIONS: &[&str] = &[
     // The font's own style name (name ID 17, else 2). NULL = not read yet, so every existing row is
     // read once on the next scan. '' = read, the file has none.
     "ALTER TABLE fonts ADD COLUMN style_name TEXT;",
+    // Variable fonts: top of the wght axis (0 = no such axis) and whether an ital or slnt axis exists,
+    // so one file can count as bold and italic for the Reading rule. NULL = not read yet; only
+    // variable rows are re-read for it.
+    "ALTER TABLE fonts ADD COLUMN wght_axis_max INTEGER;",
+    "ALTER TABLE fonts ADD COLUMN ital_axis INTEGER;",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -309,7 +314,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>, 
 /// font (vendor_id NULL = not read yet; '' = read, no real vendor code). Foundry
 /// and designer only fill gaps; existing values (Google enrichment, edits) stay.
 pub fn enrich_from_name_tables(conn: &Connection) {
-    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL OR style_name IS NULL") {
+    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL OR style_name IS NULL OR (is_variable = 1 AND wght_axis_max IS NULL)") {
         Ok(mut st) => st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
@@ -320,15 +325,16 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
         // A file we cannot open counts as covering Latin: never hide what we could not check.
-        let (vendor, manufacturer, designer, trial, url, variable, latin, style) = match meta {
-            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin, m.style_name.unwrap_or_default()),
-            None => (String::new(), None, None, false, None, false, true, String::new()),
+        let (vendor, manufacturer, designer, trial, url, variable, latin, style, wght_max, ital_axis) = match meta {
+            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin, m.style_name.unwrap_or_default(), m.wght_axis_max, m.ital_axis),
+            None => (String::new(), None, None, false, None, false, true, String::new(), 0, false),
         };
         conn.execute(
             "UPDATE fonts SET vendor_id = ?1, \
              foundry = COALESCE(NULLIF(foundry, ''), ?2), \
-             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8, style_name = ?9 WHERE font_id = ?6",
-            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32, style], // '' = read, none
+             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8, style_name = ?9, \
+             wght_axis_max = ?10, ital_axis = ?11 WHERE font_id = ?6",
+            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32, style, wght_max, ital_axis as i32], // '' = read, none
         )
         .ok();
     }
@@ -492,11 +498,11 @@ pub fn classify_all(conn: &Connection) {
 /// disagreed (29% of multi-file families). The family's upright face nearest
 /// weight 400 decides; every non-override file in the family takes its answer.
 fn unify_family_skeletons(conn: &Connection) {
-    let rows: Vec<(String, String, i64, String, String, String)> = match conn.prepare(
-        "SELECT font_family, file_name, weight, skeleton, flesh_contrast, COALESCE(classification_reason, '') FROM fonts",
+    let rows: Vec<(String, String, String, i64, String, String, String)> = match conn.prepare(
+        "SELECT font_family, file_name, style, weight, skeleton, flesh_contrast, COALESCE(classification_reason, '') FROM fonts",
     ) {
         Ok(mut stmt) => stmt
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)))
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
@@ -504,11 +510,9 @@ fn unify_family_skeletons(conn: &Connection) {
 
     // family -> (distance from an upright 400, skeleton, flesh_contrast, reason)
     let mut best: std::collections::HashMap<String, (i64, String, String, String)> = std::collections::HashMap::new();
-    for (family, file_name, weight, skeleton, flesh, reason) in rows {
+    for (family, file_name, style, weight, skeleton, flesh, reason) in rows {
         if skeleton == "unknown" { continue; }
-        let lower = file_name.to_lowercase();
-        let slanted = lower.contains("italic") || lower.contains("oblique") || lower.contains("kursiv");
-        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+        let dist = upright_distance(weight, is_slanted(&file_name, &style));
         let entry = best.entry(family).or_insert((i64::MAX, String::new(), String::new(), String::new()));
         if dist < entry.0 {
             *entry = (dist, skeleton, flesh, reason);
@@ -530,18 +534,16 @@ fn unify_family_skeletons(conn: &Connection) {
 /// serifs, so an italic file of a serif family measured as sans. The upright
 /// face nearest weight 400 decides for the whole family.
 fn unify_family_serif(conn: &Connection) {
-    let rows: Vec<(String, String, i64, i32)> = match conn.prepare("SELECT font_family, file_name, weight, flesh_serif FROM fonts") {
+    let rows: Vec<(String, String, String, i64, i32)> = match conn.prepare("SELECT font_family, file_name, style, weight, flesh_serif FROM fonts") {
         Ok(mut stmt) => stmt
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
     };
     let mut best: std::collections::HashMap<String, (i64, i32)> = std::collections::HashMap::new();
-    for (family, file_name, weight, serif) in rows {
-        let lower = file_name.to_lowercase();
-        let slanted = lower.contains("italic") || lower.contains("oblique") || lower.contains("kursiv");
-        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+    for (family, file_name, style, weight, serif) in rows {
+        let dist = upright_distance(weight, is_slanted(&file_name, &style));
         let entry = best.entry(family).or_insert((i64::MAX, 0));
         if dist < entry.0 {
             *entry = (dist, serif);

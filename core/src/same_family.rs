@@ -116,7 +116,7 @@ fn is_narrow(label: &str) -> bool {
 }
 
 fn is_italic(f: &FontData, style: &[String]) -> bool {
-    f.style == "italic" || style.iter().any(|w| matches!(w.as_str(), "italic" | "oblique" | "kursiv" | "slanted" | "ital"))
+    crate::names::is_slanted(&f.file_name, &f.style) || style.iter().any(|w| w == "ital")
 }
 
 fn has_text_cut_word(style: &[String]) -> bool {
@@ -345,6 +345,8 @@ mod tests {
             file_path: format!("/x/{file_name}"),
             style: if italic { "italic" } else { "normal" }.into(),
             is_variable: false,
+            wght_axis_max: 0,
+            ital_axis: false,
         }
     }
 

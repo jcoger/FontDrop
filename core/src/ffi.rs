@@ -222,18 +222,18 @@ impl Library {
 
     /// How many families the Reading rule removes from the candidates for `font_id`
     /// ("42 not made for long text"). Counts families, not capped by the page size.
-    pub fn reading_hidden_count(&self, font_id: String, excluded_ids: Vec<String>) -> Result<u32, CoreError> {
+    pub fn reading_hidden_count(&self, font_id: String, excluded_ids: Vec<String>, excluded_families: Vec<String>) -> Result<u32, CoreError> {
         let conn = self.lock()?;
-        pairing::unfit_family_count(&conn, &font_id, excluded_ids).map_err(|m| {
+        pairing::unfit_family_count(&conn, &font_id, excluded_ids, excluded_families).map_err(|m| {
             if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
         })
     }
 
     /// Families for Reading when no Display face is chosen yet: one per family, with the same long-text
     /// rule as pairs (`only_fit`) and the count of families that rule removes. Hidden families stay out.
-    pub fn reading_families(&self, excluded_ids: Vec<String>, only_fit: bool) -> Result<ReadingFamilies, CoreError> {
+    pub fn reading_families(&self, excluded_ids: Vec<String>, excluded_families: Vec<String>, only_fit: bool) -> Result<ReadingFamilies, CoreError> {
         let conn = self.lock()?;
-        let (list, unfit) = pairing::reading_families(&conn, excluded_ids, only_fit).map_err(CoreError::Db)?;
+        let (list, unfit) = pairing::reading_families(&conn, excluded_ids, excluded_families, only_fit).map_err(CoreError::Db)?;
         Ok(ReadingFamilies {
             families: list.into_iter().map(|(font_id, family)| ReadingFamily { font_id, family }).collect(),
             not_for_long_text: unfit,
@@ -334,6 +334,7 @@ impl Library {
             .collect())
     }
 
+    /// `excluded_families` removes every file of those families (the core expands the names).
     /// A flat ranked list of partners for `font_id`, one per family, best first,
     /// at most `limit`. Same exclusions as `font_pairs` (`job` "reading" drops
     /// families unfit for body text). Unlike the buckets there is no cap of 11,
@@ -342,11 +343,12 @@ impl Library {
         &self,
         font_id: String,
         excluded_ids: Vec<String>,
+        excluded_families: Vec<String>,
         job: Option<String>,
         limit: u32,
     ) -> Result<Vec<PairCandidate>, CoreError> {
         let conn = self.lock()?;
-        let scored = pairing::font_candidates(&conn, &font_id, excluded_ids, job.as_deref(), limit as usize)
+        let scored = pairing::font_candidates(&conn, &font_id, excluded_ids, excluded_families, job.as_deref(), limit as usize)
             .map_err(|m| {
                 if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
             })?;

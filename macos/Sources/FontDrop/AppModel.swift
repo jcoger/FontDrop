@@ -621,12 +621,12 @@ final class AppModel {
         let id = display.fontId, limit = UInt32(candidateLimit)
         let job: String? = includeUnfitFaces ? nil : "reading"
         // Reading browses the same sources as the Display filter; the long-text count follows it too.
-        let outside = idsOutsideSources(keeping: display.name)
+        let outside = familiesOutsideSources(keeping: display.name)
         do {
             let ranked = try await background {
-                try $0.fontCandidates(fontId: id, excludedIds: outside, job: job, limit: limit)
+                try $0.fontCandidates(fontId: id, excludedIds: [], excludedFamilies: outside, job: job, limit: limit)
             }
-            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: outside) }
+            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: [], excludedFamilies: outside) }
             var seen = Set<String>()
             var list: [Candidate] = []
             for p in ranked where !p.family.isEmpty && seen.insert(p.family).inserted {
@@ -675,10 +675,10 @@ final class AppModel {
         candidatesError = nil
         defer { if generation == candidateGeneration { candidatesLoading = false } }
         let keepFamily = candidate(selectedCandidate)?.family
-        let outside = idsOutsideSources(keeping: "")
+        let outside = familiesOutsideSources(keeping: "")
         let fitOnly = !includeUnfitFaces
         do {
-            let found = try await background { try $0.readingFamilies(excludedIds: outside, onlyFit: fitOnly) }
+            let found = try await background { try $0.readingFamilies(excludedIds: [], excludedFamilies: outside, onlyFit: fitOnly) }
             guard generation == candidateGeneration else { return }   // superseded (a Display face was chosen, or a newer load)
             var list: [Candidate] = []
             for f in found.families {
@@ -705,14 +705,15 @@ final class AppModel {
     /// The active source chips as one string, so a change reloads the Reading list.
     var sourcesKey: String { Source.all.filter(filter.sources.contains).map(\.key).joined(separator: ",") }
 
-    /// Font ids of every family outside the active source chips (none selected means all sources).
+    /// Names of the families outside the active source chips (none selected means all sources).
     /// Passed to the core as exclusions so Reading and its long-text count match the Display filter.
+    /// The core expands a name to every file of the family, so twin .ttf/.otf files cannot leak through.
     /// `keeping` is the Display family, which stays whatever its source.
-    private func idsOutsideSources(keeping display: String) -> [String] {
+    func familiesOutsideSources(keeping display: String) -> [String] {
         guard !filter.sources.isEmpty else { return [] }
-        return fontsByFamily.flatMap { name, files -> [String] in
-            guard name != display, let entry = allEntries[name], !entry.sources.contains(where: filter.sources.contains) else { return [] }
-            return files.map(\.fontId)
+        return fontsByFamily.keys.filter { name in
+            guard name != display, let entry = allEntries[name] else { return false }
+            return !entry.sources.contains(where: filter.sources.contains)
         }
     }
 

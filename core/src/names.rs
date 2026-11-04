@@ -11,9 +11,38 @@ pub struct Classification {
     pub width: String,    // "condensed" | "normal" | "extended"
 }
 
+/// Is this file a slanted (italic or oblique) style? The one rule for the whole core:
+/// the file's own style flag (the `style` column), or italic, oblique, kursiv or
+/// slanted in its file name. Reading, Display, the finder and the classifier all call this.
+pub fn is_slanted(file_name: &str, style: &str) -> bool {
+    if style == "italic" {
+        return true;
+    }
+    let l = file_name.to_lowercase();
+    ["italic", "oblique", "kursiv", "slanted"].iter().any(|w| l.contains(w))
+}
+
+/// How far a file is from "the upright face a person would click first": distance
+/// from weight 400, with every slanted file behind every upright one.
+/// The smallest value in a family is its representative file.
+pub fn upright_distance(weight: i64, slanted: bool) -> i64 {
+    (weight - 400).abs() + if slanted { 1000 } else { 0 }
+}
+
 #[cfg(test)]
 mod name_tests {
-    use super::{looks_trial, strip_instance_words, trial_from_names};
+    use super::{is_slanted, looks_trial, strip_instance_words, trial_from_names, upright_distance};
+    #[test]
+    fn one_rule_for_slanted_files() {
+        assert!(is_slanted("Acme-Italic.otf", "normal"));
+        assert!(is_slanted("Acme-LightOblique.ttf", "normal"));
+        assert!(is_slanted("Acme-Kursiv.otf", "normal"));
+        assert!(is_slanted("Acme-Slanted.otf", "normal"));
+        assert!(is_slanted("Acme-Regular.otf", "italic"), "the file's own flag counts");
+        assert!(!is_slanted("Acme-Regular.otf", "normal"));
+        assert!(upright_distance(400, true) > upright_distance(900, false));
+        assert_eq!(upright_distance(300, false), 100);
+    }
     #[test]
     fn spots_trial_builds() {
         assert!(looks_trial("TestSöhne"));
@@ -146,6 +175,10 @@ pub struct NameMeta {
     pub foundry_url: Option<String>,
     /// The file has variation axes (an `fvar` table).
     pub variable: bool,
+    /// Top of the `wght` axis (0 when there is none). 600 or more means the one file reaches bold.
+    pub wght_axis_max: i64,
+    /// An `ital` or `slnt` axis: the one file reaches italic.
+    pub ital_axis: bool,
     /// Its cmap draws basic Latin (see `covers_latin`). Symbol and dingbat fonts do not.
     pub covers_latin: bool,
     /// The font's own style name: typographic subfamily (ID 17), else subfamily (ID 2).
@@ -235,7 +268,11 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
         .find(|u| u.starts_with("http"));
     let (u, l, d) = latin_coverage(&font);
     let style_name = [StringId::TYPOGRAPHIC_SUBFAMILY_NAME, StringId::SUBFAMILY_NAME].into_iter().find_map(text);
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: font.axes().len() > 0, covers_latin: covers_latin(u, l, d), style_name })
+    let axes = font.axes();
+    let tag = |t: &str| axes.iter().find(|a| a.tag().to_string() == t);
+    let wght_axis_max = tag("wght").map_or(0, |a| a.max_value().round() as i64);
+    let ital_axis = tag("ital").is_some() || tag("slnt").is_some();
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: axes.len() > 0, wght_axis_max, ital_axis, covers_latin: covers_latin(u, l, d), style_name })
 }
 
 pub struct FontMeta {

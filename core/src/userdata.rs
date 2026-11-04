@@ -6,7 +6,7 @@
 //! "Like my picks" (docs/ideas/pairing-experience.md) reads patterns from the
 //! chosen pairs. It only speaks after 3 picks and always says what it learned.
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection};
 use serde::Serialize;
 
 /// Jobs a face can be chosen for (BRO ch.3 lists six; these are the four the
@@ -152,16 +152,25 @@ pub const MIN_PICKS: usize = 3;
 
 /// Traits of a family's upright face nearest weight 400.
 fn traits(conn: &Connection, family: &str) -> Option<(Option<String>, String, i32)> {
-    conn.query_row(
-        "SELECT vendor_id, skeleton, flesh_serif FROM fonts
-         WHERE font_family = ?1 AND lower(file_name) NOT LIKE '%italic%'
-         ORDER BY abs(weight - 400) LIMIT 1",
-        params![family],
-        |r| Ok((r.get::<_, Option<String>>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?)),
-    )
-    .optional()
-    .ok()
-    .flatten()
+    let mut st = conn
+        .prepare("SELECT vendor_id, skeleton, flesh_serif, file_name, style, weight FROM fonts WHERE font_family = ?1")
+        .ok()?;
+    let rows: Vec<(Option<String>, String, i32, i64)> = st
+        .query_map(params![family], |r| {
+            let file_name: String = r.get(3)?;
+            let style: String = r.get(4)?;
+            let weight: i64 = r.get(5)?;
+            Ok((
+                r.get::<_, Option<String>>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i32>(2)?,
+                crate::names::upright_distance(weight, crate::names::is_slanted(&file_name, &style)),
+            ))
+        })
+        .ok()?
+        .flatten()
+        .collect();
+    rows.into_iter().min_by_key(|r| r.3).map(|(v, s, serif, _)| (v, s, serif))
 }
 
 pub fn house_style(conn: &Connection) -> Result<HouseStyle, String> {
