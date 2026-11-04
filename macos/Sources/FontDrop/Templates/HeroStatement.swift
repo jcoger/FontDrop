@@ -17,20 +17,35 @@ struct HeroStatement: View {
                 VStack(alignment: .leading, spacing: 28) {
                     ctx.headline(Self.headline)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(alignment: .bottom, spacing: 32) {
-                        ctx.reading(TemplateCopy.statementSub, 16, lh: 1.5, color: p.secondary)
-                            .frame(maxWidth: 260, alignment: .leading)
-                        Spacer(minLength: 0)
-                        HStack(spacing: 8) {
-                            ctx.button(TemplateCopy.statementPrimary, filled: true)
-                            ctx.button(TemplateCopy.statementSecondary, filled: false)
+                    // Side by side as drawn. When the buttons of a wide face leave the line too little room, they drop under it.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .bottom, spacing: 0) {
+                            sub
+                            Spacer(minLength: 24)
+                            buttons
                         }
-                        .fixedSize()
+                        VStack(alignment: .leading, spacing: 20) {
+                            sub
+                            buttons
+                        }
                     }
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
         }
+    }
+
+    /// 260 wide as drawn. A wide face keeps 18 characters a line by widening it, up to 320.
+    private var sub: some View {
+        ctx.reading(TemplateCopy.statementSub, 16, lh: 1.5, color: p.secondary, measure: 260, maxMeasure: 320)
+    }
+
+    private var buttons: some View {
+        HStack(spacing: 8) {
+            ctx.button(TemplateCopy.statementPrimary, filled: true)
+            ctx.button(TemplateCopy.statementSecondary, filled: false)
+        }
+        .fixedSize()
     }
 
     private var nav: some View {

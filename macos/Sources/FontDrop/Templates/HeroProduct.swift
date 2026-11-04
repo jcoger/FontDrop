@@ -29,9 +29,8 @@ struct HeroProduct: View {
                     ctx.headline(Self.headline, align: .center)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 520)
-                    ctx.reading(TemplateCopy.productSub, 16, lh: 1.5, color: p.secondary)
+                    ctx.reading(TemplateCopy.productSub, 16, lh: 1.5, color: p.secondary, measure: 400, maxMeasure: 520)
                         .multilineTextAlignment(.center)
-                        .frame(maxWidth: 400)
                     HStack(spacing: 8) {
                         ctx.button(TemplateCopy.productPrimary, filled: true, radius: 10, horizontal: 22)
                         ctx.button(TemplateCopy.productSecondary, filled: false, soft: true, radius: 10, horizontal: 22)

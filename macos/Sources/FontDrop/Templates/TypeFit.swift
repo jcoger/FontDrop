@@ -30,6 +30,8 @@ enum TypeFit {
     static let displayClamp: ClosedRange<CGFloat> = 0.65...1.45
     /// A headline never grows past this multiple of its board size, even when the column would take more.
     static let headlineCeiling: CGFloat = 1.75
+    /// The ceiling for the second pass, when the first could not reach the column: a condensed face set big and stacked.
+    static let raisedCeiling: CGFloat = 5
     /// The shortest longest-line a headline accepts, as a share of its column.
     static let minFill: CGFloat = 0.8
     /// Air kept between the ink of one line and the next, in em.
@@ -86,6 +88,41 @@ enum TypeFit {
     private static func clamp(_ size: CGFloat, px: CGFloat, to range: ClosedRange<CGFloat>) -> Solved {
         let low = px * range.lowerBound, high = px * range.upperBound
         return Solved(size: min(max(size, low), high), clamped: size < low - 0.001 || size > high + 0.001)
+    }
+
+    // MARK: Measure
+
+    /// Reading text needs at least this many characters on an average line.
+    static let minCharsPerLine: CGFloat = 18
+    /// How far below the Fit size a Reading role may drop to keep that: to 0.65 of the board size.
+    static let measureFloor: CGFloat = 0.65
+
+    struct Measure {
+        var size: CGFloat
+        var column: CGFloat
+        /// Characters on an average line at this size and column.
+        var chars: CGFloat
+    }
+
+    /// The width of an average character of `text`, per point of size.
+    static func advancePerChar(_ text: String, face: FaceSpec) -> CGFloat? {
+        guard !text.isEmpty, let font = FontLoader.shared.styledFont(face, ratio: 100 / CGFloat(face.settings.size)) else { return nil }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
+        return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)) / CTFontGetSize(font) / CGFloat(text.count)
+    }
+
+    /// Keeps `text` readable in a column: at least `minCharsPerLine`. A wide face gets smaller type first (down to
+    /// `floorSize`, unless `locked`: then the scale owns the size), then a wider column, up to `maxColumn`.
+    static func measure(_ text: String, face: FaceSpec, size: CGFloat, floorSize: CGFloat, locked: Bool,
+                        column: CGFloat, maxColumn: CGFloat) -> Measure? {
+        guard let adv = advancePerChar(text, face: face), adv > 0 else { return nil }
+        var s = size, w = column
+        func chars(_ s: CGFloat, _ w: CGFloat) -> CGFloat { w / (adv * s) }
+        if chars(s, w) < minCharsPerLine {
+            if !locked { s = max(floorSize, min(s, w / (adv * minCharsPerLine))) }
+            if chars(s, w) < minCharsPerLine { w = max(w, min(maxColumn, minCharsPerLine * adv * s)) }
+        }
+        return Measure(size: s, column: w, chars: chars(s, w))
     }
 
     // MARK: Line height
@@ -163,9 +200,34 @@ enum TypeFit {
         let key = "\(face.resolvedPath)|\(plain.hashValue)|\(text)|\(px)|\(trackingEm)|\(lh)|\(width)|\(range)|\(maxHeight ?? 0)"
         lock.lock(); let hit = headlineMemo[key]; lock.unlock()
         if let hit { return hit }
-        guard let base = FontLoader.shared.styledFont(face, ratio: 1) else { return nil }
+        guard FontLoader.shared.styledFont(face, ratio: 1) != nil else { return nil }
 
-        let ceiling = px * headlineCeiling
+        var out = scan(text, face: face, px: px, trackingEm: trackingEm, lh: lh, width: width, lines: range,
+                       maxHeight: maxHeight, ceilingFactor: headlineCeiling)
+        // The ceiling stopped it short of the column (a condensed face, which wants to be big and stacked): allow
+        // two more lines and a higher ceiling, and take whichever reaches the column.
+        if out == nil || out!.fill < minFill {
+            let more = range.lowerBound...(range.upperBound + 2)
+            if let again = scan(text, face: face, px: px, trackingEm: trackingEm, lh: lh, width: width, lines: more,
+                                maxHeight: maxHeight, ceilingFactor: raisedCeiling), again.fill > (out?.fill ?? 0) {
+                out = again
+            }
+        }
+        if out == nil { out = set(text, face: face, size: px * FitWords.floor, trackingEm: trackingEm, width: width, lh: lh) }
+        if let out {
+            lock.lock()
+            if headlineMemo.count > 2000 { headlineMemo.removeAll() }
+            headlineMemo[key] = out
+            lock.unlock()
+        }
+        return out
+    }
+
+    /// One pass of the search: sizes from `ceilingFactor x px` down, in 1% steps.
+    private static func scan(_ text: String, face: FaceSpec, px: CGFloat, trackingEm: Double, lh: Double, width: CGFloat,
+                             lines range: ClosedRange<Int>, maxHeight: CGFloat?, ceilingFactor: CGFloat) -> Headline? {
+        guard let base = FontLoader.shared.styledFont(face, ratio: 1) else { return nil }
+        let ceiling = px * ceilingFactor
         var best: Headline?            // best fill so far among sizes that satisfy the hard rules
         var chosen: Headline?
         var size = ceiling
@@ -189,20 +251,10 @@ enum TypeFit {
             if let c = chosen, size < min(px, c.size) * 0.9 { break }      // only farther from the board size from here
             size *= 0.99
         }
-        var out = chosen ?? best
-        if var o = out {
-            o.heightLimited = heightLimited && o.fill < minFill
-            o.capped = abs(o.size - ceiling) < ceiling * 0.011 && o.fill < minFill
-            out = o
-        }
-        if out == nil { out = set(text, face: face, size: px * FitWords.floor, trackingEm: trackingEm, width: width, lh: lh) }
-        if let out {
-            lock.lock()
-            if headlineMemo.count > 2000 { headlineMemo.removeAll() }
-            headlineMemo[key] = out
-            lock.unlock()
-        }
-        return out
+        guard var o = chosen ?? best else { return nil }
+        o.heightLimited = heightLimited && o.fill < minFill
+        o.capped = abs(o.size - ceiling) < ceiling * 0.011 && o.fill < minFill
+        return o
     }
 }
 
@@ -241,6 +293,8 @@ struct FitRecord {
     let tracking: Double
     let pitch: CGFloat?
     let need: CGFloat?
+    /// Reading with a column: characters on an average line at the drawn size and column.
+    var charsPerLine: CGFloat? = nil
 }
 
 /// Collects every `FitRecord` a template's views solve while they render. Tests only; nil in the app.

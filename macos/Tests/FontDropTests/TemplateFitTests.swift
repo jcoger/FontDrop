@@ -213,7 +213,7 @@ final class TemplateFitTests: XCTestCase {
 
     // MARK: Every variant
 
-    private struct Check { var failures: [String] = []; var clamped: [String] = []; var rows: [String] = []; var limited: [String] = [] }
+    private struct Check { var failures: [String] = []; var clamped: [String] = []; var rows: [String] = []; var limited: [String] = []; var measured: [String] = [] }
 
     /// Renders each template variant for each sample and checks what the views solved.
     func testEveryVariantFitsEverySample() async throws {
@@ -257,6 +257,13 @@ final class TemplateFitTests: XCTestCase {
                             if sample.name == "PP Museum", template.id != "poster" { museumRatios["\(template.id).\(variant.id)"] = r.size / r.px }
                             check.rows.append("\(sample.name) | \(template.id).\(variant.id) | headline \(Int(r.px)) -> \(String(format: "%.1f", r.size)) | \(r.lines.count) lines | fill \(Int(fill * 100))%")
                         }
+                        // 5. Reading in a column keeps at least 18 characters a line (smaller type, then a wider column)
+                        if r.kind == .reading, let chars = r.charsPerLine {
+                            if chars < TypeFit.minCharsPerLine - 0.5 {
+                                check.failures.append("\(tag): \"\(r.text.prefix(24))\" only \(String(format: "%.1f", chars)) characters a line")
+                            }
+                            check.measured.append("\(sample.name) | \(template.id).\(variant.id) | \(String(format: "%.1f", chars)) chars a line at \(String(format: "%.1f", r.size)) pt")
+                        }
                         // 4. body x-height within 5% of the target (unless clamped)
                         if r.kind == .reading, let t = r.xTarget, let a = r.xActual, t > 0 {
                             if r.clamped {
@@ -271,6 +278,7 @@ final class TemplateFitTests: XCTestCase {
         }
         print("FIT TABLE\n" + check.rows.sorted().joined(separator: "\n"))
         print("FIT LIMITED (\(check.limited.count))\n" + Set(check.limited).sorted().joined(separator: "\n"))
+        print("FIT MEASURE\n" + Set(check.measured).sorted().joined(separator: "\n"))
         print("FIT CLAMPED (\(Set(check.clamped).count))\n" + Set(check.clamped).sorted().joined(separator: "\n"))
         print("FIT SAMPLES: " + list.map(\.name).joined(separator: ", "))
         print("FIT PP MUSEUM size/px: \(museumRatios.sorted { $0.key < $1.key }.map { "\($0.key)=\(String(format: "%.2f", $0.value))" }.joined(separator: " "))")
@@ -302,6 +310,16 @@ final class TemplateFitTests: XCTestCase {
             }
         }
         XCTAssertEqual(failures, [])
+    }
+
+    /// Counts pictorial families (ornaments, dingbats, symbol sets) among the Latin-covering families the Display and
+    /// Reading lists draw from. By name only; it prints, it does not assert, and nothing is filtered.
+    func testCountPictorialFamilies() throws {
+        let db = try dbPath()
+        let words = ["ornament", "dingbat", "webdings", "wingdings", "symbol", "emoji", "picto", "bats", "glyphs", "fleuron"]
+        let families = Set(rows(db).map(\.family)).sorted()
+        let hits = families.filter { f in words.contains { f.lowercased().contains($0) } }
+        print("FIT PICTORIAL \(hits.count) of \(families.count) families: \(hits.joined(separator: ", "))")
     }
 
     // MARK: Contact sheets

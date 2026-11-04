@@ -29,8 +29,7 @@ struct ArticleFeature: View {
                 ctx.label(TemplateCopy.featureIssue, color: p.accent, weight: 400)
             }
             ctx.headline(Self.headline, color: p.background)
-            ctx.reading(TemplateCopy.featureDeck, 15, lh: 1.47, color: deckColor)
-                .frame(maxWidth: 380, alignment: .leading)
+            ctx.reading(TemplateCopy.featureDeck, 15, lh: 1.47, color: deckColor, measure: 380, maxMeasure: 520)
         }
         .padding(.horizontal, 40).padding(.top, 40).padding(.bottom, 32)
         .frame(maxWidth: .infinity, alignment: .leading)

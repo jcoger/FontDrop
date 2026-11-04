@@ -61,15 +61,22 @@ struct PairContext {
     }
 
     /// Text in the Reading face. Same arguments as `display`; Fit matches the board's x-height.
+    @ViewBuilder
     func reading(_ text: String, _ px: CGFloat, track: Double = 0, lh: Double? = nil, weight: Double? = nil,
                  italic: Bool = false, figures: Figures = .inherit, face: FaceSpec? = nil, color: HexColor? = nil,
-                 width: CGFloat? = nil, align: HorizontalAlignment = .leading, step: Int? = nil) -> some View {
+                 width: CGFloat? = nil, align: HorizontalAlignment = .leading, step: Int? = nil,
+                 measure: CGFloat? = nil, maxMeasure: CGFloat? = nil) -> some View {
         let spec = Self.styled(face ?? body, weight: weight, italic: italic, figures: figures)
         let size = solve(text, spec, px: px, isDisplay: false, track: track, lh: lh, step: step,
-                         width: width, lines: nil, maxHeight: nil)
-        return FaceText(face: spec, text: text, ratio: size / CGFloat(spec.settings.size), tick: tick, trackBias: track, leading: lh,
-                        wrapWidth: width, lineAlignment: align)
+                         width: width, lines: nil, maxHeight: nil, measure: measure, maxMeasure: maxMeasure)
+        // `measure` is the column the text sits in. In a wide face the column may widen, up to `maxMeasure`, to keep a readable line.
+        let column = measure.map { m in
+            TypeFit.measure(text, face: spec, size: size, floorSize: size, locked: true, column: m, maxColumn: maxMeasure ?? m)?.column ?? m
+        }
+        let drawn = FaceText(face: spec, text: text, ratio: size / CGFloat(spec.settings.size), tick: tick, trackBias: track, leading: lh,
+                             wrapWidth: width, lineAlignment: align)
             .foregroundStyle((color ?? palette.text).color)
+        if let column { drawn.frame(width: column, alignment: .leading) } else { drawn }
     }
 
     /// A Reading paragraph with an italic word, a bold phrase or a link inside it.
@@ -119,7 +126,8 @@ struct PairContext {
 
     /// The size to draw `text` at, in points. Also records what it solved, when a test asked for that.
     private func solve(_ text: String, _ face: FaceSpec, px: CGFloat, isDisplay: Bool, track: Double, lh: Double?, step: Int?,
-                       width: CGFloat?, lines: ClosedRange<Int>?, maxHeight: CGFloat?) -> CGFloat {
+                       width: CGFloat?, lines: ClosedRange<Int>?, maxHeight: CGFloat?,
+                       measure: CGFloat? = nil, maxMeasure: CGFloat? = nil) -> CGFloat {
         let trim = CGFloat(face.settings.trim)
         let shrink = isDisplay ? fit : 1
         let tracking = face.settings.tracking + track
@@ -151,8 +159,17 @@ struct PairContext {
             }
             return size
         }
-        let r = roleSize(face, px: px, isDisplay: isDisplay, step: step)
-        let size = r.size * trim * shrink
+        var r = roleSize(face, px: px, isDisplay: isDisplay, step: step)
+        var size = r.size * trim * shrink
+        // Reading text in a narrow column needs a readable line: at least 18 characters. Smaller type (to 0.65x) first.
+        var chars: CGFloat?
+        if let measure, !isDisplay,
+           let m = TypeFit.measure(text, face: face, size: size, floorSize: px * TypeFit.measureFloor * trim, locked: scale.locked,
+                                   column: measure, maxColumn: maxMeasure ?? measure) {
+            if m.size < size - 0.001 { r.clamped = true }
+            size = m.size
+            chars = m.chars
+        }
         if let recorder {
             let m = TypeFit.metrics(face)
             let set = width.flatMap { TypeFit.set(text, face: face, size: size, trackingEm: tracking, width: $0, lh: lh ?? face.settings.lineHeight) }
@@ -161,7 +178,7 @@ struct PairContext {
                                    heightLimited: false, capped: false,
                                    xTarget: isDisplay ? nil : px * TypeFit.refXHeight * trim,
                                    xActual: isDisplay ? nil : size * (m?.xHeight ?? 0),
-                                   tracking: tracking, pitch: set?.pitch, need: set?.need))
+                                   tracking: tracking, pitch: set?.pitch, need: set?.need, charsPerLine: chars))
         }
         return size
     }
