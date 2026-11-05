@@ -30,6 +30,7 @@ struct FilterBar: View {
                 model.filter.savedOnly.toggle()
             }
             MoreMenu()
+            DisplaySortMenu()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

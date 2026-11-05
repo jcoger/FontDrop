@@ -11,7 +11,7 @@ struct FamilyPickerView: View {
 
     var body: some View {
         @Bindable var model = model
-        let families = model.visibleFamilies
+        let families = screen == .display ? model.displayGridFamilies : model.visibleFamilies
         let chosen = model.chosen(screen)
         let sample = model.sampleText
         let tick = model.fontTick
@@ -37,6 +37,7 @@ struct FamilyPickerView: View {
                                        isChosen: chosen == family.name,
                                        isSaved: model.isSaved(family.name),
                                        isHidden: model.isHidden(family.name),
+                                       reason: screen == .display ? model.displayReason(for: family.name) : nil,
                                        playground: model.selectedFamily == family.name ? playgroundFace(family) : nil,
                                        toggleSaved: { Task { await model.setFavorite(family.name, on: !model.isSaved(family.name)) } },
                                        toggleHidden: { Task { await model.setHidden(family.name, hidden: !model.isHidden(family.name)) } })
@@ -51,6 +52,10 @@ struct FamilyPickerView: View {
         // Open on the chosen face, so the grid starts where you left off.
         .task(id: "\(model.brandID ?? 0)/\(screen.rawValue)/\(model.fontsReady)") {
             if model.fontsReady, let name = model.chosen(screen) { proxy.scrollTo(name, anchor: .center) }
+        }
+        // Pairs with: rank every family against the chosen Text face (reloads when that face or the library changes).
+        .task(id: "\(model.readingFamily?.fontId ?? "")/\(model.libraryRevision)/\(model.fontsReady)") {
+            if screen == .display, model.fontsReady { await model.loadDisplayPairs() }
         }
         }
         }
@@ -82,6 +87,9 @@ struct FamilyPickerView: View {
 
     private func subtitle(count: Int) -> String {
         let brand = model.brand?.name ?? "Your brand name"
+        if screen == .display, model.displaySort == .pairsWith, model.displayPairsAreCurrent, let text = model.readingFamily?.name {
+            return Lexicon.Pairs.subtitle(brand: brand, count: count, text: text)
+        }
         let tail = screen == .display ? "The face you pick here sets the tone for Text." : "Pick one for this job."
         return "\(brand) set in each of \(count) families. Your fonts come first. \(tail)"
     }
@@ -97,6 +105,7 @@ struct FamilyCard: View {
     let isChosen: Bool
     let isSaved: Bool
     let isHidden: Bool
+    var reason: String?              // Pairs with: why this face pairs with the Text face, in place of the style count
     var playground: FaceSpec?        // set on the selected card once the designer changed something
     let toggleSaved: () -> Void
     let toggleHidden: () -> Void
@@ -121,8 +130,8 @@ struct FamilyCard: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(family.name).font(.callout.weight(.semibold)).lineLimit(1)
-                    Text("\(family.styleCount) \(family.styleCount == 1 ? "style" : "styles")")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Text(reason ?? "\(family.styleCount) \(family.styleCount == 1 ? "style" : "styles")")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 8)
                 if isChosen {

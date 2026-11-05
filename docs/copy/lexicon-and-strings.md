@@ -510,3 +510,28 @@ A pass · B pass · C pass (no em dashes) · F pass after 17.7 · R pass
 | 19.14 | VoiceOver landmarks | **Sidebar**, the screen name (Display, Text, Set) for the content, **Inspector**; the three jobs as one list "Display, Text and Set" | |
 
 Plain words. No em dashes.
+
+## 20. Either way in, and plain text faces (R3, 2026-11-05)
+
+A Text face can come first. Once one is chosen the Display grid can rank headline faces against it, using the same pairing engine run the other way. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 20.1 | display.sort.pairsWith | **Pairs with Timeless Sans** (menu item) · **Sort · Pairs with Timeless Sans** (menu label) | Names the Text face. The default on Display while a Text face is chosen and no Display face is. Rows that exist only after a Text face is chosen |
+| 20.2 | display.sort.library | **Your fonts first** (menu item) · **Sort · Your fonts first** (menu label) | The order Display always had: your fonts, then the rest. The menu hides when there is no Text face |
+| 20.3 | display.sort.help | **Sort the grid. Pairs with puts the best headline partners for your Text face first.** | Hover on the Sort menu |
+| 20.4 | display.subtitle.pairsWith | **Acme set in each of 505 families. The best partners for Timeless Sans come first.** | Subtitle of the Display grid under Pairs with. With the library sort the old subtitle stays |
+| 20.5 | display.reason.* | **Same foundry as Timeless Sans** · **Rational, like Timeless Sans** · **x-height within 3% of Timeless Sans** · **Same x-height as Timeless Sans** · **Stroke contrast with Timeless Sans** · **Same designer as Timeless Sans** | Card line, replaces the style count while Pairs with is on. It is the helping evidence that few of the top 60 cards share. When all of a card's evidence is common, the pair line: **Clear contrast with Timeless Sans** (20.6 to 20.9). Role-worded: the card is the headline, the named face is the Text face |
+| 20.6 | display.reason.plain | **Character over plain Timeless Sans** | A sans headline with character over a dependable sans (20.10) |
+| 20.7 | display.reason.uniform | **Harmony with Timeless Sans** | Same form and structure (the Harmony term, section 1) |
+| 20.8 | display.reason.superfamily | **Drawn as a set with Timeless Sans** | |
+| 20.9 | display.reason.middle | **Too close to Timeless Sans** · **Structure unknown** | The warning and the no-reading case. Same family and no engine result: no line, the style count stays |
+| 20.10 | evidence.plain | Chip **Plain text face** · Why row **Clear difference**, detail **A plain, dependable text face under a headline with character.** | On a Text candidate whose Display face is a sans with character. Counts as Clear difference (Difference: Distinct passes it) |
+
+A plain pair is not Strong: same form is not the far end. Structure: Mixed keeps a plain pair that shares no skeleton.
+
+Open for the owner: the engine reads "a sans with character" as "not a basic" (widely used or named for text by the type guides). The workhorse signals alone pass Agrandir and PP Museum. See docs/pairing-score.md, Roles.
+
+### Gates for section 20
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · R pass

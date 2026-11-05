@@ -327,41 +327,25 @@ impl Library {
         .map_err(|m| {
             if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
         })?;
-        let mut paths: HashMap<String, (String, String)> = HashMap::new();
-        let mut stmt = conn.prepare("SELECT font_id, file_path, font_family FROM fonts")?;
-        for r in stmt.query_map([], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
-        })? {
-            let (id, p, fam) = r?;
-            paths.insert(id, (p, fam));
-        }
-        Ok(scored
-            .into_iter()
-            .enumerate()
-            .map(|(i, p)| {
-                let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
-                PairCandidate {
-                    workhorse: horses.contains(&p.font_id),
-                    suggested_body_style: body_style(p.suggested_body_style, &paths),
-                    family,
-                    file_path,
-                    font_id: p.font_id,
-                    pair_type: p.pair_type,
-                    evidence: p
-                        .evidence
-                        .into_iter()
-                        .map(|e| Evidence {
-                            lens: e.lens,
-                            detail: e.detail,
-                            source: e.source,
-                            strength: e.strength,
-                            effect: e.effect,
-                        })
-                        .collect(),
-                    rank: i as u32,
-                }
-            })
-            .collect())
+        pair_candidates(&conn, scored, &horses)
+    }
+
+    /// Either way in: the Display faces that pair with a chosen Text face (`font_id` is a file of the Text family),
+    /// one per family, best partner first, at most `limit`. The same pair score as `font_candidates` run the other way,
+    /// so a pair has one score from both sides. Each entry's `font_id` and `file_path` are the Display candidate's. The
+    /// Text-only rules (long-text fitness, dependable faces first) do not apply. Hidden fonts are always out.
+    pub fn display_candidates(
+        &self,
+        font_id: String,
+        excluded_ids: Vec<String>,
+        excluded_families: Vec<String>,
+        limit: u32,
+    ) -> Result<Vec<PairCandidate>, CoreError> {
+        let conn = self.lock()?;
+        let scored = pairing::display_candidates(&conn, &font_id, excluded_ids, excluded_families, limit as usize).map_err(|m| {
+            if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
+        })?;
+        pair_candidates(&conn, scored, &HashSet::new())
     }
 
     // ── Brands ────────────────────────────────────────────────────────────────
@@ -424,6 +408,40 @@ impl Library {
             statements: h.statements,
         })
     }
+}
+
+/// Engine scores as records for Swift: each entry's family and file path come from its font id.
+/// `horses` holds the font ids to mark as dependable text faces.
+fn pair_candidates(conn: &Connection, scored: Vec<pairing::PairScore>, horses: &HashSet<String>) -> Result<Vec<PairCandidate>, CoreError> {
+    let mut paths: HashMap<String, (String, String)> = HashMap::new();
+    let mut stmt = conn.prepare("SELECT font_id, file_path, font_family FROM fonts")?;
+    for r in stmt.query_map([], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+    })? {
+        let (id, p, fam) = r?;
+        paths.insert(id, (p, fam));
+    }
+    Ok(scored
+        .into_iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
+            PairCandidate {
+                workhorse: horses.contains(&p.font_id),
+                suggested_body_style: body_style(p.suggested_body_style, &paths),
+                family,
+                file_path,
+                font_id: p.font_id,
+                pair_type: p.pair_type,
+                evidence: p
+                    .evidence
+                    .into_iter()
+                    .map(|e| Evidence { lens: e.lens, detail: e.detail, source: e.source, strength: e.strength, effect: e.effect })
+                    .collect(),
+                rank: i as u32,
+            }
+        })
+        .collect())
 }
 
 /// The engine's body style with its file path filled in from the id.

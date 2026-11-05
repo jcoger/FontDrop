@@ -25,7 +25,8 @@ pub struct PairScore {
     /// Unrounded score, used to rank so candidates don't tie.
     #[serde(skip)]
     pub precise: f32,
-    /// "contrast" | "uniform" | "middle" | "uncertain" | "superfamily" | "same_family"
+    /// "contrast" | "plain" | "uniform" | "middle" | "uncertain" | "superfamily" | "same_family"
+    /// ("plain": a dependable sans under a sans Display face with character, see `plain_under_character`)
     pub pair_type: String,
     pub reason: String,
     pub evidence: Vec<Evidence>,
@@ -121,9 +122,12 @@ fn width_str(f: &FontData) -> &str {
 //     their own group instead of first place.
 // Scores are continuous (f32) so thousands of candidates don't tie.
 
+/// How far apart two measures are, as a percent of the larger one. The larger one, not "the first": the score must
+/// not depend on which face is called the primary, so the same pair scores the same from the Display side and from
+/// the Text side (see `score_roles`).
 fn pct_diff(a: Option<f64>, b: Option<f64>) -> Option<f64> {
     match (a, b) {
-        (Some(a), Some(b)) if a > 0.0 => Some(((a - b).abs() / a * 100.0).min(100.0)),
+        (Some(a), Some(b)) if a > 0.0 && b > 0.0 => Some(((a - b).abs() / a.max(b) * 100.0).min(100.0)),
         _ => None,
     }
 }
@@ -290,6 +294,88 @@ fn score_pair(primary: &FontData, candidate: &FontData) -> Option<PairScore> {
     })
 }
 
+// ── Roles: Display and Text ───────────────────────────────────────────────────
+//
+// The pair score is symmetric: `score_pair(a, b)` and `score_pair(b, a)` give the same number, pair type and
+// evidence (only the order of the words in a label differs). So a pair scores the same whichever side the designer
+// starts from. What is NOT symmetric is deliberate, and lives here, in one place, by role:
+//   Text side only     the long-text rule (`unfit_for_reading`), the dependable-faces-first grouping
+//                      (`workhorse.rs`), the type-guide boost (`recommendations.rs`). They say what a face needs to
+//                      be to set a paragraph. They apply to the Text list, never to the Display list.
+//   Display side only  nothing today. The Display list is every family, ranked by the pair score alone.
+//   By role            D7 below: whether a plain sans reads as a clear difference depends on which one is the headline.
+
+/// The base score a pair type starts from in `score_pair`.
+fn base_score(pair_type: &str, known: bool) -> f32 {
+    match pair_type {
+        "superfamily" => 60.0,
+        "contrast" => if known { 70.0 } else { 62.0 },
+        "uniform" => 60.0,
+        "middle" => 25.0,
+        _ => 30.0,
+    }
+}
+
+/// The most a plain pair gains for typical proportions, and how far from the library median advance that gain fades out.
+const PLAIN_TYPICAL_BONUS: f32 = 8.0;
+const PLAIN_TYPICAL_SPAN: f64 = 0.05;
+
+/// D7, basics show up. A sans Display face with character leaves a plain, dependable sans as its natural partner.
+/// Same form, so the pair is "uniform" or "the middle" to the engine, which hid every plain sans under Difference:
+/// Distinct. Here that pair becomes `plain`: it passes Distinct, is scored as a clear difference, and says why.
+///
+/// "Character" is judged by what the workhorse signals can and cannot see. They measure width, x-height, stroke
+/// contrast and weights, so a neutral face and a quirky one with plain proportions (Agrandir, PP Museum) both pass.
+/// A Display face therefore counts as a basic only when it is a workhorse AND others agree it is plain: widely used
+/// on Google Fonts or named for text by the type guides (`is_basic`). Anything else, a workhorse by the measures alone
+/// included, has character. Never for a near-duplicate (same structure, texture and metrics), never when the Display
+/// face is a basic (two basics are alike, not different), never the Display face's own family (`score_pair` skips it).
+/// `s` is the result of `score_pair(display, text)`.
+fn plain_under_character(s: &mut PairScore, display: &FontData, text: &FontData, display_is_basic: bool, text_is_horse: bool) {
+    let both_sans = display.flesh_serif == 0 && text.flesh_serif == 0;
+    let same_form_type = matches!(s.pair_type.as_str(), "uniform" | "middle" | "uncertain");
+    let near_duplicate = s.evidence.iter().any(|e| e.lens == "Near-duplicate");
+    if !(both_sans && same_form_type && !display_is_basic && text_is_horse && !near_duplicate) {
+        return;
+    }
+    let known = display.skeleton != "unknown" && text.skeleton != "unknown";
+    s.precise += base_score("contrast", known) - base_score(&s.pair_type, known);
+    // Among plain faces, the most typical first: the basics sit in the middle of the library's proportions, the
+    // quirky and the extreme at the edges. Up to PLAIN_TYPICAL_BONUS for a mean advance at the library median.
+    if let Some(adv) = text.advance_ratio {
+        let closeness = (1.0 - (adv - crate::workhorse::LIBRARY_MEDIAN_ADVANCE).abs() / PLAIN_TYPICAL_SPAN).max(0.0);
+        s.precise += PLAIN_TYPICAL_BONUS * closeness as f32;
+    }
+    s.score = s.precise.max(0.0).min(100.0).round() as u8;
+    s.pair_type = "plain".into();
+    s.evidence.retain(|e| !matches!(e.lens.as_str(), "Uniform" | "The middle" | "Unclassified"));
+    s.evidence.insert(0, Evidence {
+        lens: "Plain text face".into(),
+        detail: "a dependable text face under a headline with character".into(),
+        source: String::new(),
+        strength: "shortcut".into(),
+        effect: 1,
+    });
+    let tail = s.reason.find(" \u{00B7} ").map(|i| s.reason[i..].to_string()).unwrap_or_default();
+    s.reason = format!("Plain text face{tail}");
+}
+
+/// The pair score with the roles applied: `display` is the headline face, `text` the body face. `horses` is the
+/// workhorse assessment by family. The result's `font_id` is the `text` file, as in `score_pair`.
+pub fn score_roles(display: &FontData, text: &FontData, horses: &std::collections::HashMap<String, crate::workhorse::Workhorse>) -> Option<PairScore> {
+    let mut s = score_pair(display, text)?;
+    let horse = |f: &FontData| horses.get(f.font_family.as_str()).map_or(false, |h| h.is);
+    let basic = |f: &FontData| horses.get(f.font_family.as_str()).map_or(false, is_basic);
+    plain_under_character(&mut s, display, text, basic(display), horse(text));
+    Some(s)
+}
+
+/// A workhorse that is also known to be plain: widely used (Google's popularity rank) or recommended for text by the
+/// type guides. The measures alone cannot tell a neutral face from a quirky one with plain proportions.
+fn is_basic(h: &crate::workhorse::Workhorse) -> bool {
+    h.is && (h.passed.contains(&"widely used") || h.passed.contains(&"recommended for text"))
+}
+
 // ── Query + score ─────────────────────────────────────────────────────────────
 
 pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
@@ -429,10 +515,16 @@ fn unfit_ids(all: &[FontData], name_rule: bool) -> HashSet<String> {
 /// family (each family's best file). The slots should be different typefaces,
 /// not several weights of one. Shared by the buckets and the flat list.
 fn rank_by_family(primary: &FontData, all: &[FontData], excluded: &HashSet<String>) -> Vec<PairScore> {
+    rank_scored(all, excluded, |c| score_pair(primary, c))
+}
+
+/// `rank_by_family` with the scoring given: the Text list scores (Display face, candidate), the Display list scores
+/// (candidate, Text face). The scorer returns the score with `font_id` set to the candidate's file.
+fn rank_scored(all: &[FontData], excluded: &HashSet<String>, mut score: impl FnMut(&FontData) -> Option<PairScore>) -> Vec<PairScore> {
     let mut scores: Vec<(PairScore, &str)> = all
         .iter()
         .filter(|c| !excluded.contains(&c.font_id))
-        .filter_map(|c| score_pair(primary, c).map(|s| (s, c.font_family.as_str())))
+        .filter_map(|c| score(c).map(|s| (s, c.font_family.as_str())))
         .filter(|(s, _)| s.precise > 0.0)
         .collect();
     scores.sort_by(|a, b| b.0.precise.partial_cmp(&a.0.precise).unwrap_or(std::cmp::Ordering::Equal));
@@ -507,7 +599,7 @@ pub fn reading_candidates(
     let horses = crate::workhorse::assess_all(&all, &crate::workhorse::popularity(conn));
     let family_of: std::collections::HashMap<&str, &str> = all.iter().map(|f| (f.font_id.as_str(), f.font_family.as_str())).collect();
     let is_horse = |id: &str| family_of.get(id).and_then(|f| horses.get(*f)).map_or(false, |h| h.is);
-    let mut ranked = rank_by_family(primary, &all, &excluded);
+    let mut ranked = rank_scored(&all, &excluded, |c| score_roles(primary, c, &horses));
     // Faces the published guides recommend for body text get the same small boost the other shortcuts get, and say why.
     // Only here, in Reading: the pair score the eval measures is not touched.
     for s in &mut ranked {
@@ -532,6 +624,35 @@ pub fn reading_candidates(
     first.truncate(limit);
     let ids: HashSet<String> = first.iter().filter(|s| is_horse(&s.font_id)).map(|s| s.font_id.clone()).collect();
     Ok((crate::same_family::put_first(first, same_family, limit), ids))
+}
+
+/// Either way in: the Display list for a chosen Text face. Every family that could be the headline, best partner first,
+/// one per family, at most `limit`. The same pair score as the Text list, run the other way: each candidate is scored
+/// as the Display face and `text_font_id` as the Text face (`score_roles(candidate, text)`), so a pair has one score
+/// from both sides. Each entry's `font_id` is the candidate (Display) file. The Text-side rules (long-text fitness,
+/// dependable faces first, type-guide boost) do not apply: any family may be a headline. Hidden fonts, `excluded_ids`
+/// and every file of `excluded_families` stay out. No same-family offer: the Text face's own family is skipped.
+pub fn display_candidates(
+    conn: &Connection,
+    text_font_id: &str,
+    excluded_ids: Vec<String>,
+    excluded_families: Vec<String>,
+    limit: usize,
+) -> Result<Vec<PairScore>, String> {
+    let all = load_all_fonts(conn)?;
+    let text = all
+        .iter()
+        .find(|f| f.font_id == text_font_id)
+        .ok_or_else(|| format!("Font {} not found", text_font_id))?;
+    let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    excluded.extend(crate::finder::hidden_font_ids(conn));
+    excluded.extend(ids_of_families(&all, &excluded_families));
+    let horses = crate::workhorse::assess_all(&all, &crate::workhorse::popularity(conn));
+    let mut ranked = rank_scored(&all, &excluded, |c| {
+        score_roles(c, text, &horses).map(|mut s| { s.font_id = c.font_id.clone(); s })
+    });
+    ranked.truncate(limit);
+    Ok(ranked)
 }
 
 /// How many families the Reading rule (`unfit_for_reading`) removes from the candidate list:
@@ -1190,15 +1311,21 @@ mod tests {
             println!("   WORKHORSE: {}  google rank: {:?}  recommended: {}", w.is, rank, crate::recommendations::for_family(name).is_some());
             println!("   passed: {} | failed: {} | unknown: {}", w.passed.join(", "), w.failed.join(", "), w.unknown.join(", "));
         }
-        for key in ["agrandir", "ppmuseum", "timelessserif"] {
+        // DISPLAYS="agrandir,ppmuseum" picks the Display faces (normalised names, no spaces).
+        let displays: Vec<String> = std::env::var("DISPLAYS").unwrap_or("agrandir,ppmuseum,timelessserif".into()).split(',').map(|s| s.trim().to_string()).collect();
+        for key in displays.iter().map(String::as_str) {
             let Some(primary) = pick_primary(&all, key, &[]) else { println!("{key}: not installed"); continue };
             let (page, _) = reading_candidates(&conn, &primary.font_id, vec![], vec![], false, 10_000).unwrap();
             let fam = |id: &str| all.iter().find(|f| f.font_id == id).map(|f| f.font_family.clone()).unwrap_or_default();
-            let distinct: Vec<&PairScore> = page.iter().filter(|s| s.pair_type == "contrast" || s.pair_type == "same_family").collect();
+            let distinct: Vec<&PairScore> = page.iter().filter(|s| s.pair_type == "contrast" || s.pair_type == "plain" || s.pair_type == "same_family").collect();
             println!("\nDisplay = {}: {} families in Reading under Any, {} under Distinct (workhorses {} / {})", primary.font_family,
                 page.len(), distinct.len(),
                 page.iter().filter(|s| horses[&fam(&s.font_id)].is).count(),
                 distinct.iter().filter(|s| horses[&fam(&s.font_id)].is).count());
+            if std::env::var("TOP").is_ok() {
+                let top: Vec<String> = distinct.iter().take(60).enumerate().map(|(i, s)| format!("{}.{}{}[{:.0}]", i + 1, fam(&s.font_id), if s.pair_type == "plain" { "*" } else { "" }, s.precise)).collect();
+                println!("   top 60 under Distinct (* = plain): {}", top.join("  "));
+            }
             for name in &names {
                 let pos_any = page.iter().position(|s| fam(&s.font_id) == *name);
                 let pos_dist = distinct.iter().position(|s| fam(&s.font_id) == *name);
@@ -1207,6 +1334,51 @@ mod tests {
                 println!("   {:<16} Any {:<22} Distinct {:<22} type: {}", name, show(pos_any), show(pos_dist), kind);
             }
         }
+    }
+
+    // Either way in, on a DB copy:
+    //   FONTDROP_DB=<copy> TEXTS="timelesssans,ppneuemontreal" cargo test --lib eval_either_way -- --ignored --nocapture
+    // For each Text face: the top Display candidates, and a sample of pairs scored from both directions (the Text list
+    // for Display = A against the Display list for Text = B). Prints the largest disagreement.
+    #[test]
+    #[ignore]
+    fn eval_either_way() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB");
+        let conn = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let all = load_all_fonts(&conn).unwrap();
+        let horses = crate::workhorse::assess_all(&all, &crate::workhorse::popularity(&conn));
+        let fam = |id: &str| all.iter().find(|f| f.font_id == id).map(|f| f.font_family.clone()).unwrap_or_default();
+        let texts: Vec<String> = std::env::var("TEXTS").unwrap_or("timelesssans".into()).split(',').map(|s| s.trim().to_string()).collect();
+        for key in &texts {
+            let Some(text) = pick_primary(&all, key, &[]) else { println!("{key}: not installed"); continue };
+            let list = display_candidates(&conn, &text.font_id, vec![], vec![], 10_000).unwrap();
+            println!("\nText = {}: {} Display candidates", text.font_family, list.len());
+            for (i, s) in list.iter().take(15).enumerate() {
+                println!("  {:>2}. {:<30} {:<9} {:>5.1}  {}", i + 1, fam(&s.font_id), s.pair_type, s.precise, s.reason);
+            }
+        }
+        // Same two files, scored both ways: the engine's score must not care which one is called the primary.
+        // Then the roles: the pair type may differ by direction only through D7 (one is a plain sans over a workhorse sans).
+        let (mut pairs, mut worst, mut type_diff, mut d7, mut unexplained) = (0, 0f32, 0, 0, 0);
+        let mut worst_at = String::new();
+        let basic = |f: &FontData| horses.get(f.font_family.as_str()).map_or(false, is_basic);
+        let horse = |f: &FontData| horses.get(f.font_family.as_str()).map_or(false, |h| h.is);
+        for a in all.iter().step_by(37) {
+            for b in all.iter().step_by(41) {
+                let (Some(ab), Some(ba)) = (score_pair(a, b), score_pair(b, a)) else { continue };
+                pairs += 1;
+                let diff = (ab.precise - ba.precise).abs();
+                if ab.pair_type != ba.pair_type { type_diff += 1; }
+                if diff > worst { worst = diff; worst_at = format!("{} / {}", a.font_id, b.font_id); }
+                let (ra, rb) = (score_roles(a, b, &horses).unwrap(), score_roles(b, a, &horses).unwrap());
+                if ra.pair_type != rb.pair_type || (ra.precise - rb.precise).abs() > 1e-4 {
+                    let explained = (ra.pair_type == "plain" && !basic(a) && horse(b)) || (rb.pair_type == "plain" && !basic(b) && horse(a));
+                    if explained { d7 += 1 } else { unexplained += 1 }
+                }
+            }
+        }
+        println!("\nsymmetry sample: {pairs} file pairs scored both ways; largest score difference {worst:.5} ({worst_at}); pair type differs in {type_diff}");
+        println!("with roles: {d7} pairs differ by direction through D7 (a plain sans over a workhorse sans), {unexplained} differ for any other reason");
     }
 
     // ── Broad benchmark (Google Fonts pairs mined from real sites + books) ──
@@ -1479,5 +1651,251 @@ mod tests {
             s_close.score,
             s_far.score
         );
+    }
+
+    // ── Roles: D7 (basics show up) and the symmetry of the score ───────────
+
+    use std::collections::HashMap;
+
+    /// A family that counts as a workhorse: four weights, a true italic, normal width, text x-height, moderate contrast.
+    fn horse_family(name: &str, skeleton: &str, serif: i32) -> Vec<FontData> {
+        let mk = |file: &str, w: u16, style: &str| {
+            let mut f = font(&format!("{name}-{file}"), name);
+            f.file_name = file.into();
+            f.weight = w;
+            f.style = style.into();
+            f.skeleton = skeleton.into();
+            f.flesh_serif = serif;
+            f.x_height_ratio = Some(0.50);
+            f.cap_height_ratio = Some(0.70);
+            f.advance_ratio = Some(0.62);
+            f.stroke_contrast_ratio = Some(1.5);
+            f
+        };
+        vec![mk("Text-Regular.otf", 400, "normal"), mk("Text-Italic.otf", 400, "italic"), mk("Text-Medium.otf", 500, "normal"),
+             mk("Text-Bold.otf", 700, "normal"), mk("Text-Light.otf", 300, "normal")]
+    }
+
+    /// A quirky headline sans: one weight, no italic (so not a workhorse), with its own x-height and cap height.
+    fn quirky_sans(name: &str, skeleton: &str) -> FontData {
+        let mut f = font(&format!("{name}-Regular"), name);
+        f.skeleton = skeleton.into();
+        f.x_height_ratio = Some(0.45);
+        f.cap_height_ratio = Some(0.66);
+        f.advance_ratio = Some(0.62);
+        f.stroke_contrast_ratio = Some(1.5);
+        f
+    }
+
+    fn horses_of(all: &[FontData]) -> HashMap<String, crate::workhorse::Workhorse> {
+        crate::workhorse::assess_all(all, &HashMap::new())
+    }
+
+    /// `horses_of`, with Google popularity ranks for some families (a widely used face is a basic).
+    fn horses_ranked(all: &[FontData], ranks: &[(&str, u32)]) -> HashMap<String, crate::workhorse::Workhorse> {
+        let pop: HashMap<String, u32> = ranks.iter().map(|(n, r)| (crate::google_list::normalize_family(n), *r)).collect();
+        crate::workhorse::assess_all(all, &pop)
+    }
+
+    fn regular<'a>(all: &'a [FontData], family: &str) -> &'a FontData {
+        all.iter().find(|f| f.font_family == family && f.weight == 400 && f.style == "normal").expect("family in the pool")
+    }
+
+    #[test]
+    fn d7_a_quirky_sans_display_lets_a_workhorse_sans_through_distinct() {
+        let mut all = vec![quirky_sans("Quirk", "dynamic")];
+        all.extend(horse_family("Plain", "rational", 0));
+        let horses = horses_of(&all);
+        assert!(!horses["Quirk"].is && horses["Plain"].is, "fixture: Quirk is not a workhorse, Plain is");
+        let (q, p) = (regular(&all, "Quirk"), regular(&all, "Plain"));
+        let before = score_pair(q, p).unwrap();
+        assert_eq!(before.pair_type, "middle", "the engine alone calls a different-skeleton sans pair the middle");
+        let s = score_roles(q, p, &horses).unwrap();
+        assert_eq!(s.pair_type, "plain");
+        assert!(s.precise > before.precise + 30.0, "scored as a clear difference: {} vs {}", s.precise, before.precise);
+        assert!(s.evidence.iter().any(|e| e.lens == "Plain text face" && e.effect == 1));
+        assert!(!s.evidence.iter().any(|e| e.lens == "The middle"), "no 'too close' warning on a plain pair");
+        assert!(s.reason.starts_with("Plain text face"), "{}", s.reason);
+    }
+
+    #[test]
+    fn d7_same_skeleton_uniform_pair_also_passes() {
+        let mut all = vec![quirky_sans("Quirk", "rational")];
+        all.extend(horse_family("Plain", "rational", 0));
+        let horses = horses_of(&all);
+        let (q, p) = (regular(&all, "Quirk"), regular(&all, "Plain"));
+        assert_eq!(score_pair(q, p).unwrap().pair_type, "uniform");
+        assert_eq!(score_roles(q, p, &horses).unwrap().pair_type, "plain");
+    }
+
+    #[test]
+    fn d7_a_display_that_only_measures_plain_still_has_character() {
+        // Agrandir and PP Museum pass every workhorse signal. Nobody else calls them plain: no Google rank, no guide.
+        let mut all = horse_family("Agrandir-like", "geometric", 0);
+        all.extend(horse_family("Plain", "rational", 0));
+        let horses = horses_of(&all);
+        assert!(horses["Agrandir-like"].is && !is_basic(&horses["Agrandir-like"]));
+        let (d, t) = (regular(&all, "Agrandir-like"), regular(&all, "Plain"));
+        assert_eq!(score_pair(d, t).unwrap().pair_type, "middle");
+        // Same measures as the plain face: that is a near-duplicate and stays out, so shift its proportions.
+        let mut shifted = horse_family("Agrandir-like", "geometric", 0);
+        for f in &mut shifted { f.x_height_ratio = Some(0.47); f.cap_height_ratio = Some(0.67); }
+        shifted.extend(horse_family("Plain", "rational", 0));
+        let horses = horses_of(&shifted);
+        assert_eq!(score_roles(regular(&shifted, "Agrandir-like"), regular(&shifted, "Plain"), &horses).unwrap().pair_type, "plain");
+    }
+
+    #[test]
+    fn d7_a_workhorse_sans_display_does_not() {
+        // A basic: a workhorse that is also widely used.
+        let mut all = horse_family("Basic", "geometric", 0);
+        all.extend(horse_family("Plain", "rational", 0));
+        let horses = horses_ranked(&all, &[("Basic", 12)]);
+        assert!(horses["Basic"].is && horses["Plain"].is && is_basic(&horses["Basic"]));
+        let s = score_roles(regular(&all, "Basic"), regular(&all, "Plain"), &horses).unwrap();
+        assert_eq!(s.pair_type, score_pair(regular(&all, "Basic"), regular(&all, "Plain")).unwrap().pair_type);
+        assert_ne!(s.pair_type, "plain");
+        assert!(!s.evidence.iter().any(|e| e.lens == "Plain text face"));
+    }
+
+    #[test]
+    fn d7_serif_with_sans_still_passes_as_contrast() {
+        let mut all = vec![quirky_sans("Quirk", "dynamic")];
+        all.extend(horse_family("Plain Serif", "dynamic", 1));
+        let horses = horses_of(&all);
+        let s = score_roles(regular(&all, "Quirk"), regular(&all, "Plain Serif"), &horses).unwrap();
+        assert_eq!(s.pair_type, "contrast");
+        assert_eq!(s.precise, score_pair(regular(&all, "Quirk"), regular(&all, "Plain Serif")).unwrap().precise, "not touched");
+        // And the other way round: a serif workhorse Display with a sans Text.
+        let mut all = horse_family("Book Serif", "dynamic", 1);
+        all.extend(horse_family("Plain", "rational", 0));
+        let horses = horses_of(&all);
+        assert_eq!(score_roles(regular(&all, "Book Serif"), regular(&all, "Plain"), &horses).unwrap().pair_type, "contrast");
+    }
+
+    #[test]
+    fn d7_never_a_near_duplicate_or_a_text_face_that_is_not_a_workhorse() {
+        // Same structure, stroke and metrics as the plain face: the engine flags it, D7 leaves it alone.
+        let mut all = horse_family("Plain", "rational", 0);
+        let mut twin = quirky_sans("Twin", "rational");
+        twin.x_height_ratio = Some(0.50);
+        twin.cap_height_ratio = Some(0.70);
+        all.push(twin);
+        let horses = horses_of(&all);
+        let s = score_roles(regular(&all, "Twin"), regular(&all, "Plain"), &horses).unwrap();
+        assert!(s.evidence.iter().any(|e| e.lens == "Near-duplicate"));
+        assert_ne!(s.pair_type, "plain");
+        // A quirky Text face is not a basic: nothing changes.
+        let all = vec![quirky_sans("Quirk", "dynamic"), quirky_sans("Odd", "rational")];
+        let horses = horses_of(&all);
+        assert_ne!(score_roles(&all[0], &all[1], &horses).unwrap().pair_type, "plain");
+    }
+
+    #[test]
+    fn d7_a_plain_sans_lands_with_the_contrast_pairs_in_the_ranking() {
+        let mut all = vec![quirky_sans("Quirk", "dynamic")];
+        all.extend(horse_family("Plain", "rational", 0));
+        for i in 0..5 {
+            all.extend(horse_family(&format!("Book{i}"), "dynamic", 1));
+        }
+        let horses = horses_of(&all);
+        let q = regular(&all, "Quirk");
+        let ranked = rank_scored(&all, &HashSet::new(), |c| score_roles(q, c, &horses));
+        let place = |fam: &str| ranked.iter().position(|s| all.iter().find(|f| f.font_id == s.font_id).unwrap().font_family == fam).unwrap();
+        assert!(place("Plain") < 6, "the plain sans ranks with the serif workhorses, not after them: #{}", place("Plain") + 1);
+    }
+
+    /// A small library with every kind of difference the score reads.
+    fn mixed_pool() -> Vec<FontData> {
+        let mut all = Vec::new();
+        let skeletons = ["dynamic", "geometric", "rational", "unknown"];
+        let widths = ["normal", "condensed", "expanded"];
+        for i in 0..24usize {
+            let mut f = font(&format!("f{i}"), &format!("Fam{i}"));
+            f.skeleton = skeletons[i % 4].into();
+            f.flesh_serif = (i % 3 == 0) as i32;
+            f.flesh_contrast = if i % 5 == 0 { "contrasting" } else { "linear" }.into();
+            f.x_height_ratio = if i % 7 == 6 { None } else { Some(0.40 + (i % 9) as f64 * 0.02) };
+            f.cap_height_ratio = Some(0.62 + (i % 6) as f64 * 0.02);
+            f.width_class = Some(widths[i % 3].into());
+            f.foundry = if i % 4 < 2 { Some("Acme Foundry".into()) } else { None };
+            f.designer = if i % 6 < 2 { Some("A. Person & B. Person".into()) } else if i % 6 == 2 { Some("B. Person".into()) } else { None };
+            f.vendor_id = if i % 8 < 3 { Some("ACME".into()) } else { None };
+            if i % 10 < 2 { f.superfamily_group = Some("Set".into()); f.superfamily_role = Some(format!("r{}", i % 2)); }
+            all.push(f);
+        }
+        all.extend(horse_family("Plain", "rational", 0));
+        all.extend(horse_family("Book", "dynamic", 1));
+        all
+    }
+
+    /// The thing the Display list relies on: the same pair scores the same from either side. Number, type and
+    /// evidence all match; only the order of words in a label may differ.
+    #[test]
+    fn the_pair_score_is_the_same_from_either_side() {
+        let all = mixed_pool();
+        let key = |s: &PairScore| {
+            let mut ev: Vec<(String, i8)> = s.evidence.iter().map(|e| (e.lens.clone(), e.effect)).collect();
+            ev.sort();
+            (s.pair_type.clone(), ev)
+        };
+        let mut checked = 0;
+        for a in &all {
+            for b in &all {
+                let (Some(ab), Some(ba)) = (score_pair(a, b), score_pair(b, a)) else {
+                    assert!(score_pair(a, b).is_none() && score_pair(b, a).is_none(), "skipped one way only: {} / {}", a.font_id, b.font_id);
+                    continue;
+                };
+                assert!((ab.precise - ba.precise).abs() < 1e-4, "{} / {}: {} vs {}", a.font_id, b.font_id, ab.precise, ba.precise);
+                assert_eq!(key(&ab), key(&ba), "{} / {}", a.font_id, b.font_id);
+                checked += 1;
+            }
+        }
+        assert!(checked > 400, "{checked} ordered pairs checked");
+    }
+
+    /// With the roles applied the score may differ by direction in one case only, and on purpose: D7.
+    #[test]
+    fn the_roles_differ_by_direction_only_through_d7() {
+        let mut all = mixed_pool();
+        all.push(quirky_sans("Quirk", "dynamic"));
+        let horses = horses_of(&all);
+        let horse = |f: &FontData| horses[f.font_family.as_str()].is;
+        let basic = |f: &FontData| is_basic(&horses[f.font_family.as_str()]);
+        let mut role_cases = 0;
+        for a in &all {
+            for b in &all {
+                let (Some(ab), Some(ba)) = (score_roles(a, b, &horses), score_roles(b, a, &horses)) else { continue };
+                if (ab.precise - ba.precise).abs() < 1e-4 && ab.pair_type == ba.pair_type { continue; }
+                role_cases += 1;
+                // Display = a, Text = b is plain, or Display = b, Text = a is plain: one of them is a quirky sans over a workhorse sans.
+                let a_over_b = ab.pair_type == "plain" && !basic(a) && horse(b);
+                let b_over_a = ba.pair_type == "plain" && !basic(b) && horse(a);
+                assert!(a_over_b || b_over_a, "{} / {}: {} {} vs {} {}", a.font_id, b.font_id, ab.pair_type, ab.precise, ba.pair_type, ba.precise);
+            }
+        }
+        assert!(role_cases > 0, "the pool has quirky sans over plain sans pairs");
+    }
+
+    /// The Display list and the Text list hold one number for a pair: the Text list scores (Display, candidate),
+    /// the Display list scores (candidate, Text), and for (A as Display, B as Text) both are `score_roles(A, B)`.
+    #[test]
+    fn display_list_and_text_list_agree_on_a_pair() {
+        let mut all = mixed_pool();
+        all.push(quirky_sans("Quirk", "dynamic"));
+        let horses = horses_of(&all);
+        let none = HashSet::new();
+        for (da, tb) in [("Quirk", "Plain"), ("Quirk", "Book"), ("Fam3", "Plain"), ("Plain", "Fam4"), ("Fam9", "Fam12")] {
+            let (a, b) = (regular(&all, da), regular(&all, tb));
+            // Text list for Display = A: the entry for B's family.
+            let text_list = rank_scored(&all, &none, |c| score_roles(a, c, &horses));
+            let in_text = text_list.iter().find(|s| all.iter().find(|f| f.font_id == s.font_id).unwrap().font_family == tb);
+            // Display list for Text = B: the entry for A's family.
+            let display_list = rank_scored(&all, &none, |c| score_roles(c, b, &horses).map(|mut s| { s.font_id = c.font_id.clone(); s }));
+            let in_display = display_list.iter().find(|s| all.iter().find(|f| f.font_id == s.font_id).unwrap().font_family == da);
+            let (t, d) = (in_text.expect("B in A's Text list"), in_display.expect("A in B's Display list"));
+            assert!((t.precise - d.precise).abs() < 1e-4, "{da} over {tb}: Text list {} vs Display list {}", t.precise, d.precise);
+            assert_eq!(t.pair_type, d.pair_type, "{da} over {tb}");
+        }
     }
 }
