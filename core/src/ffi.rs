@@ -72,6 +72,21 @@ pub struct FontFile {
     pub style_name: String,
 }
 
+/// How far the startup scan has got. `fraction` runs 0 to 1. `files` and `families` are what the scan found on disk.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ScanProgress {
+    pub fraction: f64,
+    pub files: u32,
+    pub families: u32,
+}
+
+/// Read while `Library::refresh_library` runs on another thread. Safe at any time; zeros when no scan has run.
+#[uniffi::export]
+pub fn scan_progress() -> ScanProgress {
+    let s = crate::progress::snapshot();
+    ScanProgress { fraction: s.fraction(), files: s.files, families: s.families }
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct ReadingFamily {
     pub font_id: String,

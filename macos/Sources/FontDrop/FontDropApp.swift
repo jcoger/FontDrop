@@ -39,8 +39,12 @@ struct FontDropApp: App {
                 }
             }
             CommandGroup(after: .sidebar) {
-                Button("Show or hide inspector") { model.inspectorTouched = true; model.showInspector.toggle() }
-                    .keyboardShortcut("i", modifiers: [.command, .option])
+                Button(model.showSidebar ? Lexicon.hideSidebar : Lexicon.showSidebar) { model.showSidebar.toggle() }
+                    .keyboardShortcut("s", modifiers: [.command, .control])
+                Button(model.showInspector ? Lexicon.hideInspector : Lexicon.showInspector) {
+                    model.inspectorTouched = true; model.showInspector.toggle()
+                }
+                .keyboardShortcut("i", modifiers: [.command, .option])
             }
             CommandMenu(Lexicon.typeMenu) {
                 ForEach(["display", "reading"], id: \.self) { job in

@@ -79,6 +79,11 @@ struct Theme {
     // Red has one job: a live value.
     let signal: RGBA
     let signalGlow: [(radius: CGFloat, opacity: Double)]
+    /// While a hand is on the dial: brighter and wider. Light keeps one tight halo.
+    let signalGlowTurning: [(radius: CGFloat, opacity: Double)]
+
+    // The dial.
+    let dialArc: RGBA, dialStop: RGBA
 
     // Slider.
     let sliderTrack: RGBA, sliderFill: RGBA, sliderThumb: RGBA
@@ -104,6 +109,8 @@ struct Theme {
         onPrimaryButton: RGBA(0x161615),
         signal: RGBA(0xE5341D),
         signalGlow: [(2, 0.90), (7, 0.45)],
+        signalGlowTurning: [(3, 0.95), (10, 0.55)],
+        dialArc: RGBA(0x3A3A37), dialStop: RGBA(0x77756F),
         sliderTrack: RGBA(0x2B2B29), sliderFill: RGBA(0xEDEBE5), sliderThumb: RGBA(0xEDEBE5),
         rulerTick: RGBA(0x5E5C57),
         grainOpacity: 0.07)
@@ -126,6 +133,8 @@ struct Theme {
         onPrimaryButton: RGBA(0xFFFFFF),
         signal: RGBA(0xE5341D),
         signalGlow: [(1.5, 0.60)],
+        signalGlowTurning: [(2.5, 0.70)],
+        dialArc: RGBA(0xC4C2BC), dialStop: RGBA(0x8F8D87),
         sliderTrack: RGBA(0xDEDEDB), sliderFill: RGBA(0x1D1D1F), sliderThumb: RGBA(0xFFFFFF),
         rulerTick: RGBA(0xB8B6B0),
         grainOpacity: 0)
@@ -243,7 +252,7 @@ struct LabelStyle10: ViewModifier {
 }
 
 extension View {
-    func moduleLabel() -> some View { modifier(LabelStyle10()) }
+    func moduleLabel(color: KeyPath<Theme, RGBA> = \.textSecondary) -> some View { modifier(LabelStyle10(color: color)) }
 }
 
 // MARK: - Surfaces
@@ -259,6 +268,7 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
         let shadows = bar ? theme.barShadow : theme.panelShadow
         content
             .background(shape.fill(theme[keyPath: fill].color))
+            .background { SystemGlass(shape: shape) }
             .overlay(
                 shape.strokeBorder(theme.rimRing.color, lineWidth: 1)
             )
@@ -270,6 +280,19 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
             )
             .compositingGroup()
             .modifier(ShadowStack(shadows: shadows))
+    }
+}
+
+/// The system's own glass under the token fill: Liquid Glass on macOS 26, the thin material before it.
+/// The token rim and fill sit on top, so the look stays the spec's and the material only adds depth.
+private struct SystemGlass<S: InsettableShape>: View {
+    let shape: S
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            Color.clear.glassEffect(.regular, in: shape)
+        } else {
+            shape.fill(.ultraThinMaterial)
+        }
     }
 }
 
@@ -410,12 +433,13 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct GlassButtonStyle: ButtonStyle {
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var enabled
+    var large = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .regular))
+            .font(.system(size: large ? 14 : 13, weight: large ? .medium : .regular))
             .foregroundStyle(theme.textPrimary.color)
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(.horizontal, large ? 22 : 14).padding(.vertical, large ? 11 : 8)
             .background(Capsule().fill(theme.controlGround.color.opacity(configuration.isPressed ? 0.6 : 1)))
             .opacity(enabled ? 1 : 0.4)
             .contentShape(Capsule())

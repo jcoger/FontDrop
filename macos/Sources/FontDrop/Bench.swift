@@ -122,6 +122,30 @@ func captureSize() -> NSSize {
 ///   FD_LOCK=1 (environment)    lock the scale: every size is body x ratio^step instead of fitted to the font. Not an argument: `--lock` stalls the app at launch
 ///   --pick-reading <family>    choose this family for Reading (in the DB copy)
 ///   --clear <job>              clear the Display or Reading face (in the DB copy)
+/// --body-size, --ratio and FD_LOCK for the brand's scale. `family` is the Text face the lock starts from
+/// (the selected candidate on Text, the chosen face on Set).
+@MainActor
+func applyScaleFlags(_ model: AppModel, family: (name: String, path: String)?) {
+    let args = CommandLine.arguments
+    func value(_ flag: String) -> String? {
+        if let i = args.firstIndex(of: flag), i + 1 < args.count { return args[i + 1] }
+        return ProcessInfo.processInfo.environment["FD_" + flag.dropFirst(2).uppercased().replacingOccurrences(of: "-", with: "_")]
+    }
+    let body = value("--body-size").flatMap(Double.init)
+    let ratio = value("--ratio").flatMap(Double.init)
+    // Environment only: an argument spelled --lock stalls the app at launch (before any of our code runs).
+    let lock = ProcessInfo.processInfo.environment["FD_LOCK"] != nil
+    guard body != nil || ratio != nil || lock else { return }
+    if lock, body == nil, ratio == nil, let family {
+        model.lockScale(reading: family.name, fallbackPath: family.path)      // starts from what Fit gives, as the switch does
+    }
+    model.updateScale {
+        if let body { $0.body = body }
+        if let ratio { $0.ratio = TypeScale.nearestRatio(ratio) }
+        if lock { $0.locked = true }
+    }
+}
+
 @MainActor
 func applyReadingFlags(_ model: AppModel) async {
     let args = CommandLine.arguments
@@ -145,20 +169,7 @@ func applyReadingFlags(_ model: AppModel) async {
             $0.trim = min(max(trim, TypeSettings.trimRange.lowerBound), TypeSettings.trimRange.upperBound)
         }
     }
-    let body = value("--body-size").flatMap(Double.init)
-    let ratio = value("--ratio").flatMap(Double.init)
-    // Environment only: an argument spelled --lock stalls the app at launch (before any of our code runs).
-    let lock = ProcessInfo.processInfo.environment["FD_LOCK"] != nil
-    if body != nil || ratio != nil || lock {
-        if lock, body == nil, ratio == nil, let c = model.candidate(model.selectedCandidate) {
-            model.lockScale(reading: c.family, fallbackPath: c.filePath)      // starts from what Fit gives, as the switch does
-        }
-        model.updateScale {
-            if let body { $0.body = body }
-            if let ratio { $0.ratio = TypeScale.nearestRatio(ratio) }
-            if lock { $0.locked = true }
-        }
-    }
+    applyScaleFlags(model, family: model.candidate(model.selectedCandidate).map { ($0.family, $0.filePath) })
     if let z = value("--zoom").flatMap(Double.init) { while model.stageZoom.factor < z - 0.01 && model.stageZoom.canZoomIn { model.stageZoom.zoomIn() } }
     if args.contains("--compare") || value("--compare") != nil { model.compareMode = true }
 }
@@ -194,6 +205,9 @@ enum ScreenshotRunner {
             await applyReadingFlags(model)
         } else {
             model.selectedFamily = model.options.select ?? model.chosen(model.screen) ?? model.visibleFamilies.first?.name
+            if model.screen == .set, let r = model.readingFamily {
+                applyScaleFlags(model, family: (r.name, r.filePath))
+            }
         }
         if model.options.bgRefresh {
             // FD_BG_REFRESH=1 runs the real background rescan. FD_BG_REFRESH_AT=<s> captures that many seconds
@@ -266,6 +280,9 @@ enum Bench {
 
     static func runIfRequested(model: AppModel) async {
         guard model.options.bench else { return }
+        // A test host counts as a bench for isolation, but it must not run the measurement: the bench quits the app
+        // when it ends, and that would pull the host out from under the tests that are still running.
+        guard !LaunchOptions.isTestHost(ProcessInfo.processInfo.environment) else { return }
         while !model.fontsReady {
             if case .failed(let m) = model.phase { log("failed: \(m)"); NSApp.terminate(nil); return }
             try? await Task.sleep(for: .milliseconds(100))
