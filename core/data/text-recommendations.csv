@@ -1,0 +1,79 @@
+# Typefaces that published type guides recommend for body text.
+#
+# Every row was checked against the live page on 2026-11-04. A family that could not be confirmed on its page is not here.
+# Short quotes and section titles are quoted from the pages (under 15 words each); the pages belong to their authors:
+#   Typewolf (typewolf.com): "Top 10 Favorite Body Text Fonts" and "Top 40 Google Fonts", where an asterisk marks body text friendly.
+#   Butterick's Practical Typography (practicaltypography.com): the font pages ("available for body text in this book")
+#     and the system fonts page, where a star marks fonts plausible for body text (the A list, "Generally tolerable").
+# Not used: Better Web Typography, Google Fonts Knowledge and foundry pages named no family for text, or could not be read.
+#
+# Columns: family, source (publisher), url, quote, role. The role is always "body".
+# Read by core/src/recommendations.rs. To add a row, fetch the page first and keep the quote short.
+family,source,url,quote,role
+Electra,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Minion,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Sabon,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Calluna,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Neue Haas Unica,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Tiempos Text,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Freight Text,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Plantin,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Baskerville,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+Acumin,Typewolf,https://www.typewolf.com/top-10-body-text-fonts,Top 10 Favorite Body Text Fonts,body
+DM Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Inter,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Space Mono,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Work Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Libre Franklin,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Fira Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Alegreya Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Alegreya,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Source Sans Pro,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Source Serif Pro,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Roboto,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Fraunces,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Poppins,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Archivo Narrow,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Libre Baskerville,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Karla,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Lora,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Proza Libre,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Spectral,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+IBM Plex Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Lato,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+PT Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+PT Serif,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Cardo,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Chivo,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Neuton,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Rubik,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Open Sans,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Raleway,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Merriweather,Typewolf,https://www.typewolf.com/google-fonts,An asterisk indicates the family is body text friendly.,body
+Equity,Butterick's Practical Typography,https://practicaltypography.com/equity.html,one of the fonts available for body text in this book,body
+Valkyrie,Butterick's Practical Typography,https://practicaltypography.com/valkyrie.html,one of the fonts available for body text in this book,body
+Century Supra,Butterick's Practical Typography,https://practicaltypography.com/century-supra.html,one of the fonts available for body text in this book,body
+Concourse,Butterick's Practical Typography,https://practicaltypography.com/concourse.html,one of the fonts available for body text in this book,body
+Heliotrope,Butterick's Practical Typography,https://practicaltypography.com/heliotrope.html,one of the fonts available for body text in this book,body
+Charter,Butterick's Practical Typography,https://practicaltypography.com/charter.html,designed as a body text font,body
+Athelas,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Avenir,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Bell MT,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Book Antiqua,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Californian FB,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Calisto MT,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Century Schoolbook,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Charter,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Franklin Gothic,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Garamond,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Gill Sans,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Gill Sans MT,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Goudy Old Style,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Helvetica,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Helvetica Neue,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Hoefler Text,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Iowan Old Style,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Optima,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Palatino,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Seravek,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body
+Sitka,Butterick's Practical Typography,https://practicaltypography.com/system-fonts.html,Fonts plausible for body text are marked with a star. (A list: generally tolerable),body

@@ -63,7 +63,7 @@ fn has_word(text: &str, list: &[&str]) -> bool {
 }
 
 /// The assessment of one family from all its files. `popularity` is Google's rank for it, when Google lists it.
-pub fn assess(files: &[&FontData], popularity: Option<u32>) -> Workhorse {
+pub fn assess(files: &[&FontData], popularity: Option<u32>, recommended: bool) -> Workhorse {
     let mut passed: Vec<&'static str> = Vec::new();
     let mut failed: Vec<&'static str> = Vec::new();
     let mut unknown: Vec<&'static str> = Vec::new();
@@ -132,10 +132,16 @@ pub fn assess(files: &[&FontData], popularity: Option<u32>) -> Workhorse {
     put(x_height, "text x-height");
     put(contrast, "moderate contrast");
     put(Some(widely_used), "widely used");
+    put(Some(recommended), "recommended for text");
 
     let core = width == Some(true) && not_display && x_height == Some(true) && contrast == Some(true);
     let lifted = widely_used && weights.len() >= 2 && italic;
-    Workhorse { is: core && (text_family || lifted), passed, failed, unknown }
+    // A face the published guides recommend for body text is a dependable text face even when a measured signal could
+    // not be read. It is not one when a measurement says otherwise: a recommended face that measures condensed, or
+    // far too contrasty, stays out. The weights and italics are not asked of it.
+    let measured_against = width == Some(false) || !not_display || x_height == Some(false) || contrast == Some(false);
+    let endorsed = recommended && !measured_against;
+    Workhorse { is: (core && (text_family || lifted)) || endorsed, passed, failed, unknown }
 }
 
 /// Google's popularity rank by normalised family name. Empty when the list was never fetched.
@@ -161,7 +167,7 @@ pub fn assess_all(all: &[FontData], popularity: &HashMap<String, u32>) -> HashMa
         .into_iter()
         .map(|(family, files)| {
             let rank = popularity.get(&crate::google_list::normalize_family(family)).copied();
-            (family.to_string(), assess(&files, rank))
+            (family.to_string(), assess(&files, rank, crate::recommendations::for_family(family).is_some()))
         })
         .collect()
 }
@@ -214,7 +220,12 @@ mod tests {
 
     fn assess_owned(files: &[FontData], rank: Option<u32>) -> Workhorse {
         let refs: Vec<&FontData> = files.iter().collect();
-        assess(&refs, rank)
+        assess(&refs, rank, false)
+    }
+
+    fn assess_recommended(files: &[FontData]) -> Workhorse {
+        let refs: Vec<&FontData> = files.iter().collect();
+        assess(&refs, None, true)
     }
 
     #[test]
@@ -292,6 +303,32 @@ mod tests {
         assert!(!at(0.80, 1.2).is, "an extended face (0.80) is not");
         assert!(!at(0.54, 1.2).is, "0.54 is narrower than a quarter of the library");
         assert!(at(0.56, 1.2).is && at(0.72, 1.2).is, "the band includes its ends");
+    }
+
+    /// Recommended by the guides: unknown signals are forgiven, a failed measurement is not.
+    #[test]
+    fn a_recommended_face_is_forgiven_an_unread_signal_but_not_a_failed_one() {
+        // Never measured, a single file: not a workhorse on its own, a workhorse with the guides' word.
+        let make = || {
+            let mut f = file("Acme Book", "Book-Regular.otf", 400, "normal");
+            f.stroke_contrast_ratio = None;
+            f.advance_ratio = None;
+            vec![f]
+        };
+        let one = make();
+        assert!(!assess_owned(&one, None).is);
+        let w = assess_recommended(&one);
+        assert!(w.is, "{w:?}");
+        assert!(w.passed.contains(&"recommended for text") && w.unknown.contains(&"moderate contrast"));
+        // A measurement that fails keeps it out: condensed, high contrast, a display cut.
+        let mut narrow = make();
+        narrow[0].advance_ratio = Some(0.36);
+        assert!(!assess_recommended(&narrow).is, "measures condensed");
+        let mut contrasty = make();
+        contrasty[0].stroke_contrast_ratio = Some(7.0);
+        assert!(!assess_recommended(&contrasty).is, "measures high contrast");
+        let display = vec![file("Acme Display", "Display-Regular.otf", 400, "normal")];
+        assert!(!assess_recommended(&display).is, "named a display cut");
     }
 
     #[test]
