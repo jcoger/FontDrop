@@ -588,3 +588,25 @@ The Set screen shows the pair at every step of the scale. Its inspector gains 02
 ### Gates for section 22
 
 C pass (no em dashes)
+
+## 23. Export (R6, 2026-11-05)
+
+Export lives in File > Export, in a bar over the Set stage and in the Set inspector's foot. Five actions, one confirmation line. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 23.1 | export.menu | **Export** | The word is Export, never Hand off (IA decision 6). Bar pill, File submenu and the label over the inspector foot |
+| 23.2 | export.items | **Copy CSS** · **Copy Tailwind** · **Copy for Paper** · **Spec page…** · **Copy license list** | File menu shortcuts: Shift-Command C, T, P, S, L |
+| 23.3 | export.needsFaces | **Pick a Display and a Text face to export** | The one reason the items are off. Shown in the inspector foot and as hover on the bar pill. The items are never hidden |
+| 23.4 | export.notice | **CSS copied** · **Tailwind copied** · **Paper tokens copied** · **License list copied** · **Spec page saved** · **Could not save the spec page** | A line in the Set bar for about two seconds. No modal. Also announced to VoiceOver |
+| 23.5 | export.help | **Custom properties, font rules and one class per step, as CSS** · **A Tailwind v4 @theme block: fonts, sizes, line heights and tracking** · **The same tokens, titled for Paper** · **One page with both faces, the scale, the tuning, your colors and the licenses, as PDF and PNG** · **Each face with its foundry and link. Trials say License before you ship.** | Hover on each action |
+| 23.6 | export.savePanel | File name **Acme type spec** · **Saves the spec as a PDF and a PNG with the same name.** | One panel, two files |
+| 23.7 | export.license.flags | **License before you ship** (trial) · **Open license (Google Fonts)** · **Check the foundry's terms for web and app use** (everything else) | A trial always says license first, even when its name is in Google's list |
+| 23.8 | export.license.missing | **Foundry not named in the font file** · **No link in the font file** | When the font carries no foundry name or link |
+| 23.9 | export.spec.sections | **Type pair spec** · **Scale** · **Tuning** · **Colors** · **Sample** · **Licenses** · **Sizes are real points. A point is one CSS px.** | Spec page. Colors only when the brand has set them |
+| 23.10 | export.spec.tuning | **Body 18 pt · ratio 1.196** · **Measure 66 characters · line height 1.45** · **Display: trim 1.00 · tracking 6.6% · optical size Auto** | One line each |
+| 23.11 | set.row.face | **Agrandir · Grand Heavy** | The face line of each Set row now names the style it draws |
+
+### Gates for section 23
+
+C pass (no em dashes) · R pass

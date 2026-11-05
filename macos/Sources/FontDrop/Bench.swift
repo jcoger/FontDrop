@@ -250,6 +250,9 @@ enum ScreenshotRunner {
             model.selectedFamily = family
             await model.choose("display", family: family)
         }
+        if let note = args.firstIndex(of: "--demo-notice").flatMap({ $0 + 1 < args.count ? args[$0 + 1] : nil }) ?? env["FD_DEMO_NOTICE"] {
+            model.exportNotice = note        // set directly, so it stays up for the capture
+        }
         try? await Task.sleep(for: .seconds(3))
         NSApp.windows.first(where: { $0.isVisible })?.makeKeyAndOrderFront(nil)
         NSApp.activate()
@@ -438,5 +441,40 @@ enum Bench {
                           dts.count, nominal, p(0.5), p(0.95), p(0.99), s.last! * 1000,
                           late, Double(late) / Double(dts.count) * 100, severe, min(y, distance), distance)
         }
+    }
+}
+
+
+/// `--export-dir <dir>` writes every export for the brand's pair into the folder and quits: pair.css, pair.tailwind.css,
+/// pair.paper.css, licenses.txt, spec.pdf and spec.png. No panel, no pasteboard. The render check and the spec page
+/// samples come from here. (Also FD_EXPORT_DIR.)
+@MainActor
+enum ExportRunner {
+    static func runIfRequested(model: AppModel) async {
+        let args = CommandLine.arguments
+        let dir = args.firstIndex(of: "--export-dir").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
+            ?? ProcessInfo.processInfo.environment["FD_EXPORT_DIR"]
+        guard let dir else { return }
+        while !model.fontsReady {
+            if case .failed(let m) = model.phase { print("EXPORT failed: \(m)"); NSApp.terminate(nil); return }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let base = URL(fileURLWithPath: dir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        guard let spec = await ExportSpec.make(model: model), let d = model.displayFamily, let r = model.readingFamily else {
+            print("EXPORT failed: \(Lexicon.Export.needsFaces)"); NSApp.terminate(nil); return
+        }
+        do {
+            try Exporters.css(spec).write(to: base.appendingPathComponent("pair.css"), atomically: true, encoding: .utf8)
+            try Exporters.theme(spec).write(to: base.appendingPathComponent("pair.tailwind.css"), atomically: true, encoding: .utf8)
+            try Exporters.theme(spec, paper: true).write(to: base.appendingPathComponent("pair.paper.css"), atomically: true, encoding: .utf8)
+            try Exporters.licenses(spec).write(to: base.appendingPathComponent("licenses.txt"), atomically: true, encoding: .utf8)
+            let out = try SpecPage.write(spec: spec, displayFace: model.face("display", d), textFace: model.face("reading", r),
+                                         base: base.appendingPathComponent("spec"))
+            print("EXPORT wrote \(out.pdf.path) \(out.png.path)")
+        } catch {
+            print("EXPORT failed: \(error)")
+        }
+        NSApp.terminate(nil)
     }
 }

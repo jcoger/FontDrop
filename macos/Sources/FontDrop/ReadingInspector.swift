@@ -245,8 +245,47 @@ struct SetInspector: View {
                     Text(Lexicon.Scale.needsText).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
                         .padding(.top, 24)
                 }
+                ExportFoot()
             }
             .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
+        }
+    }
+}
+
+/// The foot of the Set inspector: Export as five plain actions, or the one reason they are off.
+struct ExportFoot: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Rectangle().fill(theme.sliderTrack.color).frame(height: 1)
+            Text(Lexicon.Export.menu).moduleLabel()
+            if let reason = model.exportReason {
+                Text(reason).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
+            }
+            row([(Lexicon.Export.copyCSS, Lexicon.Export.helpCSS, { model.copyExport(.css) }),
+                 (Lexicon.Export.copyTailwind, Lexicon.Export.helpTailwind, { model.copyExport(.tailwind) })])
+            row([(Lexicon.Export.copyPaper, Lexicon.Export.helpPaper, { model.copyExport(.paper) }),
+                 (Lexicon.Export.specPage, Lexicon.Export.helpSpec, { model.saveSpecPage() })])
+            row([(Lexicon.Export.copyLicenses, Lexicon.Export.helpLicenses, { model.copyExport(.licenses) })])
+        }
+        .padding(.top, 26)
+        .opacity(model.canExport ? 1 : 0.55)
+    }
+
+    private func row(_ items: [(String, String, () -> Void)]) -> some View {
+        HStack(spacing: 8) {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                Button(action: item.2) {
+                    Text(item.0).font(.system(size: 12)).foregroundStyle(theme.textPrimary.color).lineLimit(1)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .pill()
+                }
+                .buttonStyle(.plain).disabled(!model.canExport)
+                .help(item.1)
+            }
+            Spacer(minLength: 0)
         }
     }
 }

@@ -54,6 +54,7 @@ struct RootView: View {
         .task { await model.bootstrap() }
         .task { await ScreenshotRunner.runIfRequested(model: model) }
         .task { await Bench.runIfRequested(model: model) }
+        .task { await ExportRunner.runIfRequested(model: model) }
     }
 
     @ViewBuilder

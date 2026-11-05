@@ -29,6 +29,7 @@ struct SetView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.stage.color)
+        .overlay(alignment: .top) { SetBar() }
         // The saved style (a heavy cut, say) may not be loaded yet. Without its file the text draws invisibly.
         .task(id: "\(model.displayFamily?.name ?? "")/\(model.readingFamily?.name ?? "")") {
             await model.preloadStyles(of: [model.displayFamily?.name, model.readingFamily?.name].compactMap { $0 })
@@ -182,5 +183,43 @@ struct SetRowPlan {
         // A little under the full width: the widest line must not touch the edge.
         let f = fit(room: specWidth * 0.98, width: { lineWidth(at: $0) })
         return SetRowPlan(leading: TextRules.headingLeading(step: step.rawValue), factor: f, drawnPt: pt * f, drawnWidth: nil)
+    }
+}
+
+/// The bar over the Set stage: the Export menu, a line that says what an export did, and the inspector toggle.
+struct SetBar: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Spacer(minLength: 8)
+            if let note = model.exportNotice {
+                Text(note).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    .foregroundStyle(theme.textPrimary.color)
+                    .padding(.horizontal, 14).frame(height: 36)
+                    .glass(\.glassBar, in: Capsule(), bar: true)
+                    .transition(.opacity)
+                    .accessibilityLabel(note)
+            }
+            Menu {
+                ExportMenuItems()
+            } label: {
+                HStack(spacing: 6) {
+                    Text(Lexicon.Export.menu).font(.system(size: 13)).foregroundStyle(theme.textPrimary.color)
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+                }
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .padding(.horizontal, 14).frame(height: 36)
+            .glass(\.glassBar, in: Capsule(), bar: true)
+            .disabled(!model.canExport)
+            .help(model.exportReason ?? Lexicon.Export.menu)
+            .accessibilityLabel(Lexicon.Export.menu)
+            InspectorToggle()
+        }
+        .padding(.horizontal, 16).padding(.top, 16)
+        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeOut(duration: 0.15), value: model.exportNotice)
     }
 }

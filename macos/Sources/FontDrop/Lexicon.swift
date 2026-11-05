@@ -677,6 +677,51 @@ enum Lexicon {
         static let noOpticalOrStyle = "No optical size or style axis. Weight and width are under Style on the Text screen."
     }
 
+    /// Round R6: Export (lexicon section 23). Plain words, no em dashes.
+    enum Export {
+        static let menu = "Export"
+        static let copyCSS = "Copy CSS"
+        static let copyTailwind = "Copy Tailwind"
+        static let copyPaper = "Copy for Paper"
+        static let specPage = "Spec page\u{2026}"
+        static let copyLicenses = "Copy license list"
+        static let needsFaces = "Pick a Display and a Text face to export"
+        static let cssCopied = "CSS copied"
+        static let tailwindCopied = "Tailwind copied"
+        static let paperCopied = "Paper tokens copied"
+        static let licensesCopied = "License list copied"
+        static let specSaved = "Spec page saved"
+        static let specFailed = "Could not save the spec page"
+        static let savePanelMessage = "Saves the spec as a PDF and a PNG with the same name."
+        static func defaultFileName(_ brand: String) -> String { "\(brand) type spec" }
+        static let helpCSS = "Custom properties, font rules and one class per step, as CSS"
+        static let helpTailwind = "A Tailwind v4 @theme block: fonts, sizes, line heights and tracking"
+        static let helpPaper = "The same tokens, titled for Paper"
+        static let helpSpec = "One page with both faces, the scale, the tuning, your colors and the licenses, as PDF and PNG"
+        static let helpLicenses = "Each face with its foundry and link. Trials say License before you ship."
+
+        static let specKicker = "Type pair spec"
+        static func specSubtitle(display: String, text: String) -> String { "\(display) with \(text)" }
+        static let scaleTitle = "Scale"
+        static let scaleNote = "Sizes are real points. A point is one CSS px."
+        static let tuningTitle = "Tuning"
+        static let colorsTitle = "Colors"
+        static let sampleTitle = "Sample"
+        static let licenseTitle = "Licenses"
+        static let noFoundry = "Foundry not named in the font file"
+        static let noLink = "No link in the font file"
+        static let colorBackground = "Background"
+        static let colorText = "Text"
+        static let colorAccent = "Accent"
+        static func scaleLine(body: Double, ratio: Double) -> String { "Body \(Int(body.rounded())) pt \u{00B7} ratio \(TypeScale.ratioLabel(ratio))" }
+        static func textLine(measure: Int, lineHeight: Double) -> String { "Measure \(measure) characters \u{00B7} line height " + String(format: "%.2f", lineHeight) }
+        static func faceTuning(role: String, trim: Double, tracking: Double, opticalSize: Double?) -> String {
+            let track = String(format: "%.1f", tracking * 100)
+            let optical = opticalSize.map { "\(Int($0.rounded())) pt" } ?? "Auto"
+            return "\(role): trim " + String(format: "%.2f", trim) + " \u{00B7} tracking \(track)% \u{00B7} optical size \(optical)"
+        }
+    }
+
     enum BrandMenu {
         static let delete = "Delete brand\u{2026}"
         static func confirmTitle(_ name: String) -> String { "Delete \(name)?" }
