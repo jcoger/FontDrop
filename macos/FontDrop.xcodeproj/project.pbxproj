@@ -22,6 +22,7 @@
 		3CC84A4FA94EFC19170C5695 /* SameFamilyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4E2EF4D0A0D90BD4D091EA /* SameFamilyTests.swift */; };
 		3D749A54877DC25E4FB4E0AA /* HeroStatement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01C9D68F2CF6B7BFB655E1D /* HeroStatement.swift */; };
 		3E7B8F2951D70A880CED4739 /* PosterReadout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294AFE450D755F0F5CB7669A /* PosterReadout.swift */; };
+		4116874B2B6CFE70A59D5BB8 /* PosterFitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08AFBD8BF385333288AEDE8 /* PosterFitTests.swift */; };
 		43FED4DEA46C9DF6368F11EB /* FontDropCore in Frameworks */ = {isa = PBXBuildFile; productRef = 295C722A69BA7B3CEFA2757F /* FontDropCore */; };
 		488A20D66A2AF6C28185B587 /* Bench.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A800DE57A154D964A780F27 /* Bench.swift */; };
 		4A2C61B950C635A4BFF5C8BC /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE7A979ECF90F6A4E70E4C23 /* SidebarView.swift */; };
@@ -46,6 +47,7 @@
 		A3DBFA936E8FE6AD78B4969A /* ColorsPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */; };
 		A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF45315ED86D1A62A42E9D5D /* DisplayView.swift */; };
 		A852010CD99968F953D52A1D /* TemplatePalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A70A5AEF9AB9A8B3AD2F94 /* TemplatePalette.swift */; };
+		AB5434D3B830C6E2B1CAF0FE /* LaunchPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */; };
 		B2EC8EFC5EF12BC52FCD9004 /* ColorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1392F04AD1B9B11E2372CB55 /* ColorMath.swift */; };
 		BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366C8EEFF62B64D9A353D0A3 /* Components.swift */; };
 		C39BD445A03AC2AC55850378 /* AppUITemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1EF282224F001EA5646D3C /* AppUITemplate.swift */; };
@@ -119,9 +121,11 @@
 		AC4E2EF4D0A0D90BD4D091EA /* SameFamilyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SameFamilyTests.swift; sourceTree = "<group>"; };
 		AECE4DEC6DEDB1520296A144 /* ReadingInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingInspector.swift; sourceTree = "<group>"; };
 		AF45315ED86D1A62A42E9D5D /* DisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayView.swift; sourceTree = "<group>"; };
+		B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchPathTests.swift; sourceTree = "<group>"; };
 		B57030ADD61FE303D2F09BD5 /* PosterSpecimen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSpecimen.swift; sourceTree = "<group>"; };
 		B7FBF5567DA13C4003CE4BDA /* Copy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Copy.swift; sourceTree = "<group>"; };
 		C732E56B7B9C84CC59264D58 /* PosterEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterEvent.swift; sourceTree = "<group>"; };
+		D08AFBD8BF385333288AEDE8 /* PosterFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterFitTests.swift; sourceTree = "<group>"; };
 		D523C8ECB26B3F1DC554339D /* PosterTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTemplate.swift; sourceTree = "<group>"; };
 		D7AFB737F07FE18ACCE826C0 /* AppDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDashboard.swift; sourceTree = "<group>"; };
 		D8A70A5AEF9AB9A8B3AD2F94 /* TemplatePalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatePalette.swift; sourceTree = "<group>"; };
@@ -169,7 +173,9 @@
 				87B370D95E47FCF4D5DE05C8 /* ColorMathTests.swift */,
 				382020E250E4336580BD7B20 /* FinderTests.swift */,
 				7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */,
+				B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */,
 				0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */,
+				D08AFBD8BF385333288AEDE8 /* PosterFitTests.swift */,
 				6046E775A350959D59C8B1AC /* ReadingStageTests.swift */,
 				94A986121FCC102B0FA12D9B /* RescanAndClearTests.swift */,
 				AC4E2EF4D0A0D90BD4D091EA /* SameFamilyTests.swift */,
@@ -417,7 +423,9 @@
 				902B4624A75B8BACE7E8005E /* ColorMathTests.swift in Sources */,
 				858AF1009D078B080B14624C /* FinderTests.swift in Sources */,
 				119C0B28D1FCE012A42E1843 /* FlowTests.swift in Sources */,
+				AB5434D3B830C6E2B1CAF0FE /* LaunchPathTests.swift in Sources */,
 				1F182ADA6660560FBA4B31A4 /* LensEngineTests.swift in Sources */,
+				4116874B2B6CFE70A59D5BB8 /* PosterFitTests.swift in Sources */,
 				DB5A8E1944294858E657D5CA /* ReadingStageTests.swift in Sources */,
 				FF51E5A10EDFE2B480988E93 /* RescanAndClearTests.swift in Sources */,
 				3CC84A4FA94EFC19170C5695 /* SameFamilyTests.swift in Sources */,

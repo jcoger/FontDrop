@@ -25,7 +25,8 @@ pub struct PairScore {
     /// Unrounded score, used to rank so candidates don't tie.
     #[serde(skip)]
     pub precise: f32,
-    pub pair_type: String, // "harmonious" | "bold" | "conflict" | "uncertain" | "superfamily"
+    /// "contrast" | "uniform" | "middle" | "uncertain" | "superfamily" | "same_family"
+    pub pair_type: String,
     pub reason: String,
     pub evidence: Vec<Evidence>,
     /// Only for `same_family`: the style of that family to set the body text in.
@@ -88,6 +89,10 @@ pub struct FontData {
     /// "normal" | "italic" (from the file's own style flags)
     pub style: String,
     pub is_variable: bool,
+    /// Top of the `wght` axis of a variable file (0 = none, or not read yet).
+    pub wght_axis_max: i64,
+    /// A variable file with an `ital` or `slnt` axis.
+    pub ital_axis: bool,
 }
 
 
@@ -291,7 +296,8 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
                     foundry, designer, file_name,
                     optical_role, superfamily_group, superfamily_role,
                     weight_range_min, weight_range_max, spacing_personality, width_class,
-                    vendor_id, file_path, style, COALESCE(is_variable, 0)
+                    vendor_id, file_path, style, COALESCE(is_variable, 0),
+                    COALESCE(wght_axis_max, 0), COALESCE(ital_axis, 0)
              FROM fonts",
         )
         .map_err(|e| e.to_string())?;
@@ -322,6 +328,8 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
             file_path: row.get(20)?,
             style: row.get(21)?,
             is_variable: row.get::<_, i64>(22)? != 0,
+            wght_axis_max: row.get(23)?,
+            ital_axis: row.get::<_, i64>(24)? != 0,
         })
     })
         .map_err(|e| e.to_string())?
@@ -333,7 +341,7 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-/// `excluded_ids`: fonts the user has hidden. They never take a match slot.
+/// Matches for one font, in buckets. `excluded_ids`: fonts the user has hidden; they never take a match slot.
 /// Browse filters (search, category, Starred) are deliberately NOT applied here:
 /// matches come from the whole visible library, not the left panel's current view.
 pub fn font_pairs(
@@ -363,21 +371,26 @@ pub fn font_pairs(
 /// ship regular, italic, bold and bold italic (Typewolf 18/19/36, Stocks);
 /// never a display cut in a text role (Typewolf 21, Reynolds); condensed and
 /// mono faces fail for long text (Typewolf 22/81, Refactoring UI).
-/// Italic here is "has an italic file", a proxy until true-italic is checked.
+/// Italic here is "has a slanted file" (`names::is_slanted`: italic, oblique, kursiv, slanted),
+/// a proxy until true-italic is checked. A variable file counts for what its axes reach:
+/// a `wght` axis that tops out at 600 or more is a bold, an `ital` or `slnt` axis is an italic.
 pub fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
     #[derive(Default)]
     struct Cover { regular: bool, italic: bool, bold: bool, bold_italic: bool }
     let mut cover: std::collections::HashMap<&str, Cover> = Default::default();
     for f in all {
-        let name = f.file_name.to_lowercase();
-        let italic = name.contains("italic") || name.contains("kursiv");
-        let bold = f.weight >= 600;
+        let slanted = crate::names::is_slanted(&f.file_name, &f.style);
+        let reaches_bold = f.is_variable && f.wght_axis_max >= 600;
+        let has_regular = f.weight < 600 || reaches_bold;
+        let has_bold = f.weight >= 600 || reaches_bold;
+        // Upright, slanted, or both when one variable file carries an italic axis.
+        let slants: &[bool] = if slanted { &[true] } else if f.is_variable && f.ital_axis { &[false, true] } else { &[false] };
         let c = cover.entry(f.font_family.as_str()).or_default();
-        match (italic, bold) {
-            (false, false) => c.regular = true,
-            (true, false) => c.italic = true,
-            (false, true) => c.bold = true,
-            (true, true) => c.bold_italic = true,
+        for &italic in slants {
+            match italic {
+                false => { c.regular |= has_regular; c.bold |= has_bold; }
+                true => { c.italic |= has_regular; c.bold_italic |= has_bold; }
+            }
         }
     }
     all.iter()
@@ -432,6 +445,7 @@ pub fn font_candidates(
     conn: &Connection,
     font_id: &str,
     excluded_ids: Vec<String>,
+    excluded_families: Vec<String>,
     job: Option<&str>,
     limit: usize,
 ) -> Result<Vec<PairScore>, String> {
@@ -442,6 +456,7 @@ pub fn font_candidates(
         .ok_or_else(|| format!("Font {} not found", font_id))?;
     let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
     excluded.extend(crate::finder::hidden_font_ids(conn)); // junk list and the user's hides
+    excluded.extend(ids_of_families(&all, &excluded_families));
     let same_family = crate::same_family::offer(primary, &all, &excluded);
     if job == Some("reading") {
         excluded.extend(unfit_for_reading(&all));
@@ -451,12 +466,13 @@ pub fn font_candidates(
 
 /// How many families the Reading rule (`unfit_for_reading`) removes from the candidate list:
 /// families that would rank without it and do not with it. Same other exclusions as
-/// `font_candidates` (the given ids, hidden families). Counts families, not files, and is
+/// `font_candidates` (the given ids and families, hidden families). Counts families, not files, and is
 /// not capped by the page size, so "N not made for long text" matches what "Show them" adds.
 pub fn unfit_family_count(
     conn: &Connection,
     font_id: &str,
     excluded_ids: Vec<String>,
+    excluded_families: Vec<String>,
 ) -> Result<u32, String> {
     let all = load_all_fonts(conn)?;
     let primary = all
@@ -465,6 +481,7 @@ pub fn unfit_family_count(
         .ok_or_else(|| format!("Font {} not found", font_id))?;
     let mut base: HashSet<String> = excluded_ids.into_iter().collect();
     base.extend(crate::finder::hidden_font_ids(conn));
+    base.extend(ids_of_families(&all, &excluded_families));
     let family_of: std::collections::HashMap<&str, &str> =
         all.iter().map(|f| (f.font_id.as_str(), f.font_family.as_str())).collect();
     let families = |excluded: &HashSet<String>| -> HashSet<String> {
@@ -482,30 +499,51 @@ pub fn unfit_family_count(
 
 /// Reading before a Display face exists: one entry per family, (font_id, family), in library order.
 /// With `only_fit` the long-text rule (`unfit_for_reading`) applies, as it does for pairs. The second value
-/// is how many families that rule removes ("N not made for long text"), whatever `only_fit` is.
-/// Hidden families and `excluded_ids` stay out.
+/// is how many families that rule removes ("N not made for long text"), whatever `only_fit` is: only
+/// families with no fit file, so it equals what "Show them" adds.
+/// Hidden families, `excluded_ids` and every file of `excluded_families` stay out.
 pub fn reading_families(
     conn: &Connection,
     excluded_ids: Vec<String>,
+    excluded_families: Vec<String>,
     only_fit: bool,
 ) -> Result<(Vec<(String, String)>, u32), String> {
     let all = load_all_fonts(conn)?;
     let mut base: HashSet<String> = excluded_ids.into_iter().collect();
     base.extend(crate::finder::hidden_font_ids(conn));
-    let unfit = unfit_for_reading(&all);
+    base.extend(ids_of_families(&all, &excluded_families));
+    Ok(reading_list(&all, &base, only_fit))
+}
+
+/// The list and the count behind `reading_families`, on rows already loaded.
+fn reading_list(all: &[FontData], base: &HashSet<String>, only_fit: bool) -> (Vec<(String, String)>, u32) {
+    let unfit = unfit_for_reading(all);
     let mut seen: HashSet<&str> = HashSet::new();
-    let mut unfit_families: HashSet<&str> = HashSet::new();
+    let mut families: HashSet<&str> = HashSet::new();
+    let mut fit_families: HashSet<&str> = HashSet::new();
     let mut out: Vec<(String, String)> = Vec::new();
     for f in all.iter().filter(|f| !base.contains(&f.font_id)) {
+        families.insert(f.font_family.as_str());
         let is_unfit = unfit.contains(&f.font_id);
-        if is_unfit { unfit_families.insert(f.font_family.as_str()); }
+        if !is_unfit { fit_families.insert(f.font_family.as_str()); }
         if (is_unfit && only_fit) || !seen.insert(f.font_family.as_str()) { continue; }
         out.push((f.font_id.clone(), f.font_family.clone()));
     }
-    Ok((out, unfit_families.len() as u32))
+    (out, (families.len() - fit_families.len()) as u32)
 }
 
-/// Score every non-hidden candidate against `primary` and fill the three buckets.
+/// Every font id of the named families. The caller names families (the unit a designer
+/// thinks in); the core expands them, so a twin .ttf/.otf file or a hidden-style file
+/// can never slip past a family-level exclusion.
+fn ids_of_families(all: &[FontData], families: &[String]) -> HashSet<String> {
+    if families.is_empty() {
+        return HashSet::new();
+    }
+    let names: HashSet<&str> = families.iter().map(String::as_str).collect();
+    all.iter().filter(|f| names.contains(f.font_family.as_str())).map(|f| f.font_id.clone()).collect()
+}
+
+/// Score every non-hidden candidate against `primary` and fill the Contrast, Uniform and Designed together buckets.
 pub fn bucket_pairs(
     primary: &FontData,
     all: &[FontData],
@@ -577,6 +615,8 @@ mod tests {
             file_path: format!("/x/{id}.ttf"),
             style: "normal".to_string(),
             is_variable: false,
+            wght_axis_max: 0,
+            ital_axis: false,
         }
     }
 
@@ -670,6 +710,157 @@ mod tests {
         assert!(ranked[0].font_id.starts_with('a'));
     }
 
+    fn styled(id: &str, family: &str, file: &str, weight: u16) -> FontData {
+        let mut f = font(id, family);
+        f.file_name = file.to_string();
+        f.weight = weight;
+        f
+    }
+
+    /// Regular, italic, bold and bold italic as four files.
+    fn full_set(family: &str, tag: &str, italic_word: &str) -> Vec<FontData> {
+        vec![
+            styled(&format!("{tag}1"), family, "R-Regular.otf", 400),
+            styled(&format!("{tag}2"), family, &format!("R-{italic_word}.otf"), 400),
+            styled(&format!("{tag}3"), family, "R-Bold.otf", 700),
+            styled(&format!("{tag}4"), family, &format!("R-Bold{italic_word}.otf"), 700),
+        ]
+    }
+
+    #[test]
+    fn oblique_files_count_as_italic_for_reading() {
+        // The same rule Display uses: an Oblique set is a full set, not "not made for long text".
+        let mut all = full_set("Obl", "o", "Oblique");
+        all.extend(full_set("Ita", "i", "Italic"));
+        assert!(unfit_for_reading(&all).is_empty());
+    }
+
+    #[test]
+    fn a_variable_file_that_reaches_bold_and_italic_is_fit_for_reading() {
+        let mut vf = styled("v1", "Vari", "Vari[wght].ttf", 400);
+        vf.is_variable = true;
+        vf.wght_axis_max = 900;
+        // Upright only: bold is reached, italic is not.
+        assert!(unfit_for_reading(&[vf.clone_for_test()]).contains("v1"));
+        // An ital axis supplies the italic.
+        let mut with_ital = vf.clone_for_test();
+        with_ital.ital_axis = true;
+        assert!(unfit_for_reading(&[with_ital]).is_empty());
+        // An italic variable file beside the upright one does the same.
+        let mut italic_vf = styled("v2", "Vari", "Vari-Italic[wght].ttf", 400);
+        italic_vf.is_variable = true;
+        italic_vf.wght_axis_max = 900;
+        assert!(unfit_for_reading(&[vf.clone_for_test(), italic_vf]).is_empty());
+        // A variable file whose wght axis stops below 600 has no bold.
+        let mut light = styled("v3", "Lite", "Lite[wght].ttf", 400);
+        light.is_variable = true;
+        light.wght_axis_max = 500;
+        light.ital_axis = true;
+        assert!(unfit_for_reading(&[light]).contains("v3"));
+    }
+
+    impl FontData {
+        fn clone_for_test(&self) -> FontData {
+            let mut f = font(&self.font_id, &self.font_family);
+            f.file_name = self.file_name.clone();
+            f.weight = self.weight;
+            f.is_variable = self.is_variable;
+            f.wght_axis_max = self.wght_axis_max;
+            f.ital_axis = self.ital_axis;
+            f.style = self.style.clone();
+            f
+        }
+    }
+
+    #[test]
+    fn long_text_count_counts_only_families_with_no_fit_file() {
+        // Mixed: a full set plus a condensed file. Its other files are fit, so the family is not "unfit".
+        let mut all = full_set("Mixed", "m", "Italic");
+        let mut narrow = styled("m5", "Mixed", "R-Cond.otf", 400);
+        narrow.width_class = Some("condensed".into());
+        all.push(narrow);
+        // Thin: one regular file, no italic or bold: unfit.
+        all.push(styled("t1", "Thin", "T-Regular.otf", 400));
+        // Whole: a full set, fit.
+        all.extend(full_set("Whole", "w", "Italic"));
+        let (list, unfit) = reading_list(&all, &HashSet::new(), true);
+        let names: Vec<&str> = list.iter().map(|(_, f)| f.as_str()).collect();
+        assert_eq!(names, vec!["Mixed", "Whole"]);
+        assert_eq!(unfit, 1, "only Thin has no fit file");
+        // "Show them" adds exactly the counted families.
+        let (everything, _) = reading_list(&all, &HashSet::new(), false);
+        assert_eq!(everything.len() - list.len(), unfit as usize);
+    }
+
+    fn db_with(rows: &[(&str, &str, &str, i64)]) -> (Connection, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("fontdrop-pairing-{}-{}", std::process::id(), rows.len()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("t.db");
+        let _ = std::fs::remove_file(&path);
+        let conn = crate::db::try_open_db_at(&path).unwrap();
+        for (id, family, file, weight) in rows {
+            conn.execute(
+                "INSERT INTO fonts (font_id, name, file_path, file_name, source, font_family, weight, category, style, width, skeleton, flesh_contrast, flesh_serif, classification_source, user_override, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, 'user', ?2, ?5, 'other', 'normal', 'normal', 'geometric', 'linear', 0, 'file', 0, 'x', 'x')",
+                rusqlite::params![id, family, format!("/x/{file}"), file, weight],
+            )
+            .unwrap();
+        }
+        (conn, dir)
+    }
+
+    #[test]
+    fn excluding_a_family_by_name_removes_every_one_of_its_files() {
+        // Beta ships its regular as .otf and .ttf twins; excluding by file id would miss the twin.
+        let mut rows = vec![];
+        for (tag, fam) in [("a", "Alpha"), ("b", "Beta")] {
+            for (i, (file, w)) in [("Regular.otf", 400), ("Regular.ttf", 400), ("Italic.otf", 400), ("Bold.otf", 700), ("BoldItalic.otf", 700)].iter().enumerate() {
+                rows.push((format!("{tag}{i}"), fam.to_string(), format!("{fam}-{file}"), *w));
+            }
+        }
+        let borrowed: Vec<(&str, &str, &str, i64)> = rows.iter().map(|(a, b, c, d)| (a.as_str(), b.as_str(), c.as_str(), *d)).collect();
+        let (conn, dir) = db_with(&borrowed);
+        let (all, _) = reading_families(&conn, vec![], vec![], true).map(|(l, c)| (l, c)).unwrap();
+        assert_eq!(all.len(), 2);
+        // The old way: only the de-duplicated file id. The .ttf twin stays in the library's list of files.
+        let (list, _) = reading_families(&conn, vec!["b0".into()], vec![], true).unwrap();
+        assert_eq!(list.len(), 2, "excluding one file of Beta does not remove Beta");
+        let (list, unfit) = reading_families(&conn, vec![], vec!["Beta".into()], true).unwrap();
+        assert_eq!(list.iter().map(|(_, f)| f.as_str()).collect::<Vec<_>>(), vec!["Alpha"]);
+        assert_eq!(unfit, 0);
+        // Candidates and the count honour it too.
+        let primary = "a0";
+        let ranked = font_candidates(&conn, primary, vec![], vec!["Beta".into()], None, 50).unwrap();
+        assert!(ranked.iter().all(|s| !s.font_id.starts_with('b')));
+        let n = unfit_family_count(&conn, primary, vec![], vec!["Beta".into()]).unwrap();
+        assert_eq!(n, 0);
+        drop(conn);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// How many variable families reach Reading, on a COPY of a real database:
+    ///   FONTDROP_DB=<copy> cargo test --lib variable_reading_report -- --ignored --nocapture
+    /// Run it before and after a rescan: the rescan reads the axes the rule needs.
+    #[test]
+    #[ignore]
+    fn variable_reading_report() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB to a copy");
+        assert!(!path.contains("Application Support"), "point FONTDROP_DB at a copy, not the live DB");
+        let conn = Connection::open(&path).unwrap();
+        let all = load_all_fonts(&conn).unwrap();
+        let unfit = unfit_for_reading(&all);
+        let mut fam: std::collections::HashMap<&str, (bool, bool)> = Default::default();
+        for f in &all {
+            let e = fam.entry(f.font_family.as_str()).or_default();
+            e.0 |= f.is_variable;
+            e.1 |= !unfit.contains(&f.font_id);
+        }
+        let variable = fam.values().filter(|e| e.0).count();
+        let reach = fam.values().filter(|e| e.0 && e.1).count();
+        let with_axes = all.iter().filter(|f| f.is_variable && f.wght_axis_max > 0).count();
+        println!("variable families: {variable}; reach Reading: {reach}; variable files with a read wght axis: {with_axes}");
+    }
+
     // ── Ground-truth eval (real DB; run on demand) ─────────────────────────
     //
     // Pairings Jarrett actually shipped, scored both directions against the
@@ -704,7 +895,7 @@ mod tests {
     /// The upright file nearest weight 400: what a person would click first.
     fn pick_primary<'a>(all: &'a [FontData], key: &str, not: &[&str]) -> Option<&'a FontData> {
         all.iter()
-            .filter(|f| matches(f, key, not) && !f.file_name.to_lowercase().contains("italic"))
+            .filter(|f| matches(f, key, not) && !crate::names::is_slanted(&f.file_name, &f.style))
             .min_by_key(|f| (f.weight as i32 - 400).abs())
     }
 
@@ -772,7 +963,7 @@ mod tests {
         // so match on the family with instance words stripped.
         let rep = |fam: &str| -> Option<&FontData> {
             let fam = fam.to_lowercase();
-            let upright = |f: &&FontData| !f.file_name.to_lowercase().contains("italic");
+            let upright = |f: &&FontData| !crate::names::is_slanted(&f.file_name, &f.style);
             let exact = all.iter().filter(|f| f.font_family.to_lowercase() == fam).filter(upright)
                 .min_by_key(|f| (f.weight as i32 - 400).abs());
             exact.or_else(|| {
@@ -974,7 +1165,8 @@ mod tests {
                 designer TEXT, file_name TEXT, optical_role TEXT, superfamily_group TEXT,
                 superfamily_role TEXT, weight_range_min INTEGER, weight_range_max INTEGER,
                 spacing_personality TEXT, width_class TEXT, vendor_id TEXT,
-                file_path TEXT, style TEXT, is_variable INTEGER
+                file_path TEXT, style TEXT, is_variable INTEGER,
+                wght_axis_max INTEGER, ital_axis INTEGER
             );
             INSERT INTO fonts (font_id, font_family, skeleton, flesh_contrast, flesh_serif, weight, file_name, file_path, style)
             VALUES ('a','Alpha','geometric','linear',0,400,'Alpha.ttf','/x/Alpha.ttf','normal');",

@@ -37,32 +37,17 @@ struct CachedCatalog {
 }
 
 const CACHE_FILE: &str = "google_fonts_cache.json";
-const CACHE_MAX_AGE_SECS: i64 = 7 * 24 * 60 * 60; // 1 week
 
 fn cache_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join(CACHE_FILE)
 }
 
-fn now_iso() -> String {
-    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
-}
-
-/// Load the cached catalog if it exists and isn't stale.
+/// Load the cached catalog if there is one. A stale cache is still returned: the
+/// caller refetches when `force` is set and falls back to this when the network is down.
 fn load_cache(app_data_dir: &Path) -> Option<CachedCatalog> {
     let path = cache_path(app_data_dir);
     let data = std::fs::read_to_string(&path).ok()?;
-    let catalog: CachedCatalog = serde_json::from_str(&data).ok()?;
-
-    // Check freshness
-    if let Ok(fetched) = chrono::DateTime::parse_from_rfc3339(&catalog.fetched_at) {
-        let age = chrono::Utc::now().signed_duration_since(fetched);
-        if age.num_seconds() < CACHE_MAX_AGE_SECS {
-            return Some(catalog);
-        }
-    }
-
-    // Stale but still usable as fallback
-    Some(catalog)
+    serde_json::from_str(&data).ok()
 }
 
 /// Fetch the full Google Fonts list from the API.
@@ -85,7 +70,7 @@ fn fetch_catalog(api_key: &str) -> Option<Vec<GoogleFontEntry>> {
 /// Save the catalog to disk.
 fn save_cache(app_data_dir: &Path, entries: &[GoogleFontEntry]) {
     let catalog = CachedCatalog {
-        fetched_at: now_iso(),
+        fetched_at: crate::db::now_iso(),
         entries: entries.to_vec(),
     };
     if let Ok(json) = serde_json::to_string(&catalog) {
@@ -258,7 +243,7 @@ pub fn enrich_from_google(conn: &Connection, app_data_dir: &Path, force_refresh:
         .filter_map(|r| r.ok())
         .collect();
 
-    let now = crate::db::now_iso_pub();
+    let now = crate::db::now_iso();
 
     for (font_id, family_name) in &rows {
         let family_lower = family_name.to_lowercase();
@@ -318,7 +303,7 @@ fn enrich_known_designers(conn: &Connection) {
         Err(_) => return,
     };
 
-    let now = crate::db::now_iso_pub();
+    let now = crate::db::now_iso();
 
     for (font_id, family_name) in &rows {
         if let Some((foundry, designer)) = known_designer(family_name) {

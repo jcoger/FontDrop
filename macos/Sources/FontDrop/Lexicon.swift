@@ -228,6 +228,19 @@ enum Lexicon {
     static let clearFilters = "Clear filters"
     static let showMore = "Show more"
 
+    // MARK: Scanning the library (13.x)
+
+    enum Scan {
+        /// Sidebar footer while a rescan runs.
+        static let updating = "Updating your library\u{2026}"
+        /// Sidebar footer when the rescan failed. The library stays as it was.
+        static let failed = "Couldn\u{2019}t update the library"
+        static let retry = "Retry"
+        static let retryHelp = "Scan your font folders again"
+        /// Display and Reading while the library is empty and a scan is working on it.
+        static let scanningFonts = "Scanning your fonts\u{2026}"
+    }
+
     // MARK: Finding fonts (8.x)
 
     enum Finder {

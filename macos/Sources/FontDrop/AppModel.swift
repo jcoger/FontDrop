@@ -28,16 +28,27 @@ struct LaunchOptions {
     var demoSave: String?        // comma list of families to star (on the DB copy), for screenshots
     var search: String?          // start with this in the search box
     var bgRefresh = false        // debug: run the background rescan in screenshot mode too (FD_BG_REFRESH=1)
+    /// Scan these folders instead of the three font folders (--scan-folders a,b or FD_SCAN_FOLDERS). Tests scan a fixture.
+    var scanFolders: [String]?
+
+    /// True when the process is an XCTest host (the test bundle runs inside the app).
+    static func isTestHost(_ environment: [String: String]) -> Bool { environment["XCTestConfigurationFilePath"] != nil }
 
     init(arguments: [String] = CommandLine.arguments, environment: [String: String] = ProcessInfo.processInfo.environment) {
         func value(_ flag: String) -> String? {
             guard let i = arguments.firstIndex(of: flag), i + 1 < arguments.count else { return nil }
             return arguments[i + 1]
         }
-        dbPath = value("--db")
-            ?? environment["FONTDROP_DB"]
+        let explicitDB = value("--db") ?? environment["FONTDROP_DB"]
+        // A test host never opens the live library: with no DB named, it gets a throwaway one and the bench rules.
+        let hostWithoutDB = Self.isTestHost(environment) && explicitDB == nil
+        dbPath = explicitDB
+            ?? (hostWithoutDB ? NSTemporaryDirectory() + "fontdrop-testhost-\(ProcessInfo.processInfo.processIdentifier).db" : nil)
             ?? NSHomeDirectory() + "/Library/Application Support/co.dynolabs.fontdrop/fontdrop.db"
-        bench = arguments.contains("--bench")
+        bench = arguments.contains("--bench") || Self.isTestHost(environment)   // a test host never rescans, saves preferences or opens the live DB
+        if let folders = value("--scan-folders") ?? environment["FD_SCAN_FOLDERS"] {
+            scanFolders = folders.split(separator: ",").map(String.init)
+        }
         refresh = arguments.contains("--refresh")
         screenshot = value("--screenshot")
         if let s = value("--screen"), let sc = Screen(rawValue: s) { screen = sc }
@@ -134,8 +145,17 @@ final class AppModel {
     /// Bumps while fonts load in the background. Views take it as a plain value so they redraw.
     private(set) var fontTick = 0
     private(set) var fontsReady = false
+    /// Where the background rescan stands. The sidebar footer shows it; an empty library shows "Scanning your fonts".
+    enum ScanState: Equatable { case idle, running, failed(String) }
+    private(set) var scanState: ScanState = .idle
     /// True while the background rescan runs (and until it has swapped in its answer).
-    private(set) var rescanning = false
+    var rescanning: Bool { scanState == .running }
+    /// The library has no fonts yet and a scan is working on it: show "Scanning your fonts", not an empty state.
+    var scanningEmptyLibrary: Bool { families.isEmpty && scanState == .running }
+    /// `bootstrap` ran. A second window (or a repeated task) must not open the library and rescan again.
+    private var didBootstrap = false
+    /// Where small preferences live: the standard defaults for a real run, a throwaway suite for tests and screenshots.
+    let defaults: UserDefaults
     /// True once the background rescan has finished, with or without an error. Screenshot runs wait on it.
     private(set) var rescanDone = false
     private(set) var timings: [(label: String, ms: Double)] = []
@@ -213,9 +233,9 @@ final class AppModel {
         await loadCandidates()
     }
 
-    /// Which presentation template Reading draws (Templates/Registry.swift).
-    var templateID: String = UserDefaults.standard.string(forKey: "readingTemplate") ?? "article" {
-        didSet { UserDefaults.standard.set(templateID, forKey: "readingTemplate") }
+    /// Which presentation template Reading draws (`TemplateDescriptor.all` in Templates/Template.swift).
+    var templateID: String = "article" {
+        didSet { defaults.set(templateID, forKey: "readingTemplate") }
     }
 
     /// Playground settings per brand + job + family.
@@ -237,13 +257,26 @@ final class AppModel {
 
     var errorMessage: String?
 
-    init(options: LaunchOptions) {
+    /// A suite shared by every throwaway run, emptied each time it is opened, so a test or screenshot run never
+    /// reads or writes the real app's preferences (last brand, remembered template, filters, variants).
+    static func throwawayDefaults() -> UserDefaults {
+        let name = "co.dynolabs.fontdrop.throwaway"
+        UserDefaults().removePersistentDomain(forName: name)
+        return UserDefaults(suiteName: name) ?? .standard
+    }
+
+    /// `defaults` is for tests that want their own suite. Left out, a bench or screenshot run gets a throwaway one.
+    init(options: LaunchOptions, defaults: UserDefaults? = nil) {
         self.options = options
-        typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: options.screenshot == nil && !options.bench)
-        brandStyle = BrandStyleStore(dbPath: options.dbPath, persist: options.screenshot == nil && !options.bench)
+        let isolated = options.screenshot != nil || options.bench
+        let store = defaults ?? (isolated ? Self.throwawayDefaults() : .standard)
+        self.defaults = store
+        typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: !isolated)
+        brandStyle = BrandStyleStore(dbPath: options.dbPath, persist: !isolated, defaults: store)
+        templateID = store.string(forKey: "readingTemplate") ?? "article"
         if let t = options.template { templateID = t }
         // Screenshot and bench runs start from the standard filter so they repeat.
-        var f = options.screenshot == nil && !options.bench ? FinderFilter.load() : FinderFilter.standard
+        var f = isolated ? FinderFilter.standard : FinderFilter.load(from: store)
         if let list = options.sources { f.sources = Set(list.split(separator: ",").compactMap { Source(key: String($0)) }) }
         if options.showHidden { f.showHidden = true }
         if options.savedOnly { f.savedOnly = true }
@@ -313,6 +346,8 @@ final class AppModel {
     // MARK: bootstrap
 
     func bootstrap() async {
+        guard !didBootstrap else { return }      // one open and one rescan, however many windows ask
+        didBootstrap = true
         let db = dbPath
         setvbuf(stdout, nil, _IOLBF, 0); print("FONTDROP bootstrap start db=\(db) refresh=\(options.refresh)")
         do {
@@ -329,18 +364,16 @@ final class AppModel {
             }.value
             let t3 = DispatchTime.now()
 
-            installLibrary(fams, fonts)
             self.brands = brands
             timings.append(("open (migrate)", ms(t0, t1)))
             if options.refresh { timings.append(("refresh_library", ms(t1, t2))) }
             timings.append(("list_families + list_fonts + brands (\(fams.count) families)", ms(t2, t3)))
 
-            await reloadEntries()
-            await refreshFinder()
+            await applyLibrary(fams, fonts)
             if let names = options.demoSave {
                 for n in names.split(separator: ",") { await setFavorite(String(n), on: true) }
             }
-            let saved = UserDefaults.standard.object(forKey: "lastBrand") as? Int64
+            let saved = defaults.object(forKey: "lastBrand") as? Int64
             let wanted = options.brand.flatMap { n in brands.first { $0.name == n }?.id }
             await selectBrand(options.noBrand ? nil : (wanted ?? brands.first { $0.id == saved }?.id ?? brands.first?.id))
             screen = options.screen
@@ -377,29 +410,54 @@ final class AppModel {
         familyByName = Dictionary(fams.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
         fontsByFamily = Dictionary(grouping: fonts, by: \.family)
         fontCount = fonts.count
+        // A saved style file the library no longer lists (moved, replaced) is remapped or dropped.
+        typeSettings.repairStylePaths(files: fontsByFamily.mapValues { $0.map(\.filePath) }, regular: familyByName.mapValues(\.filePath))
+    }
+
+    /// The one place a library read from the core is swapped in: the lists, then the finder's flags and answer.
+    /// Bootstrap and the background rescan both come through here.
+    func applyLibrary(_ fams: [FamilySummary], _ fonts: [FontFile]) async {
+        installLibrary(fams, fonts)
+        await reloadEntries()
+        await refreshFinder()
     }
 
     private func refreshInBackground(_ lib: Library) async {
-        rescanning = true
-        defer { rescanning = false; rescanDone = true }
+        scanState = .running
+        defer { rescanDone = true }
+        let folders = options.scanFolders
         do {
-            _ = try await Task.detached(priority: .utility) { try lib.refreshLibrary() }.value
+            try await Task.detached(priority: .utility) {
+                if let folders { _ = try lib.refreshLibraryFolders(folders: folders) } else { _ = try lib.refreshLibrary() }
+            }.value
             let (fams, fonts) = try await Task.detached(priority: .userInitiated) {
                 (try lib.listFamilies(), try lib.listFonts())
             }.value
             await applyRescan(fams, fonts)
+            scanState = .idle
         } catch {
-            // A failed rescan keeps the library as it was; nothing to show the user yet.
+            // A failed rescan keeps the library as it was. The sidebar says so, with a Retry.
             print("FONTDROP background refresh failed: \(error)")
+            scanState = .failed("\(error)")
         }
+    }
+
+    /// The sidebar's Retry after a failed rescan.
+    func retryScan() async {
+        guard let lib = core, scanState != .running else { return }
+        await refreshInBackground(lib)
+    }
+
+    /// The Reading list was ranked against something that changed. Throw it away and, when Reading is showing, rank again.
+    private func reloadReading() async {
+        candidatesKey = nil
+        if screen == .reading { await loadCandidates() }
     }
 
     /// What follows a finished rescan. Everything the old library fed (the finder, loaded fonts, the Reading list) is
     /// rebuilt from the new one. Choices, shortlists and the selection are keyed by family name, so they carry over.
     func applyRescan(_ fams: [FamilySummary], _ fonts: [FontFile]) async {
-        installLibrary(fams, fonts)
-        await reloadEntries()
-        await refreshFinder()
+        await applyLibrary(fams, fonts)
         // A font that failed to load while the rescan was writing gets another try.
         FontLoader.shared.forgetFailures()
         await FontLoader.shared.preload(paths: fams.map(\.filePath)) { [weak self] n in
@@ -409,8 +467,7 @@ final class AppModel {
         await preloadStyles(of: [choices["display"], choices["reading"]].compactMap { $0 })
         libraryRevision += 1
         // Candidates were ranked against the old library. Drop them and rank again.
-        candidatesKey = nil
-        if screen == .reading { await loadCandidates() }
+        await reloadReading()
         fontTick += 1
     }
 
@@ -425,7 +482,7 @@ final class AppModel {
     // MARK: finding fonts
 
     private func persistFilter() {
-        if options.screenshot == nil && !options.bench { filter.save() }
+        if options.screenshot == nil && !options.bench { filter.save(to: defaults) }
     }
 
     /// Asks the core again, soon. Typing in the search box calls this on every key; only the last answer is used.
@@ -471,8 +528,7 @@ final class AppModel {
             try await background { hidden ? try $0.hideFamily(family: family) : try $0.unhideFamily(family: family) }
             await reloadEntries()
             await refreshFinder()
-            candidatesKey = nil
-            if screen == .reading { await loadCandidates() }
+            await reloadReading()
         } catch { report(error) }
     }
 
@@ -480,7 +536,7 @@ final class AppModel {
 
     func selectBrand(_ id: Int64?) async {
         brandID = id
-        if let id { UserDefaults.standard.set(id, forKey: "lastBrand") }
+        if let id { defaults.set(id, forKey: "lastBrand") }
         resetCandidates(); candidateLimit = Self.candidatePage
         undoChoice = [:]
         await reloadBrandData()
@@ -611,22 +667,19 @@ final class AppModel {
         guard let display = displayFamily else { await loadStandaloneCandidates(); return }
         let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)/\(sourcesKey)"
         if key == candidatesKey { return }
-        candidateGeneration += 1; candidateLoadsStarted += 1
-        let generation = candidateGeneration
-        candidatesLoading = true
-        candidatesError = nil
+        let generation = beginCandidateLoad()
         // The loading flag always comes down, unless a newer load or a reset owns it now.
         defer { if generation == candidateGeneration { candidatesLoading = false } }
         let keepFamily = candidate(selectedCandidate)?.family
         let id = display.fontId, limit = UInt32(candidateLimit)
         let job: String? = includeUnfitFaces ? nil : "reading"
         // Reading browses the same sources as the Display filter; the long-text count follows it too.
-        let outside = idsOutsideSources(keeping: display.name)
+        let outside = familiesOutsideSources(keeping: display.name)
         do {
             let ranked = try await background {
-                try $0.fontCandidates(fontId: id, excludedIds: outside, job: job, limit: limit)
+                try $0.fontCandidates(fontId: id, excludedIds: [], excludedFamilies: outside, job: job, limit: limit)
             }
-            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: outside) }
+            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: [], excludedFamilies: outside) }
             var seen = Set<String>()
             var list: [Candidate] = []
             for p in ranked where !p.family.isEmpty && seen.insert(p.family).inserted {
@@ -640,19 +693,32 @@ final class AppModel {
             let allPaths = list.flatMap { c in (fontsByFamily[c.family] ?? []).map(\.filePath) + [c.filePath] }
             await FontLoader.shared.preload(paths: allPaths)
             guard generation == candidateGeneration else { return }   // superseded while loading
-            candidates = list
             // A Same family card starts its body in the engine's suggested style, in the playground too.
             typeSettings.setSuggestedStyles(Dictionary(
                 list.compactMap { c in c.bodyStyle.map { (settingsKey("reading", c.family), $0.filePath) } },
                 uniquingKeysWith: { a, _ in a }))
-            notForLongText = Int(unfit)
-            candidatesHasMore = ranked.count >= candidateLimit
-            candidatesKey = key
-            fontTick += 1
-            reselect(list, keeping: keepFamily)
+            commitCandidates(list, key: key, notForLongText: Int(unfit), hasMore: ranked.count >= candidateLimit, keeping: keepFamily)
         } catch {
             if generation == candidateGeneration { candidatesError = "\(error)" }
         }
+    }
+
+    /// The start of a candidate load: a new generation, the loading flag up, the old error gone.
+    private func beginCandidateLoad() -> Int {
+        candidateGeneration += 1; candidateLoadsStarted += 1
+        candidatesLoading = true
+        candidatesError = nil
+        return candidateGeneration
+    }
+
+    /// The end of a candidate load that was not superseded: the list, its counts, the cache key and the selection.
+    private func commitCandidates(_ list: [Candidate], key: String, notForLongText: Int, hasMore: Bool, keeping family: String?) {
+        candidates = list
+        self.notForLongText = notForLongText
+        candidatesHasMore = hasMore
+        candidatesKey = key
+        fontTick += 1
+        reselect(list, keeping: family)
     }
 
     /// Keeps the selection on the same family when the list is rebuilt (font ids can change when the library is
@@ -669,16 +735,13 @@ final class AppModel {
     private func loadStandaloneCandidates() async {
         let key = "\(brandID ?? 0)/none/\(includeUnfitFaces)/\(sourcesKey)"
         if key == candidatesKey { return }
-        candidateGeneration += 1; candidateLoadsStarted += 1
-        let generation = candidateGeneration
-        candidatesLoading = true
-        candidatesError = nil
+        let generation = beginCandidateLoad()
         defer { if generation == candidateGeneration { candidatesLoading = false } }
         let keepFamily = candidate(selectedCandidate)?.family
-        let outside = idsOutsideSources(keeping: "")
+        let outside = familiesOutsideSources(keeping: "")
         let fitOnly = !includeUnfitFaces
         do {
-            let found = try await background { try $0.readingFamilies(excludedIds: outside, onlyFit: fitOnly) }
+            let found = try await background { try $0.readingFamilies(excludedIds: [], excludedFamilies: outside, onlyFit: fitOnly) }
             guard generation == candidateGeneration else { return }   // superseded (a Display face was chosen, or a newer load)
             var list: [Candidate] = []
             for f in found.families {
@@ -687,12 +750,7 @@ final class AppModel {
                                       pairType: "", evidence: [], order: list.count,
                                       googleRank: allEntries[family.name]?.googleRank.map(Int.init), bodyStyle: nil))
             }
-            candidates = list
-            notForLongText = Int(found.notForLongText)
-            candidatesHasMore = false
-            candidatesKey = key
-            fontTick += 1
-            reselect(list, keeping: keepFamily)
+            commitCandidates(list, key: key, notForLongText: Int(found.notForLongText), hasMore: false, keeping: keepFamily)
         } catch {
             if generation == candidateGeneration { candidatesError = "\(error)" }
         }
@@ -705,14 +763,15 @@ final class AppModel {
     /// The active source chips as one string, so a change reloads the Reading list.
     var sourcesKey: String { Source.all.filter(filter.sources.contains).map(\.key).joined(separator: ",") }
 
-    /// Font ids of every family outside the active source chips (none selected means all sources).
+    /// Names of the families outside the active source chips (none selected means all sources).
     /// Passed to the core as exclusions so Reading and its long-text count match the Display filter.
+    /// The core expands a name to every file of the family, so twin .ttf/.otf files cannot leak through.
     /// `keeping` is the Display family, which stays whatever its source.
-    private func idsOutsideSources(keeping display: String) -> [String] {
+    func familiesOutsideSources(keeping display: String) -> [String] {
         guard !filter.sources.isEmpty else { return [] }
-        return fontsByFamily.flatMap { name, files -> [String] in
-            guard name != display, let entry = allEntries[name], !entry.sources.contains(where: filter.sources.contains) else { return [] }
-            return files.map(\.fontId)
+        return fontsByFamily.keys.filter { name in
+            guard name != display, let entry = allEntries[name] else { return false }
+            return !entry.sources.contains(where: filter.sources.contains)
         }
     }
 

@@ -78,9 +78,9 @@ func applyStyleFlags(_ model: AppModel) {
         return ProcessInfo.processInfo.environment[name]
     }
     if let t = value("--template"), Templates.all.contains(where: { $0.id == t }) {
-        let saved = UserDefaults.standard.string(forKey: "readingTemplate")
+        let saved = model.defaults.string(forKey: "readingTemplate")
         model.templateID = t
-        UserDefaults.standard.set(saved, forKey: "readingTemplate")     // a screenshot run never changes the remembered template
+        model.defaults.set(saved, forKey: "readingTemplate")     // a screenshot run never changes the remembered template
     }
     let template = Templates.descriptor(model.templateID)
     if let v = value("--variant") { model.brandStyle.setVariant(v, template: template) }

@@ -366,3 +366,21 @@ Reading always shows a spinner, an error or its list. It is never blank.
 ### Gates for section 12
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass
+
+## 13. Scan status (2026-11-04)
+
+The app rescans the font folders in the background on every launch. The sidebar footer says where that stands. It is where the counts sit when nothing is happening.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 13.1 | scan.running | **Updating your library…** | Sidebar footer with a small spinner while a rescan runs. Replaces the counts until it ends |
+| 13.2 | scan.failed | **Couldn't update the library** | Sidebar footer when the rescan failed. The library stays as it was. Curly apostrophe |
+| 13.3 | scan.retry | **Retry** | Link button next to 13.2. Scans the font folders again |
+| 13.4 | scan.empty | **Scanning your fonts…** | Display and Reading, in place of the empty state, while the library has no fonts and a scan is running |
+| 13.5 | scan.counts | **4,512 fonts · 699 families** | The footer when no scan is running (unchanged) |
+
+Plain words. No em dashes. The ellipsis is the single character.
+
+### Gates for section 13
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass

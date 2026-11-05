@@ -4,7 +4,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::names::{parse_family, parse_font_meta, read_family_name, read_name_meta, Classification};
+use crate::names::{is_private_face, is_slanted, parse_family, parse_font_meta, read_family_name, read_name_meta, upright_distance, Classification};
 use crate::classifier;
 use crate::metrics;
 
@@ -101,21 +101,20 @@ CREATE TABLE IF NOT EXISTS fonts (
 
 /// Hash the first 64 KB of a font file with SHA-256 to get a stable font_id.
 fn hash_font_file(path: &Path) -> Option<String> {
-    let data = std::fs::read(path).ok()?;
-    let chunk = if data.len() > 65_536 { &data[..65_536] } else { &data };
+    use std::io::Read;
+    // Read only the 64 KB that is hashed, not the whole file (some are 190 MB).
+    // The bytes hashed are the same as before, so every font_id stays the same.
+    let mut chunk = Vec::with_capacity(65_536);
+    std::fs::File::open(path).ok()?.take(65_536).read_to_end(&mut chunk).ok()?;
     let mut hasher = Sha256::new();
-    hasher.update(chunk);
+    hasher.update(&chunk);
     Some(format!("{:x}", hasher.finalize()))
 }
 
-fn now_iso() -> String {
+pub(crate) fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
-/// Public alias for other modules.
-pub fn now_iso_pub() -> String {
-    now_iso()
-}
 
 // ── Schema migrations ─────────────────────────────────────────────────────────
 
@@ -157,6 +156,11 @@ const MIGRATIONS: &[&str] = &[
     // The font's own style name (name ID 17, else 2). NULL = not read yet, so every existing row is
     // read once on the next scan. '' = read, the file has none.
     "ALTER TABLE fonts ADD COLUMN style_name TEXT;",
+    // Variable fonts: top of the wght axis (0 = no such axis) and whether an ital or slnt axis exists,
+    // so one file can count as bold and italic for the Reading rule. NULL = not read yet; only
+    // variable rows are re-read for it.
+    "ALTER TABLE fonts ADD COLUMN wght_axis_max INTEGER;",
+    "ALTER TABLE fonts ADD COLUMN ital_axis INTEGER;",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -169,9 +173,9 @@ pub(crate) fn run_migrations(conn: &Connection) {
 
 /// Same as `run_migrations`, but reports failure instead of panicking.
 pub fn try_run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let current: i64 = conn
-        .query_row("PRAGMA user_version;", [], |r| r.get(0))
-        .unwrap_or(0);
+    // A failed read is an error, not "version 0": treating it as 0 would re-run
+    // every migration and then stamp the version down.
+    let current: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0))?;
 
     for (i, stmt) in MIGRATIONS.iter().enumerate() {
         if (i as i64) < current {
@@ -188,10 +192,15 @@ pub fn try_run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
         }
     }
 
-    // Stamp the new version. PRAGMA doesn't accept bound params, so format it
-    // (the value is MIGRATIONS.len(), not user input).
+    // Stamp the new version, never lower. A DB written by a newer build carries
+    // a higher number; an older build must leave it alone, or the newer build
+    // re-runs migrations it already applied. PRAGMA doesn't accept bound
+    // params, so format it (the value is MIGRATIONS.len(), not user input).
     let target = MIGRATIONS.len();
-    conn.execute_batch(&format!("PRAGMA user_version = {};", target))
+    if current < target as i64 {
+        conn.execute_batch(&format!("PRAGMA user_version = {};", target))?;
+    }
+    Ok(())
 }
 
 // ── DB init ───────────────────────────────────────────────────────────────────
@@ -233,7 +242,9 @@ struct ScannedFont {
     width: String,
 }
 
-fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) {
+/// `private` collects the paths of Apple's private system faces the scan skipped,
+/// so rows an older scan stored under their file-name family can be dropped.
+fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>, private: &mut Vec<String>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return,
@@ -242,7 +253,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            scan_dir_for_db(&path, source, results);
+            scan_dir_for_db(&path, source, results, private);
             continue;
         }
 
@@ -274,7 +285,8 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
         let family = read_family_name(&path).unwrap_or_else(|| parse_family(stem));
         // Apple's private system faces (".SF Arabic", ".LastResort") are hidden
         // from Font Book and every font menu; hide them here too.
-        if family.starts_with('.') || family == "LastResort" {
+        if is_private_face(&family) {
+            private.push(path.to_string_lossy().to_string());
             continue;
         }
         let meta = parse_font_meta(&path, &family);
@@ -298,46 +310,108 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
 /// font (vendor_id NULL = not read yet; '' = read, no real vendor code). Foundry
 /// and designer only fill gaps; existing values (Google enrichment, edits) stay.
 pub fn enrich_from_name_tables(conn: &Connection) {
-    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL OR style_name IS NULL") {
+    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL OR style_name IS NULL OR (is_variable = 1 AND wght_axis_max IS NULL)") {
         Ok(mut st) => st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
     };
+    let tx = conn.unchecked_transaction().ok(); // one commit for the loop
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
         // A file we cannot open counts as covering Latin: never hide what we could not check.
-        let (vendor, manufacturer, designer, trial, url, variable, latin, style) = match meta {
-            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin, m.style_name.unwrap_or_default()),
-            None => (String::new(), None, None, false, None, false, true, String::new()),
+        let (vendor, manufacturer, designer, trial, url, variable, latin, style, wght_max, ital_axis) = match meta {
+            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin, m.style_name.unwrap_or_default(), m.wght_axis_max, m.ital_axis),
+            None => (String::new(), None, None, false, None, false, true, String::new(), 0, false),
         };
         conn.execute(
             "UPDATE fonts SET vendor_id = ?1, \
              foundry = COALESCE(NULLIF(foundry, ''), ?2), \
-             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8, style_name = ?9 WHERE font_id = ?6",
-            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32, style], // '' = read, none
+             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8, style_name = ?9, \
+             wght_axis_max = ?10, ital_axis = ?11 WHERE font_id = ?6",
+            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32, style, wght_max, ital_axis as i32], // '' = read, none
         )
         .ok();
+    }
+    if let Some(tx) = tx {
+        tx.commit().ok();
     }
 }
 
 /// Drop rows whose font file is gone (uninstalled since the last scan) and
 /// Apple's private system faces. The scan only ever added and updated rows, so
 /// removed fonts stayed in the library forever.
-fn prune_missing(conn: &Connection) {
-    let rows: Vec<(String, String, String)> = match conn.prepare("SELECT font_id, file_path, font_family FROM fonts") {
+///
+/// A row the user classified by hand (`user_override = 1`) is kept even when its
+/// file is missing: a font manager that turns a font off and on again, or an
+/// unmounted volume, must not erase the correction.
+fn prune_missing(conn: &Connection, private_paths: &[String]) {
+    let private: std::collections::HashSet<&str> = private_paths.iter().map(|p| p.as_str()).collect();
+    let rows: Vec<(String, String, String, i64)> = match conn.prepare("SELECT font_id, file_path, font_family, user_override FROM fonts") {
         Ok(mut st) => st
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
     };
-    for (id, path, family) in rows {
-        let hidden = family.starts_with('.') || family == "LastResort";
-        if hidden || !Path::new(&path).exists() {
+    for (id, path, family, user_override) in rows {
+        let hidden = is_private_face(&family);
+        // A private face stored under its file name by an older scan ("SFCompact"
+        // for ".SF Compact"): the file is there, but the scan now skips it.
+        let now_private = private.contains(path.as_str());
+        let missing = !Path::new(&path).exists();
+        if hidden || ((missing || now_private) && user_override == 0) {
             conn.execute("DELETE FROM fonts WHERE font_id = ?1", params![id]).ok();
         }
+    }
+}
+
+/// A font file replaced in place gets a new font_id (the id hashes the file's
+/// first 64 KB), so the scan inserts a new row and leaves the old one with the
+/// same path. The path is the identity of an installed font: for every scanned
+/// path, drop the other rows that share it. A hand classification on the old
+/// row moves to the new one first.
+fn drop_stale_twins(conn: &Connection, scanned: &[ScannedFont]) {
+    let live: std::collections::HashSet<&str> = scanned.iter().map(|f| f.font_id.as_str()).collect();
+    // path -> the id the scan just wrote for it
+    let current: std::collections::HashMap<&str, &str> =
+        scanned.iter().map(|f| (f.file_path.as_str(), f.font_id.as_str())).collect();
+    let rows: Vec<(String, String, i64)> =
+        match conn.prepare("SELECT font_id, file_path, user_override FROM fonts ORDER BY updated_at") {
+            Ok(mut st) => st
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .map(|it| it.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default(),
+            Err(_) => return,
+        };
+    for (id, path, user_override) in &rows {
+        if live.contains(id.as_str()) {
+            continue;
+        }
+        let Some(new_id) = current.get(path.as_str()) else { continue };
+        if *user_override == 1 {
+            let new_overridden: i64 = conn
+                .query_row("SELECT user_override FROM fonts WHERE font_id = ?1", params![new_id], |r| r.get(0))
+                .unwrap_or(0);
+            if new_overridden == 0 {
+                conn.execute(
+                    "UPDATE fonts SET \
+                       foundry = old.foundry, designer = old.designer, skeleton = old.skeleton, \
+                       flesh_contrast = old.flesh_contrast, flesh_serif = old.flesh_serif, \
+                       x_height_ratio = old.x_height_ratio, cap_height_ratio = old.cap_height_ratio, \
+                       stroke_contrast_ratio = old.stroke_contrast_ratio, \
+                       classification_source = old.classification_source, user_override = 1, \
+                       google_category = old.google_category, category = old.category, \
+                       classification_reason = old.classification_reason \
+                     FROM (SELECT * FROM fonts WHERE font_id = ?2) AS old \
+                     WHERE fonts.font_id = ?1",
+                    params![new_id, id],
+                )
+                .ok();
+            }
+        }
+        conn.execute("DELETE FROM fonts WHERE font_id = ?1", params![id]).ok();
     }
 }
 
@@ -378,6 +452,7 @@ pub fn classify_all(conn: &Connection) {
         .collect();
 
     let now = now_iso();
+    let tx = conn.unchecked_transaction().ok(); // one commit for the loop
 
     for (font_id, file_path, family_name, category) in &rows {
         let result = classifier::classify_font(Path::new(file_path), family_name);
@@ -410,17 +485,20 @@ pub fn classify_all(conn: &Connection) {
     if rerun_all {
         meta_set(conn, "classifier_version", &CLASSIFIER_VERSION.to_string());
     }
+    if let Some(tx) = tx {
+        tx.commit().ok();
+    }
 }
 
 /// One skeleton per family. Files of one family were classified one by one and
 /// disagreed (29% of multi-file families). The family's upright face nearest
 /// weight 400 decides; every non-override file in the family takes its answer.
 fn unify_family_skeletons(conn: &Connection) {
-    let rows: Vec<(String, String, i64, String, String, String)> = match conn.prepare(
-        "SELECT font_family, file_name, weight, skeleton, flesh_contrast, COALESCE(classification_reason, '') FROM fonts",
+    let rows: Vec<(String, String, String, i64, String, String, String)> = match conn.prepare(
+        "SELECT font_family, file_name, style, weight, skeleton, flesh_contrast, COALESCE(classification_reason, '') FROM fonts",
     ) {
         Ok(mut stmt) => stmt
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)))
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
@@ -428,11 +506,9 @@ fn unify_family_skeletons(conn: &Connection) {
 
     // family -> (distance from an upright 400, skeleton, flesh_contrast, reason)
     let mut best: std::collections::HashMap<String, (i64, String, String, String)> = std::collections::HashMap::new();
-    for (family, file_name, weight, skeleton, flesh, reason) in rows {
+    for (family, file_name, style, weight, skeleton, flesh, reason) in rows {
         if skeleton == "unknown" { continue; }
-        let lower = file_name.to_lowercase();
-        let slanted = lower.contains("italic") || lower.contains("oblique") || lower.contains("kursiv");
-        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+        let dist = upright_distance(weight, is_slanted(&file_name, &style));
         let entry = best.entry(family).or_insert((i64::MAX, String::new(), String::new(), String::new()));
         if dist < entry.0 {
             *entry = (dist, skeleton, flesh, reason);
@@ -454,18 +530,16 @@ fn unify_family_skeletons(conn: &Connection) {
 /// serifs, so an italic file of a serif family measured as sans. The upright
 /// face nearest weight 400 decides for the whole family.
 fn unify_family_serif(conn: &Connection) {
-    let rows: Vec<(String, String, i64, i32)> = match conn.prepare("SELECT font_family, file_name, weight, flesh_serif FROM fonts") {
+    let rows: Vec<(String, String, String, i64, i32)> = match conn.prepare("SELECT font_family, file_name, style, weight, flesh_serif FROM fonts") {
         Ok(mut stmt) => stmt
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
             .unwrap_or_default(),
         Err(_) => return,
     };
     let mut best: std::collections::HashMap<String, (i64, i32)> = std::collections::HashMap::new();
-    for (family, file_name, weight, serif) in rows {
-        let lower = file_name.to_lowercase();
-        let slanted = lower.contains("italic") || lower.contains("oblique") || lower.contains("kursiv");
-        let dist = (weight - 400).abs() + if slanted { 1000 } else { 0 };
+    for (family, file_name, style, weight, serif) in rows {
+        let dist = upright_distance(weight, is_slanted(&file_name, &style));
         let entry = best.entry(family).or_insert((i64::MAX, 0));
         if dist < entry.0 {
             *entry = (dist, serif);
@@ -499,6 +573,7 @@ pub fn enrich_metrics(conn: &Connection) {
         .collect();
 
     let now = now_iso();
+    let tx = conn.unchecked_transaction().ok(); // one commit for the loop
 
     for (font_id, file_path, family_name, stroke_contrast, x_height) in &rows {
         let m = metrics::extract_extended_metrics(
@@ -545,6 +620,9 @@ pub fn enrich_metrics(conn: &Connection) {
             WHERE f2.font_family = fonts.font_family AND f2.weight_range_max IS NOT NULL
          ) WHERE weight_range_min IS NOT NULL;"
     ).ok();
+    if let Some(tx) = tx {
+        tx.commit().ok();
+    }
 }
 
 pub fn populate_db(conn: &Connection) {
@@ -566,24 +644,40 @@ pub fn populate_db(conn: &Connection) {
 /// downloaded Google Fonts.
 pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
     let mut scanned: Vec<ScannedFont> = Vec::new();
+    let mut private: Vec<String> = Vec::new();
     for (dir, source) in scan_targets {
-        scan_dir_for_db(dir, source, &mut scanned);
+        scan_dir_for_db(dir, source, &mut scanned, &mut private);
     }
 
     let now = now_iso();
 
+    // What the table holds now, read once: the loop below then touches only rows
+    // that are new or changed (about 6,000 UPDATEs on every launch otherwise).
+    type Stored = (i32, String, String, String, String, u16, String, String, String);
+    let mut stored: std::collections::HashMap<String, Stored> = std::collections::HashMap::new();
+    if let Ok(mut st) = conn.prepare(
+        "SELECT font_id, user_override, file_path, file_name, source, font_family, weight, category, style, width FROM fonts",
+    ) {
+        if let Ok(it) = st.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, (r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?, r.get(8)?, r.get(9)?)))
+        }) {
+            stored.extend(it.flatten());
+        }
+    }
+
+    // One transaction for the whole loop, as google_list.rs does: one commit
+    // instead of one per row. If it cannot start, the writes run unbatched.
+    let tx = conn.unchecked_transaction().ok();
+
     for font in &scanned {
-        // Check if row exists and whether it has a user override
-        let existing: Option<i32> = conn
-            .query_row(
-                "SELECT user_override FROM fonts WHERE font_id = ?1",
-                params![font.font_id],
-                |row| row.get(0),
-            )
-            .ok();
+        let existing: Option<i32> = stored.get(&font.font_id).map(|s| s.0);
 
         match existing {
             Some(1) => {
+                let s = &stored[&font.font_id];
+                if s.1 == font.file_path && s.2 == font.file_name && s.4 == font.font_family {
+                    continue;
+                }
                 // User override — keep their classification; refresh path and family name
                 conn.execute(
                     "UPDATE fonts SET file_path = ?1, file_name = ?2, font_family = ?3, updated_at = ?4 WHERE font_id = ?5",
@@ -592,6 +686,18 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
                 .ok();
             }
             Some(_) => {
+                let s = &stored[&font.font_id];
+                if s.1 == font.file_path
+                    && s.2 == font.file_name
+                    && s.3 == font.source
+                    && s.4 == font.font_family
+                    && s.5 == font.weight
+                    && s.6 == font.category
+                    && s.7 == font.style
+                    && s.8 == font.width
+                {
+                    continue;
+                }
                 // Exists, no override — update classification + path
                 conn.execute(
                     "UPDATE fonts SET file_path = ?1, file_name = ?2, source = ?3, \
@@ -628,7 +734,11 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
             }
         }
     }
-    prune_missing(conn);
+    drop_stale_twins(conn, &scanned);
+    prune_missing(conn, &private);
+    if let Some(tx) = tx {
+        tx.commit().ok();
+    }
 }
 
 // ── Queries the apps call ─────────────────────────────────────────────────────
@@ -820,19 +930,37 @@ pub fn refresh_google_fonts(conn: &Connection, data_dir: &Path) -> Result<u32, S
 /// connection (WAL), so readers elsewhere are never blocked for long. Returns
 /// the number of font rows afterwards.
 pub fn refresh_library(db_path: &Path) -> Result<u32, String> {
+    refresh_library_in(db_path, None)
+}
+
+/// `refresh_library` with an optional list of folders to scan instead of the three macOS
+/// font folders. A scan of given folders is the test seam: the rows get source "user" and the
+/// Google steps (network) are skipped, so a test scans a fixture folder and nothing else.
+pub fn refresh_library_in(db_path: &Path, folders: Option<&[PathBuf]>) -> Result<u32, String> {
     let conn = try_open_db_at(db_path).map_err(|e| e.to_string())?;
-    populate_db(&conn);
+    match folders {
+        Some(dirs) => {
+            let targets: Vec<(PathBuf, &str)> = dirs.iter().map(|d| (d.clone(), "user")).collect();
+            populate_from(&conn, &targets);
+        }
+        None => populate_db(&conn),
+    }
     enrich_from_name_tables(&conn);
     classify_all(&conn);
     enrich_metrics(&conn);
-    let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
-    crate::google_fonts::enrich_from_google(&conn, data_dir, false);
-    // Google's public family list (no key). Last, and never fatal: offline keeps the last stored list.
-    crate::google_list::sync_catalog(&conn, data_dir);
+    if folders.is_none() {
+        let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
+        crate::google_fonts::enrich_from_google(&conn, data_dir, false);
+        // Google's public family list (no key). Last, and never fatal: offline keeps the last stored list.
+        crate::google_list::sync_catalog(&conn, data_dir);
+    }
     conn.query_row("SELECT COUNT(*) FROM fonts", [], |r| r.get(0)).map_err(|e| e.to_string())
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod scan_tests;
 
 #[cfg(test)]
 mod tests {
@@ -964,9 +1092,17 @@ mod tests {
         assert!(!path.contains("Application Support"), "point FONTDROP_DB at a copy, not the live DB");
         let conn = Connection::open(&path).unwrap();
         run_migrations(&conn);
+        let dup_paths = |c: &Connection| -> i64 {
+            c.query_row("SELECT COUNT(*) FROM (SELECT file_path FROM fonts GROUP BY file_path HAVING COUNT(*) > 1)", [], |r| r.get(0)).unwrap()
+        };
+        println!("paths with two rows before: {}", dup_paths(&conn));
+        let t = std::time::Instant::now();
         populate_db(&conn);
+        println!("populate_db: {:.2}s", t.elapsed().as_secs_f64());
         enrich_from_name_tables(&conn);
         classify_all(&conn);
+        println!("full rescan (scan, name tables, classify): {:.2}s", t.elapsed().as_secs_f64());
+        println!("paths with two rows after: {}", dup_paths(&conn));
         let fams: i64 = conn.query_row("SELECT COUNT(DISTINCT font_family) FROM fonts WHERE source='user'", [], |r| r.get(0)).unwrap();
         let singles: i64 = conn.query_row(
             "SELECT COUNT(*) FROM (SELECT font_family FROM fonts WHERE source='user' GROUP BY font_family HAVING COUNT(*)=1)",

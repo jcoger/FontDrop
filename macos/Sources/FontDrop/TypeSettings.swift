@@ -166,6 +166,20 @@ extension TypeSettings {
     }
 }
 
+/// What to do with a saved style file path that may no longer exist.
+enum StylePathRepair {
+    /// The path itself when the library lists it; else the listed file with the same name (any folder, any
+    /// extension: a font manager moves files, and a style may now be listed as .otf instead of .ttf); else nil.
+    static func repaired(_ path: String, valid: [String]) -> String? {
+        if valid.contains(path) { return path }
+        func stem(_ p: String) -> String { URL(fileURLWithPath: p).deletingPathExtension().lastPathComponent.lowercased() }
+        let wanted = stem(path)
+        // Prefer .otf, as the library's own de-duplication does.
+        let same = valid.filter { stem($0) == wanted }
+        return same.first { $0.lowercased().hasSuffix(".otf") } ?? same.first
+    }
+}
+
 // MARK: - Store
 
 /// Settings per brand + job + family. Saved as JSON next to the library DB, so a test
@@ -224,6 +238,31 @@ final class TypeSettingsStore {
     func reset(_ key: String) {
         map[key] = nil
         scheduleSave()
+    }
+
+    /// A saved Style is a file path. When the file moved or was replaced, the path points at nothing and every
+    /// preview in that family draws blank. After the library changes, remap such a path to the family's file
+    /// with the same name (a .ttf twin of a style listed as .otf counts), or drop it so the family's regular shows.
+    /// `files`: every file the library lists, by family. `regular`: each family's own regular file. Returns how many changed.
+    @discardableResult
+    func repairStylePaths(files: [String: [String]], regular: [String: String]) -> Int {
+        var changed = 0
+        for (key, settings) in map {
+            guard let path = settings.stylePath else { continue }
+            // The key is "brand/job/family"; the family may itself hold a slash.
+            let parts = key.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+            guard parts.count == 3 else { continue }
+            let family = String(parts[2])
+            guard let listed = files[family] else { continue }      // family not in the library: keep what was saved
+            var valid = listed
+            if let r = regular[family] { valid.append(r) }
+            let fixed = StylePathRepair.repaired(path, valid: valid)
+            guard fixed != path else { continue }
+            map[key]?.stylePath = fixed         // nil drops it
+            changed += 1
+        }
+        if changed > 0 { scheduleSave() }
+        return changed
     }
 
     private func scheduleSave() {

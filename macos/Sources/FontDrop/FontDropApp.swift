@@ -14,6 +14,8 @@ struct FontDropApp: App {
         }
         .defaultSize(width: 1360, height: 860)
         .commands {
+            // One window: a second one would share this model and run the open and rescan again.
+            CommandGroup(replacing: .newItem) {}
             CommandMenu(Lexicon.typeMenu) {
                 ForEach(["display", "reading"], id: \.self) { job in
                     Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }

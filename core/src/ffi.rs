@@ -101,25 +101,6 @@ pub struct BodyStyle {
     pub label: String,
 }
 
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct PairMatch {
-    pub font_id: String,
-    pub family: String,
-    pub file_path: String,
-    pub score: u8,
-    pub pair_type: String,
-    pub reason: String,
-    pub evidence: Vec<Evidence>,
-    pub suggested_body_style: Option<BodyStyle>,
-}
-
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct PairBucket {
-    pub label: String,
-    pub description: String,
-    pub pairs: Vec<PairMatch>,
-}
-
 /// One entry of the flat ranked list (`Library::font_candidates`). Best first;
 /// `rank` is the 0-based position. One per family.
 #[derive(Debug, Clone, uniffi::Record)]
@@ -177,6 +158,12 @@ impl Library {
         db::refresh_library(&self.db_path).map_err(CoreError::Db)
     }
 
+    /// `refresh_library` over the given folders only (source "user"), with no network step.
+    /// A test seam: a test scans a fixture folder instead of the real font folders.
+    pub fn refresh_library_folders(&self, folders: Vec<String>) -> Result<u32, CoreError> {
+        let dirs: Vec<PathBuf> = folders.into_iter().map(PathBuf::from).collect();
+        db::refresh_library_in(&self.db_path, Some(&dirs)).map_err(CoreError::Db)
+    }
     /// One row per family, sorted by name (case-insensitive). The family is
     /// the name the font file declares about itself (see `names::read_family_name`).
     pub fn list_families(&self) -> Result<Vec<FamilySummary>, CoreError> {
@@ -222,18 +209,18 @@ impl Library {
 
     /// How many families the Reading rule removes from the candidates for `font_id`
     /// ("42 not made for long text"). Counts families, not capped by the page size.
-    pub fn reading_hidden_count(&self, font_id: String, excluded_ids: Vec<String>) -> Result<u32, CoreError> {
+    pub fn reading_hidden_count(&self, font_id: String, excluded_ids: Vec<String>, excluded_families: Vec<String>) -> Result<u32, CoreError> {
         let conn = self.lock()?;
-        pairing::unfit_family_count(&conn, &font_id, excluded_ids).map_err(|m| {
+        pairing::unfit_family_count(&conn, &font_id, excluded_ids, excluded_families).map_err(|m| {
             if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
         })
     }
 
     /// Families for Reading when no Display face is chosen yet: one per family, with the same long-text
     /// rule as pairs (`only_fit`) and the count of families that rule removes. Hidden families stay out.
-    pub fn reading_families(&self, excluded_ids: Vec<String>, only_fit: bool) -> Result<ReadingFamilies, CoreError> {
+    pub fn reading_families(&self, excluded_ids: Vec<String>, excluded_families: Vec<String>, only_fit: bool) -> Result<ReadingFamilies, CoreError> {
         let conn = self.lock()?;
-        let (list, unfit) = pairing::reading_families(&conn, excluded_ids, only_fit).map_err(CoreError::Db)?;
+        let (list, unfit) = pairing::reading_families(&conn, excluded_ids, excluded_families, only_fit).map_err(CoreError::Db)?;
         Ok(ReadingFamilies {
             families: list.into_iter().map(|(font_id, family)| ReadingFamily { font_id, family }).collect(),
             not_for_long_text: unfit,
@@ -266,7 +253,7 @@ impl Library {
             .into_iter()
             .filter(|f| {
                 let file = f.file_path.rsplit('/').next().unwrap_or(&f.file_path);
-                seen.insert((f.family.clone(), file_stem(file)))
+                seen.insert((f.family.clone(), finder::file_stem(file)))
             })
             .collect();
         out.sort_by(|a, b| {
@@ -275,78 +262,21 @@ impl Library {
         Ok(out)
     }
 
-    /// Matches for `font_id`, in buckets, each with its evidence. `job` is
-    /// "reading" to drop families unfit for body text. Same result as the
-    /// Tauri command `get_font_pairs`.
-    pub fn font_pairs(
-        &self,
-        font_id: String,
-        excluded_ids: Vec<String>,
-        job: Option<String>,
-    ) -> Result<Vec<PairBucket>, CoreError> {
-        let conn = self.lock()?;
-        let buckets = pairing::font_pairs(&conn, &font_id, excluded_ids, job.as_deref()).map_err(|m| {
-            if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
-        })?;
-
-        let mut paths: HashMap<String, (String, String)> = HashMap::new();
-        let mut stmt = conn.prepare("SELECT font_id, file_path, font_family FROM fonts")?;
-        for r in stmt.query_map([], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
-        })? {
-            let (id, p, fam) = r?;
-            paths.insert(id, (p, fam));
-        }
-
-        Ok(buckets
-            .into_iter()
-            .map(|b| PairBucket {
-                label: b.label,
-                description: b.description,
-                pairs: b
-                    .pairs
-                    .into_iter()
-                    .map(|p| {
-                        let (file_path, family) = paths.get(&p.font_id).cloned().unwrap_or_default();
-                        PairMatch {
-                            suggested_body_style: body_style(p.suggested_body_style, &paths),
-                            family,
-                            file_path,
-                            font_id: p.font_id,
-                            score: p.score,
-                            pair_type: p.pair_type,
-                            reason: p.reason,
-                            evidence: p
-                                .evidence
-                                .into_iter()
-                                .map(|e| Evidence {
-                                    lens: e.lens,
-                                    detail: e.detail,
-                                    source: e.source,
-                                    strength: e.strength,
-                                    effect: e.effect,
-                                })
-                                .collect(),
-                        }
-                    })
-                    .collect(),
-            })
-            .collect())
-    }
-
+    /// `excluded_ids` and `excluded_families` stay out; a family name removes every file of that family.
     /// A flat ranked list of partners for `font_id`, one per family, best first,
-    /// at most `limit`. Same exclusions as `font_pairs` (`job` "reading" drops
-    /// families unfit for body text). Unlike the buckets there is no cap of 11,
+    /// at most `limit`. Hidden fonts are always out (`job` "reading" drops
+    /// families unfit for body text). There is no cap of 11 as in the Tauri buckets,
     /// so the app can page through more ("Show more") and filter client-side.
     pub fn font_candidates(
         &self,
         font_id: String,
         excluded_ids: Vec<String>,
+        excluded_families: Vec<String>,
         job: Option<String>,
         limit: u32,
     ) -> Result<Vec<PairCandidate>, CoreError> {
         let conn = self.lock()?;
-        let scored = pairing::font_candidates(&conn, &font_id, excluded_ids, job.as_deref(), limit as usize)
+        let scored = pairing::font_candidates(&conn, &font_id, excluded_ids, excluded_families, job.as_deref(), limit as usize)
             .map_err(|m| {
                 if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
             })?;
@@ -459,12 +389,3 @@ impl Library {
     }
 }
 
-/// File name without extension, lowercased: "PPRightSerif-SpatialFine.otf"
-/// and ".ttf" are the same style.
-fn file_stem(file_name: &str) -> String {
-    let lower = file_name.to_lowercase();
-    match lower.rfind('.') {
-        Some(i) => lower[..i].to_string(),
-        None => lower,
-    }
-}
