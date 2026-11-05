@@ -151,7 +151,7 @@ struct ContentPanel<Content: View>: View {
     }
 }
 
-/// Display has no stage toolbar, so its search field and the inspector toggle sit in a row above the grid.
+/// Display has no stage toolbar, so its search field, the Sort menu and the inspector toggle sit in a row above the grid.
 struct DisplayTopRow: View {
     @Environment(AppModel.self) private var model
 
@@ -160,6 +160,7 @@ struct DisplayTopRow: View {
             SearchField(prompt: Lexicon.Finder.searchPrompt)
                 .frame(maxWidth: 280)
             Spacer(minLength: 0)
+            DisplaySortMenu()
             InspectorToggle()
         }
         .padding(.horizontal, 20).padding(.top, 16)

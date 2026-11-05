@@ -199,32 +199,50 @@ struct ReadingListHead: View {
                 Text(countLine).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color).lineLimit(1).monospacedDigit()
             }
             SearchField(prompt: Lexicon.Reading.searchPrompt)
-            FlowLayout(spacing: 6) {
-                HeadMenu(title: Lexicon.Reading.sourceLabel, value: SourceScope(model.filter.sources).label) {
-                    Picker(Lexicon.Reading.sourceLabel, selection: Binding(
-                        get: { SourceScope(model.filter.sources) },
-                        set: { if let s = $0.sources { model.filter.sources = s } })) {
-                        ForEach(SourceScope.allCases.filter { $0 != .custom }) { Text($0.label).tag($0) }
+            // One row (board 17): every question that narrows the list in one "Filters · n" menu, then Sort.
+            HStack(spacing: 6) {
+                let active = ReadingFilterCount.active(sources: model.filter.sources, lenses: model.lenses, hasDisplay: hasDisplay)
+                Menu {
+                    Section(Lexicon.Reading.sourceLabel) {
+                        Picker(Lexicon.Reading.sourceLabel, selection: Binding(
+                            get: { SourceScope(model.filter.sources) },
+                            set: { if let s = $0.sources { model.filter.sources = s } })) {
+                            ForEach(SourceScope.allCases.filter { $0 != .custom }) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.inline).labelsHidden()
                     }
+                    if hasDisplay {
+                        Section(Lexicon.contrastLabel) {
+                            Picker(Lexicon.contrastLabel, selection: $model.lenses.contrast) {
+                                ForEach(ContrastLens.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.inline).labelsHidden()
+                        }
+                        Section(Lexicon.structureLabel) {
+                            Picker(Lexicon.structureLabel, selection: $model.lenses.structure) {
+                                ForEach(StructureLens.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.inline).labelsHidden()
+                        }
+                        Section(Lexicon.foundryLabel) {
+                            Picker(Lexicon.foundryLabel, selection: $model.lenses.foundry) {
+                                ForEach(FoundryLens.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.inline).labelsHidden()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(Lexicon.R4.filters(active)).font(.system(size: 12)).foregroundStyle(theme.textPrimary.color)
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .pill()
                 }
-                if hasDisplay {
-                    HeadMenu(title: Lexicon.contrastLabel, value: model.lenses.contrast.rawValue) {
-                        Picker(Lexicon.contrastLabel, selection: $model.lenses.contrast) {
-                            ForEach(ContrastLens.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                    }
-                    HeadMenu(title: Lexicon.structureLabel, value: model.lenses.structure.rawValue) {
-                        Picker(Lexicon.structureLabel, selection: $model.lenses.structure) {
-                            ForEach(StructureLens.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                    }
-                    HeadMenu(title: Lexicon.foundryLabel, value: model.lenses.foundry.rawValue) {
-                        Picker(Lexicon.foundryLabel, selection: $model.lenses.foundry) {
-                            ForEach(FoundryLens.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                    }
-                }
-                HeadMenu(title: Lexicon.sortLabel, value: model.effectiveLenses.sort.rawValue) {
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                .help(Lexicon.R4.filtersHelp)
+                .accessibilityLabel("Filters").accessibilityValue(active == 0 ? "none" : "\(active) on")
+                HeadMenu(title: Lexicon.sortLabel, value: model.effectiveLenses.sort.rawValue, showTitle: false) {
                     Picker(Lexicon.sortLabel, selection: Binding(
                         get: { model.effectiveLenses.sort },
                         set: { model.lenses.sort = $0 })) {
@@ -233,6 +251,7 @@ struct ReadingListHead: View {
                         }
                     }
                 }
+                Spacer(minLength: 0)
             }
             if !hasDisplay {
                 Button(Lexicon.Reading.pickHeadline) { model.screen = .display }
@@ -253,6 +272,7 @@ struct HeadMenu<Options: View>: View {
     @Environment(\.theme) private var theme
     let title: String
     let value: String
+    var showTitle = true
     @ViewBuilder var options: Options
 
     var body: some View {
@@ -260,8 +280,8 @@ struct HeadMenu<Options: View>: View {
             options.pickerStyle(.inline).labelsHidden()
         } label: {
             HStack(spacing: 4) {
-                (Text(title + " \u{00B7} ").foregroundStyle(theme.textSecondary.color) + Text(value).foregroundStyle(theme.textPrimary.color))
-                    .font(.system(size: 12))
+                (Text(showTitle ? title + " \u{00B7} " : "").foregroundStyle(theme.textSecondary.color) + Text(value).foregroundStyle(theme.textPrimary.color))
+                    .font(.system(size: 12)).lineLimit(1)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
             }
             .padding(.horizontal, 10).padding(.vertical, 5)
@@ -309,6 +329,21 @@ struct ReadingListFoot: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .lineLimit(1)
         }
+    }
+}
+
+/// The "n" in "Filters · n": how many of the head's questions are narrowing the list. Source counts when it is not
+/// the standard Your fonts + Google. Difference, Structure and Foundry count when they are not Any, and only once a
+/// Display face exists (before that the list has no such questions).
+enum ReadingFilterCount {
+    static func active(sources: Set<Source>, lenses: Lenses, hasDisplay: Bool) -> Int {
+        var n = SourceScope(sources) == .yoursAndGoogle ? 0 : 1
+        if hasDisplay {
+            if lenses.contrast != .any { n += 1 }
+            if lenses.structure != .any { n += 1 }
+            if lenses.foundry != .any { n += 1 }
+        }
+        return n
     }
 }
 

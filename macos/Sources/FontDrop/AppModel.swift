@@ -365,6 +365,7 @@ final class AppModel {
         if options.showHidden { f.showHidden = true }
         if options.savedOnly { f.savedOnly = true }
         filter = f
+        sampleOverrides = store.dictionary(forKey: "displaySamples") as? [String: String] ?? [:]
         if options.sort == "less-common" { lenses.sort = .lessCommon }
         if options.sort == "character-first" { lenses.sort = .characterFirst }
         if let d = options.difference, let l = ContrastLens.allCases.first(where: { $0.rawValue.lowercased() == d }) { lenses.contrast = l }
@@ -374,8 +375,21 @@ final class AppModel {
     // MARK: derived
 
     var brand: Brand? { brands.first { $0.id == brandID } }
-    /// The text the Display cards draw. "Aa Bb" until there is a brand.
-    var sampleText: String { brand?.name ?? "Aa Bb" }
+    /// The text the Display cards draw: the line the designer typed in the inspector's Sample module, else the brand name.
+    /// "Aa Bb" until there is a brand.
+    var sampleText: String { customSample ?? brand?.name ?? "Aa Bb" }
+
+    /// The line typed for the current brand, per brand and kept between launches. Nil: use the brand name.
+    var customSample: String? { brandID.flatMap { sampleOverrides[String($0)] } }
+    private(set) var sampleOverrides: [String: String] = [:]
+
+    /// Sets the Display sample line for this brand. An empty line puts the brand name back.
+    func setSample(_ text: String) {
+        guard let id = brandID else { return }
+        let line = text.trimmingCharacters(in: .whitespaces)
+        if line.isEmpty { sampleOverrides[String(id)] = nil } else { sampleOverrides[String(id)] = text }
+        defaults.set(sampleOverrides, forKey: "displaySamples")
+    }
     var displayFamily: FamilySummary? { choices["display"].flatMap { familyByName[$0] } }
     var readingFamily: FamilySummary? { choices["reading"].flatMap { familyByName[$0] } }
 

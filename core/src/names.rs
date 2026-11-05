@@ -192,6 +192,45 @@ pub struct NameMeta {
     pub style_name: Option<String>,
 }
 
+/// OS/2 `achVendID` to the foundry's name. Used only where the name table gave no manufacturer (name ID 8),
+/// so a Noto file whose manufacturer is "Monotype Imaging Inc." keeps it. Codes are matched ignoring case,
+/// padding spaces and NULs. A code that more than one maker shares, or one we cannot name for sure, is left out.
+pub const VENDOR_FOUNDRIES: &[(&str, &str)] = &[
+    ("ADBE", "Adobe"),
+    ("APPL", "Apple"),
+    ("B&H", "Bigelow & Holmes"),
+    ("BDFZ", "Founder Type"),
+    ("BITS", "Bitstream"),
+    ("DAMA", "Dalton Maag"),
+    ("DT", "DecoType"),
+    ("GOOG", "Google"),
+    ("HOEF", "Hoefler & Co"),
+    ("ITC", "ITC"),
+    ("ITCS", "ITC"),
+    ("ITFO", "Indian Type Foundry"),
+    ("KLIM", "Klim Type Foundry"),
+    ("LETR", "Letraset"),
+    ("LINO", "Linotype"),
+    ("MONO", "Monotype"),
+    ("MS", "Microsoft"),
+    ("MSFT", "Microsoft"),
+    ("MT", "Monotype"),
+    ("NDTC", "Neufville Digital"),
+    ("PARA", "ParaType"),
+    ("PP", "Pangram Pangram"),
+    ("STIX", "STIX Fonts"),
+    ("TTOK", "TikTok"),
+    ("URW", "URW Type Foundry"),
+];
+
+/// The foundry a vendor code stands for, if the table knows it.
+pub fn foundry_for_vendor(code: &str) -> Option<&'static str> {
+    let key = code.trim_matches(|c: char| c == ' ' || c == '\0');
+    if key.is_empty() { return None; }
+    let upper = key.to_uppercase();
+    VENDOR_FOUNDRIES.iter().find(|(c, _)| *c == upper).map(|(_, f)| *f)
+}
+
 /// Counts outline commands; a glyph with none draws nothing.
 #[derive(Default)]
 struct StrokeCount(usize);
@@ -472,6 +511,27 @@ pub fn named_instances(path: &std::path::Path) -> Vec<NamedInstance> {
         if !out.contains(&item) { out.push(item); }
     }
     out
+}
+
+#[cfg(test)]
+mod vendor_tests {
+    use super::foundry_for_vendor;
+
+    #[test]
+    fn a_vendor_code_names_its_foundry_ignoring_case_and_padding() {
+        assert_eq!(foundry_for_vendor("PP"), Some("Pangram Pangram"));
+        assert_eq!(foundry_for_vendor("Appl"), Some("Apple"));
+        assert_eq!(foundry_for_vendor("Bits"), Some("Bitstream"));
+        assert_eq!(foundry_for_vendor("MT\0\0"), Some("Monotype"));
+        assert_eq!(foundry_for_vendor("ITC "), Some("ITC"));
+    }
+
+    #[test]
+    fn a_shared_or_unknown_code_names_nothing() {
+        assert_eq!(foundry_for_vendor("pyrs"), None);
+        assert_eq!(foundry_for_vendor(""), None);
+        assert_eq!(foundry_for_vendor("ZZZZ"), None);
+    }
 }
 
 #[cfg(test)]
