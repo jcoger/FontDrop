@@ -98,5 +98,13 @@ final class ScaleStore {
     /// The brand is gone (the database already dropped its row).
     func forget(brand: Int64) { map[brand] = nil }
 
+    /// The first brand was just made: the scale set with no brand yet becomes its scale, and is saved.
+    func adoptUnbranded(into brand: Int64) {
+        guard memoryOnly != TypeScale() else { return }
+        map[brand] = memoryOnly
+        memoryOnly = TypeScale()
+        writer.mark(brand)
+    }
+
     func flush() { writer.flush() }
 }

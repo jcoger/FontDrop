@@ -98,8 +98,15 @@ enum ReadingLayout {
     static let sidebarWidth: CGFloat = 235
     static let inspectorWidth: CGFloat = 330
 
-    static func inspectorFits(windowWidth: CGFloat) -> Bool {
-        windowWidth - sidebarWidth - inspectorWidth >= inspectorMinContent
+    /// The strip left of the content that keeps it clear of the traffic lights while the sidebar is hidden.
+    static let hiddenInset: CGFloat = 68
+
+    static func hiddenSidebarInset(sidebarShown: Bool) -> CGFloat { sidebarShown ? 0 : hiddenInset }
+
+    /// Whether the inspector fits beside the list and stage. The sidebar takes its width only while it is shown;
+    /// hidden, the content gives up only the small strip that clears the traffic lights.
+    static func inspectorFits(windowWidth: CGFloat, sidebarShown: Bool = true) -> Bool {
+        windowWidth - (sidebarShown ? sidebarWidth : hiddenInset) - inspectorWidth >= inspectorMinContent
     }
 }
 

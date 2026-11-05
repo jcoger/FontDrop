@@ -24,3 +24,14 @@ dist-ssr
 *.sw?
 .bench/
 dist/
+
+# Xcode and SwiftPM per-user state
+xcuserdata/
+.swiftpm/
+
+# Leftovers from the deleted Tauri shell, at the repo root only (core/Cargo.lock is tracked)
+/Cargo.lock
+/src/main.rs
+
+# Agent worktrees
+.claude/worktrees/

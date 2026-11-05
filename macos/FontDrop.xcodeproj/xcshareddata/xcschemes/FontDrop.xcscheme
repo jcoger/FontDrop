@@ -35,6 +35,20 @@
                ReferencedContainer = "container:FontDrop.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "D4E1CF9D20A5BE793B15D6E8"
+               BuildableName = "FontDropUITests.xctest"
+               BlueprintName = "FontDropUITests"
+               ReferencedContainer = "container:FontDrop.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,6 +75,17 @@
                BlueprintIdentifier = "3BA405026722A52C83DDDD7F"
                BuildableName = "FontDropTests.xctest"
                BlueprintName = "FontDropTests"
+               ReferencedContainer = "container:FontDrop.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "D4E1CF9D20A5BE793B15D6E8"
+               BuildableName = "FontDropUITests.xctest"
+               BlueprintName = "FontDropUITests"
                ReferencedContainer = "container:FontDrop.xcodeproj">
             </BuildableReference>
          </TestableReference>

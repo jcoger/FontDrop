@@ -141,7 +141,20 @@ enum Exporters {
 
     static func token(_ step: ScaleStep) -> String { step.label.lowercased() }
 
-    private static func quoted(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
+    /// A CSS string. Backslash first (or the escapes added after it would double), then the quote. A raw line break
+    /// cannot sit in a CSS string, so it becomes the escape for it.
+    static func quoted(_ s: String) -> String {
+        let escaped = s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\r\n", with: "\\a ")
+            .replacingOccurrences(of: "\n", with: "\\a ")
+            .replacingOccurrences(of: "\r", with: "\\a ")
+        return "\"" + escaped + "\""
+    }
+
+    /// Text that sits inside a CSS comment. A `*/` in a brand name would close the comment early, so it is broken apart.
+    static func inComment(_ s: String) -> String { s.replacingOccurrences(of: "*/", with: "* /") }
 
     private static func stack(_ f: ExportFace) -> String { "\(quoted(f.family)), \(f.generic)" }
 
@@ -167,9 +180,9 @@ enum Exporters {
 
     private static func header(_ spec: ExportSpec) -> String {
         """
-        /* \(spec.brandName) type pair
-           Display: \(spec.display.family), \(spec.display.style) (\(spec.display.postScript))
-           Text: \(spec.text.family), \(spec.text.style) (\(spec.text.postScript))
+        /* \(inComment(spec.brandName)) type pair
+           Display: \(inComment(spec.display.family)), \(inComment(spec.display.style)) (\(inComment(spec.display.postScript)))
+           Text: \(inComment(spec.text.family)), \(inComment(spec.text.style)) (\(inComment(spec.text.postScript)))
            Sizes are px. A point in FontDrop is one CSS px. */
         """
     }
@@ -213,7 +226,7 @@ enum Exporters {
     static func theme(_ spec: ExportSpec, paper: Bool = false) -> String {
         var out: [String] = []
         if paper {
-            out.append("/* \(spec.brandName) type tokens for Paper. Paste into Paper's design tokens. */")
+            out.append("/* \(inComment(spec.brandName)) type tokens for Paper. Paste into Paper's design tokens. */")
         } else {
             out.append(header(spec))
             out.append("")
@@ -224,8 +237,11 @@ enum Exporters {
         for (name, f) in [("display", spec.display), ("text", spec.text)] {
             out.append("  --font-\(name): \(stack(f));")
         }
+        // The weight tokens are named "-style" on purpose. Tailwind builds `font-display` from --font-display (the family),
+        // and a --font-weight-display token would claim the same class name and produce no utility. These make
+        // `font-display-style` and `font-text-style`.
         for (name, f) in [("display", spec.display), ("text", spec.text)] {
-            out.append("  --font-weight-\(name): \(f.weight);")
+            out.append("  --font-weight-\(name)-style: \(f.weight);")
         }
         for step in ScaleStep.stageOrder {
             out.append("  --text-\(token(step)): \(num(spec.size(step)))px;")

@@ -15,10 +15,11 @@ struct RootView: View {
                         .frame(width: 235)
                         .modifier(PanelChrome(fill: \.glassSidebar, radius: 24))
                         .accessibilityElement(children: .contain)
-                        .accessibilityLabel("Sidebar")
+                        .accessibilityLabel(Lexicon.sidebarRegion)
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
                 ContentPanel { ContentRouter() }
+                    .padding(.leading, ReadingLayout.hiddenSidebarInset(sidebarShown: model.showSidebar))   // clears the traffic lights
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(model.screen.title)
                 if model.showInspector && !model.hidesInspector {
@@ -26,7 +27,7 @@ struct RootView: View {
                         .frame(width: 330)
                         .modifier(PanelChrome(fill: \.glassInspector, radius: 24))
                         .accessibilityElement(children: .contain)
-                        .accessibilityLabel("Inspector")
+                        .accessibilityLabel(Lexicon.inspectorRegion)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -34,6 +35,7 @@ struct RootView: View {
         }
         .ignoresSafeArea()
         .background(WindowConfigurator())
+        .background { ZoomInAlias() }
         .background(GeometryReader { geo in
             Color.clear
                 .onAppear { model.windowWidth = geo.size.width }
@@ -43,6 +45,7 @@ struct RootView: View {
         .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .snappy(duration: 0.22), value: model.showInspector)
         .onChange(of: model.screen) { _, _ in model.applyInspectorRule() }
         .onChange(of: model.windowWidth) { _, _ in model.applyInspectorRule() }
+        .onChange(of: model.showSidebar) { _, _ in model.applyInspectorRule() }
         .overlay { phaseOverlay }
         .overlay { if let state = model.preview { FacePreview(state: state) } }
         .onChange(of: model.screen) { _, _ in model.closePreview() }
@@ -114,7 +117,33 @@ struct WindowBackdrop: View {
     @Environment(\.theme) private var theme
     var body: some View {
         LinearGradient(colors: [theme.windowTop.color, theme.windowBottom.color], startPoint: .top, endPoint: .bottom)
+            .overlay { WindowDragHandle() }          // the empty chrome between the panels drags the window
     }
+}
+
+/// Command-+ also zooms the Text stage in. The View menu holds Command-= (no Shift on a US keyboard).
+struct ZoomInAlias: View {
+    @Environment(AppModel.self) private var model
+    var body: some View {
+        Button("") { model.stageZoom.zoomIn() }
+            .keyboardShortcut("+", modifiers: .command)
+            .disabled(!model.canZoomStage || !model.stageZoom.canZoomIn)
+            .opacity(0).frame(width: 0, height: 0).allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+/// An empty strip that drags the window. Only views that say so move it: the dial, the sliders and the colour area
+/// are never drag handles (the window's own "drag from anywhere" is off, see `WindowChrome`).
+struct WindowDragHandle: NSViewRepresentable {
+    final class Handle: NSView {
+        override var mouseDownCanMoveWindow: Bool { true }
+        override func mouseDown(with event: NSEvent) {
+            if event.clickCount == 2 { window?.performZoom(nil) } else { window?.performDrag(with: event) }
+        }
+    }
+    func makeNSView(context: Context) -> NSView { Handle() }
+    func updateNSView(_ view: NSView, context: Context) {}
 }
 
 /// A rounded glass panel with grain (dark only). Clips its content to the corner.
@@ -213,23 +242,31 @@ struct InspectorToggle: View {
         }
         .buttonStyle(.plain)
         .help("Show or hide the inspector")
-        .accessibilityLabel("Inspector")
+        .accessibilityLabel(Lexicon.inspectorRegion)
     }
 }
 
-/// Full-size content under a transparent title bar: the traffic lights sit inside the sidebar panel.
+/// How the window is set up.
+enum WindowChrome {
+    /// Full-size content under a transparent title bar: the traffic lights sit inside the sidebar panel.
+    /// `isMovableByWindowBackground` stays off: with it on, a drag that starts on the dial, a slider or the colour
+    /// area can move the window. Only `WindowDragHandle` strips move it.
+    @MainActor
+    static func configure(_ w: NSWindow) {
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.styleMask.insert(.fullSizeContentView)
+        w.isMovableByWindowBackground = false
+        w.title = "FontDrop"
+    }
+}
+
 struct WindowConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             guard let w = view.window else { return }
-            w.titlebarAppearsTransparent = true
-            w.titleVisibility = .hidden
-            w.styleMask.insert(.fullSizeContentView)
-            w.isMovableByWindowBackground = true
-            w.title = "FontDrop"
-            // No control starts with the keyboard focus ring: it appears when you tab or arrow into one.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { w.makeFirstResponder(nil) }
+            WindowChrome.configure(w)
         }
         return view
     }
