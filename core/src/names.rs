@@ -31,6 +31,17 @@ mod name_tests {
         assert!(!trial_from_names(["Timeless Serif", "Timeless Serif Regular"]));
     }
     #[test]
+    fn latin_rule_keeps_display_faces_and_drops_symbol_fonts() {
+        use super::covers_latin;
+        assert!(covers_latin(26, 26, 10), "a text face");
+        assert!(covers_latin(26, 0, 0), "caps only, no figures");
+        assert!(covers_latin(0, 26, 0));
+        assert!(covers_latin(26, 26, 0), "script faces often ship without figures");
+        assert!(!covers_latin(10, 24, 10), "letters mapped but most draw nothing");
+        assert!(!covers_latin(0, 0, 10), "figures alone are not Latin");
+        assert!(!covers_latin(0, 1, 0));
+    }
+    #[test]
     fn strips_default_instance_words() {
         assert_eq!(strip_instance_words("Montserrat Thin"), "Montserrat");
         assert_eq!(strip_instance_words("Nunito Sans 12pt ExtraLight 12pt"), "Nunito Sans");
@@ -119,6 +130,46 @@ pub struct NameMeta {
     pub foundry_url: Option<String>,
     /// The file has variation axes (an `fvar` table).
     pub variable: bool,
+    /// Its cmap draws basic Latin (see `covers_latin`). Symbol and dingbat fonts do not.
+    pub covers_latin: bool,
+}
+
+/// Counts outline commands; a glyph with none draws nothing.
+#[derive(Default)]
+struct StrokeCount(usize);
+impl skrifa::outline::OutlinePen for StrokeCount {
+    fn move_to(&mut self, _: f32, _: f32) { self.0 += 1; }
+    fn line_to(&mut self, _: f32, _: f32) { self.0 += 1; }
+    fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) { self.0 += 1; }
+    fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) { self.0 += 1; }
+    fn close(&mut self) {}
+}
+
+/// How much of basic Latin a font can draw: (A-Z, a-z, 0-9) counts out of (26, 26, 10).
+/// A character counts only when the cmap maps it AND its glyph has an outline. Some symbol
+/// fonts map every letter but leave most of the glyphs empty.
+pub fn latin_coverage(font: &skrifa::FontRef) -> (usize, usize, usize) {
+    use skrifa::instance::{LocationRef, Size};
+    use skrifa::outline::DrawSettings;
+    use skrifa::MetadataProvider;
+    let cmap = font.charmap();
+    let outlines = font.outline_glyphs();
+    let drawn = |c: char| -> bool {
+        let Some(gid) = cmap.map(c as u32) else { return false };
+        let Some(glyph) = outlines.get(gid) else { return false };
+        let mut pen = StrokeCount::default();
+        glyph.draw(DrawSettings::unhinted(Size::unscaled(), LocationRef::default()), &mut pen).is_ok() && pen.0 > 0
+    };
+    let count = |chars: &mut dyn Iterator<Item = char>| chars.filter(|c| drawn(*c)).count();
+    (count(&mut ('A'..='Z')), count(&mut ('a'..='z')), count(&mut ('0'..='9')))
+}
+
+/// Can this font draw a Latin sample? A text face covers all 26 capitals or all 26 lowercase
+/// letters (caps-only and small-cap display faces map one case only). Figures do not count:
+/// script and display faces often ship without them and are still real Latin faces.
+/// Symbol, dingbat and non-Latin faces cover next to none of the letters.
+pub fn covers_latin(upper: usize, lower: usize, _digits: usize) -> bool {
+    upper == 26 || lower == 26
 }
 
 /// Does any of these strings (name-table entries, the file name) read as a trial build?
@@ -163,7 +214,8 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
         .into_iter()
         .filter_map(text)
         .find(|u| u.starts_with("http"));
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: font.axes().len() > 0 })
+    let (u, l, d) = latin_coverage(&font);
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: font.axes().len() > 0, covers_latin: covers_latin(u, l, d) })
 }
 
 pub struct FontMeta {

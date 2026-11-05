@@ -28,6 +28,15 @@ pub struct PairScore {
     pub pair_type: String, // "harmonious" | "bold" | "conflict" | "uncertain" | "superfamily"
     pub reason: String,
     pub evidence: Vec<Evidence>,
+    /// Only for `same_family`: the style of that family to set the body text in.
+    pub suggested_body_style: Option<BodyStyle>,
+}
+
+/// A style of a family, by the file that holds it, with a designer-readable label ("Regular", "Text").
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct BodyStyle {
+    pub font_id: String,
+    pub label: String,
 }
 
 /// One piece of reasoning behind a score: which lens, what was measured, who
@@ -75,6 +84,10 @@ pub struct FontData {
     pub spacing_personality: Option<String>,
     pub width_class: Option<String>,
     pub vendor_id: Option<String>,
+    pub file_path: String,
+    /// "normal" | "italic" (from the file's own style flags)
+    pub style: String,
+    pub is_variable: bool,
 }
 
 
@@ -264,6 +277,7 @@ fn score_pair(primary: &FontData, candidate: &FontData) -> Option<PairScore> {
         pair_type: pair_type.into(),
         reason,
         evidence,
+        suggested_body_style: None,
     })
 }
 
@@ -277,7 +291,7 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
                     foundry, designer, file_name,
                     optical_role, superfamily_group, superfamily_role,
                     weight_range_min, weight_range_max, spacing_personality, width_class,
-                    vendor_id
+                    vendor_id, file_path, style, COALESCE(is_variable, 0)
              FROM fonts",
         )
         .map_err(|e| e.to_string())?;
@@ -305,6 +319,9 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
             spacing_personality: row.get(17)?,
             width_class: row.get(18)?,
             vendor_id: row.get(19)?,
+            file_path: row.get(20)?,
+            style: row.get(21)?,
+            is_variable: row.get::<_, i64>(22)? != 0,
         })
     })
         .map_err(|e| e.to_string())?
@@ -334,10 +351,12 @@ pub fn font_pairs(
 
     let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
     excluded.extend(crate::finder::hidden_font_ids(conn)); // junk list and the user's hides
+    // The Display family's own offer ignores the long-text rule: it is shown with a caveat instead.
+    let same_family = crate::same_family::offer(primary, &all, &excluded);
     if job == Some("reading") {
         excluded.extend(unfit_for_reading(&all));
     }
-    Ok(bucket_pairs(primary, &all, &excluded))
+    Ok(bucket_pairs_with(primary, &all, &excluded, same_family))
 }
 
 /// Font ids whose family can't do the Reading job. Sources: a body face must
@@ -423,10 +442,11 @@ pub fn font_candidates(
         .ok_or_else(|| format!("Font {} not found", font_id))?;
     let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
     excluded.extend(crate::finder::hidden_font_ids(conn)); // junk list and the user's hides
+    let same_family = crate::same_family::offer(primary, &all, &excluded);
     if job == Some("reading") {
         excluded.extend(unfit_for_reading(&all));
     }
-    Ok(ranked_candidates(primary, &all, &excluded, limit))
+    Ok(crate::same_family::put_first(ranked_candidates(primary, &all, &excluded, limit), same_family, limit))
 }
 
 /// How many families the Reading rule (`unfit_for_reading`) removes from the candidate list:
@@ -466,6 +486,16 @@ pub fn bucket_pairs(
     all: &[FontData],
     excluded: &HashSet<String>,
 ) -> Vec<PairBucket> {
+    bucket_pairs_with(primary, all, excluded, None)
+}
+
+/// `bucket_pairs`, with the Display family's own "Same family" offer (if it has one) as the first group.
+pub fn bucket_pairs_with(
+    primary: &FontData,
+    all: &[FontData],
+    excluded: &HashSet<String>,
+    same_family: Option<PairScore>,
+) -> Vec<PairBucket> {
     let ranked = rank_by_family(primary, all, excluded);
 
     // 11 slots: up to 3 uniform and 2 designed-together; contrast fills the rest.
@@ -476,7 +506,9 @@ pub fn bucket_pairs(
     let together = take("superfamily", 2);
     let contrast = take("contrast", 11 - uniform.len() - together.len());
 
+    let same: Vec<PairScore> = same_family.into_iter().collect();
     [
+        ("Same family", "Use this family for both. Pick a different width or weight for the body.", same),
         ("Clear contrast", "Serif against sans. Reads as intent.", contrast),
         ("Uniform", "Same form, same structure. Reads as one voice.", uniform),
         ("Designed together", "Made as a set. Safest, least distinctive.", together),
@@ -517,6 +549,9 @@ mod tests {
             spacing_personality: Some("normal".to_string()),
             width_class: Some("normal".to_string()),
             vendor_id: None,
+            file_path: format!("/x/{id}.ttf"),
+            style: "normal".to_string(),
+            is_variable: false,
         }
     }
 
@@ -913,10 +948,11 @@ mod tests {
                 cap_height_ratio REAL, ascender_descender_ratio REAL, foundry TEXT,
                 designer TEXT, file_name TEXT, optical_role TEXT, superfamily_group TEXT,
                 superfamily_role TEXT, weight_range_min INTEGER, weight_range_max INTEGER,
-                spacing_personality TEXT, width_class TEXT, vendor_id TEXT
+                spacing_personality TEXT, width_class TEXT, vendor_id TEXT,
+                file_path TEXT, style TEXT, is_variable INTEGER
             );
-            INSERT INTO fonts (font_id, font_family, skeleton, flesh_contrast, flesh_serif, weight, file_name)
-            VALUES ('a','Alpha','geometric','linear',0,400,'Alpha.ttf');",
+            INSERT INTO fonts (font_id, font_family, skeleton, flesh_contrast, flesh_serif, weight, file_name, file_path, style)
+            VALUES ('a','Alpha','geometric','linear',0,400,'Alpha.ttf','/x/Alpha.ttf','normal');",
         )
         .expect("create+insert");
 

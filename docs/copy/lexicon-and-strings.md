@@ -208,3 +208,29 @@ Strings for the filter bar, Saved, Hide and the Reading changes. Checked against
 ### Gates for section 8
 
 A pass (8.25 says Google, which is the data) · B pass · C pass (no em dashes; the numeric separator is a middle dot) · D pass (8.3, 8.8 read alone) · E pass (8.19 names the way back) · F pass · G n/a · H pending cold read · K pass (chips carry selection through fill and outline, and VoiceOver reads the selected state) · N pass · Q pass · R pass (no engine words: not "source", "kind", "trait", "facet")
+
+## 9. Same family and wave 3b review fixes (wave 4a, 2026-10-22)
+
+Designers often pair a family with itself: one family, a different width or weight for the body. The engine now offers the Display family as a candidate when it has range. Strings live in `Lexicon.swift` (`sameFamilyGroup`, `sameFamilyHelp`, `bodyIn`, `Finder.savedChipHelp`). Checked against sections 1 to 8: no em dashes, every label reads alone.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 9.1 | group | **Same family** | Pair group, first in the list. Not "Self pair" (engine word) or "Single family" (sounds like one weight) |
+| 9.2 | group.help | **Use this family for both. Pick a different width or weight for the body.** | Group help, and the tooltip on the card tag. Says what to do next |
+| 9.3 | chip | **Same family: 5 widths, 16 styles, text cut** | The range the engine found. Counts styles the same way as the card footer. Parts are only listed when present: widths, styles, weights, italic, text cut or optical sizes |
+| 9.4 | chip.longtext | **May be weak for long text** | Warning chip (icon + secondary color, like Too close to Display). Shown when the family has no regular, italic, bold and bold italic set at a normal width, or is a display cut or mono. The family is still offered |
+| 9.5 | longtext.why | The engine's reason, plus a full stop: "No regular, italic, bold and bold italic set at a normal width." | Why row detail |
+| 9.6 | card.body | **Body in Regular** | On the card, while the body is in the suggested style. Gone once the designer picks another style in the playground |
+| 9.7 | saved.chip.help | **Saved fonts in this view** | Tooltip on the Saved chip: its count follows the filters |
+| 9.8 | saved.sidebar.help | **All your saved fonts** | Tooltip on the sidebar Saved row: its count is global |
+
+Notes.
+
+- The suggested body style prefers a text or optical cut near weight 400 at normal width, then Regular or Book at normal width. It is never italic and never a bold text cut.
+- The Difference, Structure and Foundry lenses do not apply to Same family. It always shows and always sorts first under Best match.
+- 8.24 now follows the source chips (Your fonts, Google Fonts, Mac system) set on the Display grid. Reading browses the same sources, so "N not made for long text" matches the list.
+- Families with no Latin letters (symbol, dingbat and non-Latin script fonts) are hidden like the junk list: **Hidden** pill and **Unhide** (8.20) apply. No new strings.
+
+### Gates for section 9
+
+A pass · B pass · C pass (no em dashes) · D pass (9.1, 9.4 read alone) · E pass (9.2 says what to do) · F pass · K pass (the warning chip carries meaning through icon, not color alone) · Q pass · R pass (no "evidence", "lens" or "skeleton" in a label) · H pending cold read

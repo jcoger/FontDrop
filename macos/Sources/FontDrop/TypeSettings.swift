@@ -189,9 +189,30 @@ final class TypeSettingsStore {
 
     static func key(brand: Int64?, job: String, family: String) -> String { "\(brand ?? 0)/\(job)/\(family)" }
 
-    func settings(_ key: String, job: String) -> TypeSettings { map[key] ?? .defaults(job: job) }
+    /// Where a face's Style picker starts when the designer has not set anything: the engine's
+    /// suggested body style for a "Same family" pair. Never saved on its own (see `adoptSuggestion`).
+    private(set) var suggestedStyle: [String: String] = [:]
 
-    func isModified(_ key: String, job: String) -> Bool { (map[key] ?? .defaults(job: job)) != .defaults(job: job) }
+    private func defaults(_ key: String, job: String) -> TypeSettings {
+        var d = TypeSettings.defaults(job: job)
+        d.stylePath = suggestedStyle[key]
+        return d
+    }
+
+    func settings(_ key: String, job: String) -> TypeSettings { map[key] ?? defaults(key, job: job) }
+
+    func isModified(_ key: String, job: String) -> Bool { (map[key] ?? defaults(key, job: job)) != defaults(key, job: job) }
+
+    /// Replaces the suggested starting styles (one per Same family card on screen).
+    func setSuggestedStyles(_ styles: [String: String]) {
+        if styles != suggestedStyle { suggestedStyle = styles }
+    }
+
+    /// The designer chose this face: keep the suggested style as their setting so it survives a relaunch.
+    func adoptSuggestion(_ key: String, job: String) {
+        guard map[key] == nil, let path = suggestedStyle[key] else { return }
+        update(key, job: job) { $0.stylePath = path }
+    }
 
     func update(_ key: String, job: String, _ change: (inout TypeSettings) -> Void) {
         var s = settings(key, job: job)

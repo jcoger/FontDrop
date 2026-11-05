@@ -22,7 +22,7 @@ struct ReadingView: View {
                 }
             }
         }
-        .task(id: "\(model.brandID ?? 0)/\(model.displayFamily?.fontId ?? "")") { await model.loadCandidates() }
+        .task(id: "\(model.brandID ?? 0)/\(model.displayFamily?.fontId ?? "")/\(model.sourcesKey)") { await model.loadCandidates() }
         .toolbar { LensToolbar(lenses: $model.lenses) }
     }
 
@@ -226,7 +226,14 @@ struct CandidateCard: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(candidate.family).font(.callout.weight(.semibold)).lineLimit(1)
+                if candidate.isSameFamily {
+                    Text(Lexicon.sameFamilyGroup).font(.caption).foregroundStyle(.secondary)
+                        .help(Lexicon.sameFamilyHelp)
+                }
                 Spacer()
+                if let style = bodyStyleNote {
+                    Text(style).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
                 if isChosen {
                     Text("Chosen").font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
                 } else if isSaved {
@@ -260,13 +267,19 @@ struct CandidateCard: View {
         .onTapGesture(perform: select)
     }
 
+    /// "Body in Regular" on a Same family card, while the body is still in the suggested style.
+    private var bodyStyleNote: String? {
+        guard candidate.isSameFamily, let body = candidate.bodyStyle, context.body.resolvedPath == body.filePath else { return nil }
+        return Lexicon.bodyIn(body.label)
+    }
+
     private struct Chip { let text: String; let effect: Int8; let help: String; var warning = false }
 
     /// Engine evidence in designer words, plus "Mixed feel" when the two faces cross traditions.
     private var chips: [Chip] {
         var out = candidate.evidence.map { e in
             Chip(text: Lexicon.chip(e, xHeightNote: e.lens == "x-height" ? xHeightNote : nil),
-                 effect: e.effect, help: Lexicon.sources(e.source), warning: e.lens == "Near-duplicate")
+                 effect: e.effect, help: Lexicon.sources(e.source), warning: e.lens == "Near-duplicate" || e.lens == "Long text")
         }
         if candidate.isCrossedHands { out.append(Chip(text: "Mixed structure", effect: 0, help: Lexicon.Term.sameStructure.help)) }
         var seen = Set<String>()

@@ -223,7 +223,9 @@ pub fn hide_family(conn: &Connection, family: &str) -> Result<(), String> {
 /// Show a family again. For a junk-list family this records "shown on purpose"; for any
 /// other it removes the user's hide.
 pub fn unhide_family(conn: &Connection, family: &str) -> Result<(), String> {
-    let result = if is_junk_family(family) {
+    // Junk-list families and families with no Latin (symbol fonts) hide by default, so
+    // showing one again is recorded as "shown on purpose".
+    let result = if is_junk_family(family) || no_latin_families(conn).contains(&family.to_lowercase()) {
         conn.execute(
             "INSERT INTO hidden (family, hidden) VALUES (?1, 0) ON CONFLICT(family) DO UPDATE SET hidden = 0",
             params![family],
@@ -267,10 +269,26 @@ fn favorite_set(conn: &Connection) -> HashSet<String> {
     out
 }
 
-fn effective_hidden(name: &str, overrides: &HashMap<String, bool>) -> bool {
+/// Families (lowercased) where no style can draw basic Latin: symbol and dingbat fonts.
+/// They hide by default like the junk list. A file not read yet (NULL) counts as covering Latin,
+/// so nothing is hidden on a guess. Empty if the column is missing.
+pub fn no_latin_families(conn: &Connection) -> HashSet<String> {
+    let mut out = HashSet::new();
+    if let Ok(mut st) = conn.prepare(
+        "SELECT lower(font_family) FROM fonts GROUP BY lower(font_family) HAVING MAX(COALESCE(covers_latin, 1)) = 0",
+    ) {
+        if let Ok(rows) = st.query_map([], |r| r.get::<_, String>(0)) {
+            out.extend(rows.flatten());
+        }
+    }
+    out
+}
+
+/// The user's choice wins; otherwise the junk list and the no-Latin rule hide.
+fn effective_hidden(name: &str, overrides: &HashMap<String, bool>, no_latin: &HashSet<String>) -> bool {
     match overrides.get(&name.to_lowercase()) {
         Some(&h) => h,
-        None => is_junk_family(name),
+        None => is_junk_family(name) || no_latin.contains(&name.to_lowercase()),
     }
 }
 
@@ -278,11 +296,12 @@ fn effective_hidden(name: &str, overrides: &HashMap<String, bool>) -> bool {
 /// as exclusions so a hidden family never shows up as a match. Empty if the tables are missing.
 pub fn hidden_font_ids(conn: &Connection) -> HashSet<String> {
     let overrides = hidden_overrides(conn);
+    let no_latin = no_latin_families(conn);
     let mut out = HashSet::new();
     if let Ok(mut st) = conn.prepare("SELECT font_id, font_family FROM fonts") {
         if let Ok(rows) = st.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))) {
             for (id, fam) in rows.flatten() {
-                if effective_hidden(&fam, &overrides) {
+                if effective_hidden(&fam, &overrides, &no_latin) {
                     out.insert(id);
                 }
             }
@@ -454,6 +473,7 @@ pub fn load_families(conn: &Connection) -> Result<Vec<FamilyAgg>, rusqlite::Erro
     }
     let google_keys: HashSet<String> = google.keys().cloned().collect();
     let overrides = hidden_overrides(conn);
+    let no_latin = no_latin_families(conn);
     let favorites = favorite_set(conn);
 
     let mut out: Vec<FamilyAgg> = accs
@@ -481,7 +501,7 @@ pub fn load_families(conn: &Connection) -> Result<Vec<FamilyAgg>, rusqlite::Erro
                 kind,
                 traits,
                 saved: favorites.contains(&name.to_lowercase()),
-                hidden: effective_hidden(&name, &overrides),
+                hidden: effective_hidden(&name, &overrides, &no_latin),
                 google_rank: g.as_ref().and_then(|(_, p)| *p),
             };
             Some(FamilyAgg {
@@ -721,6 +741,34 @@ mod tests {
         // and the user can hide it again
         hide_family(&conn, "zapf dingbats").unwrap();
         assert!(!names(&find_families(&conn, &FamilyQuery::default()).unwrap()).contains(&"Zapf Dingbats"));
+    }
+
+    #[test]
+    fn families_that_cannot_draw_latin_hide_like_junk() {
+        let conn = library();
+        // A symbol family (no style covers Latin), a mixed family (one style does), an unread one (NULL).
+        for (id, family, latin) in [("sy1", "Acme Symbols", Some(0)), ("sy2", "Acme Symbols", Some(0)), ("mx1", "Acme Mixed", Some(0)), ("mx2", "Acme Mixed", Some(1)), ("un1", "Acme Unread", None)] {
+            add(&conn, row(id, family, "user"));
+            conn.execute("UPDATE fonts SET covers_latin = ?2 WHERE font_id = ?1", params![id, latin]).unwrap();
+        }
+        let q = FamilyQuery::default();
+        let shown = find_families(&conn, &q).unwrap();
+        assert!(!names(&shown).contains(&"Acme Symbols"), "no style covers Latin");
+        assert!(names(&shown).contains(&"Acme Mixed"), "one style that does is enough");
+        assert!(names(&shown).contains(&"Acme Unread"), "not read yet: never hide on a guess");
+        assert_eq!(shown.counts.hidden, 3, "junk (2) plus the symbol family");
+        // Show hidden lists it, flagged hidden.
+        let all = find_families(&conn, &FamilyQuery { include_hidden: true, ..Default::default() }).unwrap();
+        assert!(all.families.iter().find(|f| f.name == "Acme Symbols").unwrap().hidden);
+        // Pairing keeps it out.
+        let ids = hidden_font_ids(&conn);
+        assert!(ids.contains("sy1") && ids.contains("sy2") && !ids.contains("mx1"));
+        // Unhiding sticks, and the user can hide it again.
+        unhide_family(&conn, "Acme Symbols").unwrap();
+        assert!(names(&find_families(&conn, &q).unwrap()).contains(&"Acme Symbols"));
+        assert!(!hidden_font_ids(&conn).contains("sy1"));
+        hide_family(&conn, "Acme Symbols").unwrap();
+        assert!(!names(&find_families(&conn, &q).unwrap()).contains(&"Acme Symbols"));
     }
 
     #[test]
@@ -969,5 +1017,35 @@ mod tests {
         assert_eq!(unfit_family_count(&conn, "p", vec![]).unwrap(), 2);
         assert_eq!(unfit_family_count(&conn, "p", vec!["one".into()]).unwrap(), 1, "an excluded file is not counted");
         assert!(unfit_family_count(&conn, "nope", vec![]).is_err());
+    }
+
+    #[test]
+    fn display_family_with_range_leads_candidates_and_buckets_even_for_reading() {
+        use crate::pairing::{font_candidates, font_pairs};
+        let conn = mem();
+        let measured = |id: &str, family: &str, file: &str, weight: i32| {
+            add(&conn, Row { file, ..row(id, family, "user") });
+            conn.execute(
+                "UPDATE fonts SET skeleton = 'rational', x_height_ratio = 0.5, cap_height_ratio = 0.7, weight = ?2 WHERE font_id = ?1",
+                params![id, weight],
+            )
+            .unwrap();
+        };
+        // The Display family: widths, a weight spread and an italic, but no bold italic, so it fails the long-text rule.
+        for (i, (file, w)) in [("Acme-Regular.otf", 400), ("Acme-Narrow.otf", 400), ("Acme-Wide.otf", 400), ("Acme-Italic.otf", 400), ("Acme-Black.otf", 900)].iter().enumerate() {
+            measured(&format!("d{i}"), "Acme", file, *w);
+        }
+        measured("o", "Other Sans", "Regular.otf", 400);
+        for job in [Some("reading"), None] {
+            let list = font_candidates(&conn, "d0", vec![], job, 10).unwrap();
+            assert_eq!(list[0].pair_type, "same_family", "{job:?}: {list:?}");
+            assert!(list[0].suggested_body_style.is_some());
+            assert!(list[0].evidence.iter().any(|e| e.lens == "Long text"), "caveat, not removal");
+        }
+        let buckets = font_pairs(&conn, "d0", vec![], Some("reading")).unwrap();
+        assert_eq!(buckets[0].label, "Same family");
+        // A hidden Display family offers nothing.
+        hide_family(&conn, "Acme").unwrap();
+        assert!(font_candidates(&conn, "d0", vec![], None, 10).unwrap().iter().all(|c| c.pair_type != "same_family"));
     }
 }

@@ -481,6 +481,7 @@ final class AppModel {
             if previous != family { undoChoice[job] = .some(previous) }
             choices[job] = family
             choicePulse += 1
+            if job == "reading" { typeSettings.adoptSuggestion(settingsKey("reading", family), job: "reading") }
             if job == "display" { candidates = []; candidatesKey = nil; selectedCandidate = nil }
         } catch { report(error) }
     }
@@ -522,17 +523,19 @@ final class AppModel {
     /// candidate are loaded before the list is shown, so the cards never write state.
     func loadCandidates() async {
         guard let display = displayFamily else { candidates = []; candidatesKey = nil; return }
-        let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)"
+        let key = "\(brandID ?? 0)/\(display.fontId)/\(candidateLimit)/\(includeUnfitFaces)/\(sourcesKey)"
         if key == candidatesKey { return }
         candidatesLoading = true
         candidatesError = nil
         let id = display.fontId, limit = UInt32(candidateLimit)
         let job: String? = includeUnfitFaces ? nil : "reading"
+        // Reading browses the same sources as the Display filter; the long-text count follows it too.
+        let outside = idsOutsideSources(keeping: display.name)
         do {
             let ranked = try await background {
-                try $0.fontCandidates(fontId: id, excludedIds: [], job: job, limit: limit)
+                try $0.fontCandidates(fontId: id, excludedIds: outside, job: job, limit: limit)
             }
-            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: []) }
+            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: outside) }
             var seen = Set<String>()
             var list: [Candidate] = []
             for p in ranked where !p.family.isEmpty && seen.insert(p.family).inserted {
@@ -540,12 +543,17 @@ final class AppModel {
                 let path = familyByName[p.family]?.filePath ?? p.filePath
                 list.append(Candidate(id: p.fontId, family: p.family, filePath: path,
                                       pairType: p.pairType, evidence: p.evidence, order: list.count,
-                                      googleRank: allEntries[p.family]?.googleRank.map(Int.init)))
+                                      googleRank: allEntries[p.family]?.googleRank.map(Int.init),
+                                      bodyStyle: p.suggestedBodyStyle))
             }
             let allPaths = list.flatMap { c in (fontsByFamily[c.family] ?? []).map(\.filePath) + [c.filePath] }
             await FontLoader.shared.preload(paths: allPaths)
             guard displayFamily?.fontId == id else { return }   // changed while loading
             candidates = list
+            // A Same family card starts its body in the engine's suggested style, in the playground too.
+            typeSettings.setSuggestedStyles(Dictionary(
+                list.compactMap { c in c.bodyStyle.map { (settingsKey("reading", c.family), $0.filePath) } },
+                uniquingKeysWith: { a, _ in a }))
             notForLongText = Int(unfit)
             candidatesHasMore = ranked.count >= candidateLimit
             candidatesKey = key
@@ -558,6 +566,20 @@ final class AppModel {
             candidatesError = "\(error)"
         }
         candidatesLoading = false
+    }
+
+    /// The active source chips as one string, so a change reloads the Reading list.
+    var sourcesKey: String { Source.all.filter(filter.sources.contains).map(\.key).joined(separator: ",") }
+
+    /// Font ids of every family outside the active source chips (none selected means all sources).
+    /// Passed to the core as exclusions so Reading and its long-text count match the Display filter.
+    /// `keeping` is the Display family, which stays whatever its source.
+    private func idsOutsideSources(keeping display: String) -> [String] {
+        guard !filter.sources.isEmpty else { return [] }
+        return fontsByFamily.flatMap { name, files -> [String] in
+            guard name != display, let entry = allEntries[name], !entry.sources.contains(where: filter.sources.contains) else { return [] }
+            return files.map(\.fontId)
+        }
     }
 
     /// Asks the core for another page of candidates. The list keeps its order; the new ones arrive at the end.

@@ -4,6 +4,7 @@
 //! - `names`: what a font file says about itself (family, vendor, trial flag, foundry URL)
 //! - `classifier`, `metrics`: skeleton and proportion measurements
 //! - `pairing`: scoring, buckets, evidence
+//! - `same_family`: offering the Display family itself, with a body style
 //! - `userdata`: brands, shortlist per job, choices, house style
 //! - `google_fonts`: catalogue enrichment
 //! - `ffi` (feature `uniffi`): the Swift surface
@@ -19,6 +20,7 @@ pub mod google_list;
 pub mod metrics;
 pub mod names;
 pub mod pairing;
+pub mod same_family;
 pub mod userdata;
 
 pub use names::{

@@ -10,7 +10,7 @@ enum Lexicon {
     enum Term: String, CaseIterable, Identifiable {
         case structure = "Structure", sameStructure = "Same or mixed structure", rational = "Rational"
         case strokeContrast = "Stroke contrast", difference = "Clear difference", harmony = "Harmony"
-        case superfamily = "Superfamily", tooClose = "Too close"
+        case superfamily = "Superfamily", tooClose = "Too close", sameFamily = "Same family"
         var id: String { rawValue }
 
         var help: String {
@@ -23,6 +23,7 @@ enum Lexicon {
             case .harmony: "Same form and structure. Reads as one voice."
             case .superfamily: "Drawn as one set. Safest choice."
             case .tooClose: "So alike it can look like a mistake."
+            case .sameFamily: Lexicon.sameFamilyHelp
             }
         }
     }
@@ -36,6 +37,7 @@ enum Lexicon {
         case "Clear contrast": .difference
         case "Uniform": .harmony
         case "Designed together": .superfamily
+        case "Same family": .sameFamily
         case "The middle", "Near-duplicate": .tooClose
         default: nil
         }
@@ -47,6 +49,7 @@ enum Lexicon {
         case "contrast": "Clear difference"
         case "uniform": "Harmony"
         case "superfamily": "Superfamily"
+        case "same_family": sameFamilyGroup
         case "middle": "Too close"
         default: "Unclassified"
         }
@@ -136,6 +139,8 @@ enum Lexicon {
         case "Foundry": return "Same foundry"
         case "Designer": return "Same designer"
         case "Near-duplicate": return "Too close to Display"
+        case "Same family": return "Same family: \(e.detail)"
+        case "Long text": return "May be weak for long text"
         case "Width": return "Widths far apart"
         default: return e.detail.isEmpty ? e.lens : "\(e.lens): \(e.detail)"
         }
@@ -160,6 +165,7 @@ enum Lexicon {
         case "Designed together": "Superfamily"
         case "The middle", "Near-duplicate": "Too close"
         case "Texture": "Stroke contrast"
+        case "Same family": "Same family"
         case "Foundry": "Foundry"
         case "Designer": "Designer"
         default: e.lens
@@ -169,10 +175,18 @@ enum Lexicon {
     /// The row detail. The foundry or designer name lives here, not in the chip.
     static func whyDetail(_ e: Evidence) -> String {
         switch e.lens {
-        case "Foundry", "Designer": e.detail
+        case "Foundry", "Designer", "Same family": e.detail
+        case "Long text": e.detail + "."
         default: chip(e)
         }
     }
+
+    // MARK: Same family (9.x)
+
+    static let sameFamilyGroup = "Same family"
+    static let sameFamilyHelp = "Use this family for both. Pick a different width or weight for the body."
+    /// On the Same family card: which style the body text starts in.
+    static func bodyIn(_ style: String) -> String { "Body in \(style)" }
 
     // MARK: Lens labels (2.x)
 
@@ -237,6 +251,9 @@ enum Lexicon {
         static let save = "Save"
         static let saved = "Saved"
         static let removeSaved = "Remove from Saved"
+        /// 9.5: the chip counts what the filters show; the sidebar counts every saved family.
+        static let savedChipHelp = "Saved fonts in this view"
+        static let savedSidebarHelp = "All your saved fonts"
         static let savedEmpty = "Nothing saved yet. Star a family to keep it here."
         static let searchPrompt = "Search name, foundry or designer"
         static let noMatches = "No families match these filters."
