@@ -32,8 +32,7 @@ struct FamilyInspector: View {
             .safeAreaInset(edge: .bottom) { action(family).background(.ultraThinMaterial) }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.choices[screen.job ?? ""] == family.name)
         } else {
-            ContentUnavailableView(Lexicon.R4.noSelection, systemImage: "textformat",
-                                   description: Text(Lexicon.R4.noSelectionHelp))
+            EmptyScreen(label: Lexicon.R4.noSelection, line: Lexicon.R4.noSelectionHelp)
         }
     }
 

@@ -158,6 +158,13 @@ final class AppModel {
     var search = "" { didSet { if search != oldValue { scheduleFinder() } } }
     var showInspector = true
     /// Kept between launches. A screenshot or test run has its own throwaway defaults.
+    /// The Text inspector's scale line is open into the full Scale module (R9a). Closed on launch; the module is the
+    /// same one Set shows, on the same store.
+    var textScaleOpen = false
+    /// System, Light or Dark. Applied to the whole app at once and remembered.
+    var appearance: AppearanceChoice = .system {
+        didSet { if appearance != oldValue { defaults.set(appearance.rawValue, forKey: AppearanceChoice.key); appearance.apply() } }
+    }
     var showSidebar = true { didSet { if showSidebar != oldValue { defaults.set(showSidebar, forKey: "showSidebar") } } }
 
     // Library (read once, then filtered in memory)
@@ -195,7 +202,12 @@ final class AppModel {
 
     /// Source, kind and trait chips, Saved and Show hidden. Remembered between launches.
     var filter: FinderFilter {
-        didSet { if filter != oldValue { persistFilter(); scheduleFinder() } }
+        didSet {
+            // No source at all is never a state: the core reads an empty list as "every source", so the menu would say
+            // one thing and the grid show another. An empty set snaps back to the default scope.
+            if filter.sources.isEmpty { filter.sources = FinderFilter.standard.sources }
+            if filter != oldValue { persistFilter(); scheduleFinder() }
+        }
     }
     /// The core's answer to the current filter and search: families plus chip counts.
     private(set) var finderResults: FamilyResults?
@@ -376,10 +388,12 @@ final class AppModel {
         brandStyle = BrandStyleStore(persist: !isolated, defaults: store)
         templateID = store.string(forKey: "readingTemplate") ?? "article"
         showSidebar = store.object(forKey: "showSidebar") as? Bool ?? true
+        appearance = AppearanceChoice(rawValue: store.string(forKey: AppearanceChoice.key) ?? "") ?? .system
         if let t = options.template { templateID = t }
         // Screenshot and bench runs start from the standard filter so they repeat.
         var f = isolated ? FinderFilter.standard : FinderFilter.load(from: store)
         if let list = options.sources { f.sources = Set(list.split(separator: ",").compactMap { Source(key: String($0)) }) }
+        if f.sources.isEmpty { f.sources = FinderFilter.standard.sources }
         if options.showHidden { f.showHidden = true }
         if options.savedOnly { f.savedOnly = true }
         filter = f
@@ -796,6 +810,7 @@ final class AppModel {
             brands = try await background { try $0.brandsList() }
             if first { takeUnbrandedSettings(into: b.id) }
             filter.sources = FinderFilter.standard.sources; filter.savedOnly = false     // a new brand starts on Your fonts + Google
+            restoringBrand = true; selectedFamily = nil; restoringBrand = false          // and with nothing selected: the old brand's pick is not the new one's
             await selectBrand(b.id, restore: false)
             return b.id
         } catch { report(error); return nil }

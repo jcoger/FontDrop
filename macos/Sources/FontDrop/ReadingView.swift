@@ -48,16 +48,13 @@ struct ReadingList: View {
             ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? Lexicon.Reading.findingFaces)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = model.candidatesError {
-            ContentUnavailableView("Could not load candidates", systemImage: "exclamationmark.triangle", description: Text(error))
+            EmptyScreen(label: Lexicon.R9.couldNotLoadLabel, line: error)
         } else if rows.isEmpty {
-            ContentUnavailableView {
-                Label(model.candidates.isEmpty ? Lexicon.Reading.findingNone : Lexicon.readingNone,
-                      systemImage: "line.3.horizontal.decrease.circle")
-            } description: {
-                if result.hidden > 0 { Text(Lexicon.Reading.hiddenByFilters(result.hidden)) }
-            } actions: {
-                if !model.lenses.isNeutral { Button(Lexicon.clearFilters) { model.resetLenses() } }
-            }
+            EmptyScreen(label: Lexicon.R9.noMatchesLabel,
+                        line: ([model.candidates.isEmpty ? Lexicon.Reading.findingNone : Lexicon.readingNone]
+                               + (result.hidden > 0 ? [Lexicon.Reading.hiddenByFilters(result.hidden) + "."] : [])).joined(separator: " "),
+                        actionTitle: model.lenses.isNeutral ? nil : Lexicon.clearFilters,
+                        action: model.lenses.isNeutral ? nil : { model.resetLenses() })
         } else {
             ScrollViewReader { proxy in
                 ScrollView {

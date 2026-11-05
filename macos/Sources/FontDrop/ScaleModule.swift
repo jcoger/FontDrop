@@ -10,20 +10,24 @@ struct ScaleModule: View {
     @Environment(\.theme) private var theme
     let family: String
     var fallbackPath: String?
+    /// Inside the Text inspector, under the scale readout line, which already names the scale and shows the lock light.
+    var inline = false
 
     var body: some View {
         let scale = model.scale
         let sizes = model.solvedSizes(reading: family, fallbackPath: fallbackPath)
         let auto = sizes.flatMap { DialMath.autoRatio(headline: $0.headline, body: $0.body, steps: $0.headlineStep) }
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("01 \u{00B7} \(Lexicon.Scale.title)").moduleLabel()
-                Spacer()
-                HStack(spacing: 6) {
-                    SignalLight(lit: scale.locked)
-                    Text(scale.locked ? Lexicon.Dial.locked : Lexicon.auto).moduleLabel(color: scale.locked ? \.textPrimary : \.textSecondary)
+            if !inline {
+                HStack {
+                    Text("01 \u{00B7} \(Lexicon.Scale.title)").moduleLabel()
+                    Spacer()
+                    HStack(spacing: 6) {
+                        SignalLight(lit: scale.locked)
+                        Text(scale.locked ? Lexicon.Dial.locked : Lexicon.auto).moduleLabel(color: scale.locked ? \.textPrimary : \.textSecondary)
+                    }
+                    .accessibilityHidden(true)
                 }
-                .accessibilityHidden(true)
             }
             dialScreen(scale: scale, auto: auto)
             BodyControl(scale: scale, autoBody: sizes?.body) { body in
@@ -31,7 +35,8 @@ struct ScaleModule: View {
             }
             footer(scale: scale, sizes: sizes)
         }
-        .padding(.top, 22)
+        .padding(.top, inline ? 12 : 22)
+        .padding(.bottom, inline ? 4 : 0)
     }
 
     private func dialScreen(scale: TypeScale, auto: Double?) -> some View {

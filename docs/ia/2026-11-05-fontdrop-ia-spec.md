@@ -1,3 +1,5 @@
+> **Update 2026-11-05 (R9a), decision 1 changed:** Scale is no longer edited in Set only. The scale readout line in the Text inspector now opens the full Scale module (dial, Body, footer) inline, and the Text stage resizes live. It is the same `ScaleModule` and the same per-brand store Set uses. Set keeps its own copy of the module and the full specimen. Owner's reason: "I should be able to make the changes directly on here." This reverses the "cannot turn the dial while flipping body faces" cost named below.
+>
 > **Update 2026-11-05, after Jarrett read this:** Decision 1 is decided (Set owns the dial). Decisions 2 to 7 are accepted. The job "Reading" is renamed **Text** (lexicon 17), so read "Reading" below as the Text job. A third face is after v1 (ship plan v2).
 
 # IA SPEC: FontDrop Mac app · macOS · 2026-11-05 · UNTESTED

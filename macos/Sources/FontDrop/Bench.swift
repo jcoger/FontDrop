@@ -158,6 +158,7 @@ func applyReadingFlags(_ model: AppModel) async {
         for name in list.split(separator: ",") { await model.setShortlist("reading", family: String(name), on: true) }
     }
     if let f = value("--pick-reading") { await model.choose("reading", family: f) }
+    if args.contains("--scale-open") || value("--scale-open") != nil { model.textScaleOpen = true }         // Text inspector: the scale line, opened
     if let job = value("--clear") { await model.clear(job) }          // "Clear Display face", for the screenshot of the result
     if let trim = value("--trim-display").flatMap(Double.init), let d = model.displayFamily {
         model.typeSettings.update(model.settingsKey("display", d.name), job: "display") {

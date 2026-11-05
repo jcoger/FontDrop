@@ -28,8 +28,17 @@ struct FamilyPickerView: View {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Choose the \(screen.title) face").font(.title2.weight(.semibold))
-                    Text(subtitle(count: families.count))
-                        .font(.callout).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(subtitle(count: families.count))
+                            .font(.callout).foregroundStyle(.secondary)
+                        // A filter you cannot see in the bar (a style trait, Show hidden, a narrower source) is named here,
+                        // with the way out. The counts in the menus are what this grid shows, so nothing hides silently.
+                        if !model.filter.isStandard || !model.search.isEmpty {
+                            Text(Lexicon.R9.filtersOn).moduleLabel()
+                            Button(Lexicon.clearFilters) { model.filter = .standard; model.search = "" }
+                                .buttonStyle(.themeLink).font(.system(size: 12))
+                        }
+                    }
                 }
                 if families.isEmpty {
                     emptyState
@@ -100,17 +109,13 @@ struct FamilyPickerView: View {
             ProgressView(Lexicon.Scan.scanningFonts)
                 .frame(maxWidth: .infinity, minHeight: 240)
         } else if model.filter.savedOnly && model.search.isEmpty && model.filter.kinds.isEmpty && model.filter.traits.isEmpty {
-            ContentUnavailableView {
-                Label(Lexicon.Finder.savedEmpty, systemImage: "star")
-            } actions: {
-                Button(Lexicon.Finder.showAllFonts) { model.showAllFonts() }
-            }
+            EmptyScreen(label: Lexicon.R9.nothingSavedLabel, line: Lexicon.Finder.savedEmpty,
+                        actionTitle: Lexicon.Finder.showAllFonts, action: { model.showAllFonts() })
+                .frame(minHeight: 260)
         } else {
-            ContentUnavailableView {
-                Label(Lexicon.Finder.noMatches, systemImage: "line.3.horizontal.decrease.circle")
-            } actions: {
-                Button(Lexicon.clearFilters) { model.filter = .standard; model.search = "" }
-            }
+            EmptyScreen(label: Lexicon.R9.noMatchesLabel, line: Lexicon.Finder.noMatches,
+                        actionTitle: Lexicon.clearFilters, action: { model.filter = .standard; model.search = "" })
+                .frame(minHeight: 260)
         }
     }
 

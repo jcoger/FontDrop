@@ -7,23 +7,23 @@ struct ReadingInspector: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
     @State private var showSources = false
-
     var body: some View {
+        @Bindable var model = model
         let selected = model.candidate(model.selectedCandidate)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let c = selected {
+        if let c = selected {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
                     header(c)
-                    ScaleReadoutLine().padding(.top, 18)
+                    ScaleReadoutLine(open: $model.textScaleOpen).padding(.top, 18)
+                    if model.textScaleOpen { ScaleModule(family: c.family, fallbackPath: c.filePath, inline: true) }
                     if model.displayFamily != nil { whyModule(c) }
                     faceModule(c)
                     lettersModule(c)
-                } else {
-                    Text(Lexicon.Reading.pickOne).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
-                        .padding(.top, 60)
                 }
+                .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
             }
-            .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
+        } else {
+            EmptyScreen(label: Lexicon.R9.nothingSelected, line: Lexicon.Reading.pickOne)
         }
     }
 
@@ -168,15 +168,17 @@ struct WhySummary: Equatable {
 
 // MARK: - Scale readout line
 
-/// The top of the Text inspector: a recessed screen with the brand's scale. Clicking it goes to Set.
-/// The dial itself lives on Set (round R2b).
+/// The top of the Text inspector: a recessed screen with the brand's scale. Clicking it opens the full Scale module
+/// under it (the same `ScaleModule` Set uses, on the same store), and clicking again closes it. R9a reversed the old
+/// "the dial lives on Set": the designer wants to change the scale while reading the essay.
 struct ScaleReadoutLine: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
+    @Binding var open: Bool
 
     var body: some View {
         let scale = model.scale
-        Button { model.screen = .set } label: {
+        Button { withAnimationIfAllowed { open.toggle() } } label: {
             HStack(spacing: 10) {
                 Text(Lexicon.Scale.title).moduleLabel()
                 Text(Lexicon.Scale.readoutLine(scale)).font(InstrumentFonts.doto(18)).foregroundStyle(theme.textPrimary.color)
@@ -184,6 +186,7 @@ struct ScaleReadoutLine: View {
                 Spacer(minLength: 4)
                 SignalLight(lit: scale.locked)
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+                    .rotationEffect(.degrees(open ? 90 : 0))
             }
             .padding(.horizontal, 14).frame(height: 48)
             .recessed(radius: 12)
@@ -192,6 +195,7 @@ struct ScaleReadoutLine: View {
         .buttonStyle(.plain)
         .help(Lexicon.Scale.readoutHelp)
         .accessibilityLabel(Lexicon.Scale.readoutAccessibility(scale))
+        .accessibilityValue(open ? "expanded" : "collapsed")
         .accessibilityHint(Lexicon.Scale.readoutHelp)
     }
 }
@@ -242,8 +246,10 @@ struct SetInspector: View {
                     TextModule()
                     FacesModule()
                 } else {
-                    Text(Lexicon.Scale.needsText).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
-                        .padding(.top, 24)
+                    EmptyScreen(label: Lexicon.Scale.title, line: Lexicon.Scale.needsText,
+                                actionTitle: Lexicon.SetScreen.goToText, actionHint: "\u{2318}2", actionHelp: Lexicon.SetScreen.goToTextHelp,
+                                action: { model.screen = .reading })
+                        .frame(minHeight: 240)
                 }
                 ExportFoot()
             }

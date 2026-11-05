@@ -57,6 +57,7 @@ struct RootView: View {
                                                             set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(model.errorMessage ?? "") }
+        .task { model.appearance.apply() }
         .task { await model.bootstrap() }
         .task { await ScreenshotRunner.runIfRequested(model: model) }
         .task { await Bench.runIfRequested(model: model) }
@@ -116,8 +117,10 @@ struct InspectorRouter: View {
 struct WindowBackdrop: View {
     @Environment(\.theme) private var theme
     var body: some View {
+        // The empty chrome between the panels drags the window. This sits behind the panels, so it only ever gets
+        // the gutters. It is a SwiftUI gesture, not an NSView: an NSView overlay is hit before any SwiftUI content.
         LinearGradient(colors: [theme.windowTop.color, theme.windowBottom.color], startPoint: .top, endPoint: .bottom)
-            .overlay { WindowDragHandle() }          // the empty chrome between the panels drags the window
+            .windowDraggable(appKitFallback: false)
     }
 }
 
@@ -133,8 +136,35 @@ struct ZoomInAlias: View {
     }
 }
 
-/// An empty strip that drags the window. Only views that say so move it: the dial, the sliders and the colour area
-/// are never drag handles (the window's own "drag from anywhere" is off, see `WindowChrome`).
+/// Makes an empty area drag the window (and double-click zoom it). Only views that say so move it: the dial, the
+/// sliders and the colour area never do (the window's own "drag from anywhere" is off, see `WindowChrome`).
+///
+/// macOS 15 and later: SwiftUI's `WindowDragGesture`, which belongs to the view it is put on and nothing else.
+/// macOS 14: an AppKit strip behind the view (`WindowDragHandle`). It sits behind the view's own area only, so
+/// callers use this on small empty strips, never on a whole window.
+struct WindowDraggable: ViewModifier {
+    /// False for a big area (the window backdrop): on macOS 14 it then drags nothing rather than cover the content.
+    var allowsAppKitFallback = true
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content
+                .contentShape(Rectangle())
+                .gesture(WindowDragGesture())
+                .onTapGesture(count: 2) { NSApp.keyWindow?.performZoom(nil) }
+        } else if allowsAppKitFallback {
+            content.background(WindowDragHandle())
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func windowDraggable(appKitFallback: Bool = true) -> some View { modifier(WindowDraggable(allowsAppKitFallback: appKitFallback)) }
+}
+
+/// The macOS 14 form of a drag strip: an NSView that moves the window. Never overlaid on content.
 struct WindowDragHandle: NSViewRepresentable {
     final class Handle: NSView {
         override var mouseDownCanMoveWindow: Bool { true }
@@ -250,7 +280,7 @@ struct InspectorToggle: View {
 enum WindowChrome {
     /// Full-size content under a transparent title bar: the traffic lights sit inside the sidebar panel.
     /// `isMovableByWindowBackground` stays off: with it on, a drag that starts on the dial, a slider or the colour
-    /// area can move the window. Only `WindowDragHandle` strips move it.
+    /// area can move the window. Only `windowDraggable()` areas move it.
     @MainActor
     static func configure(_ w: NSWindow) {
         w.titlebarAppearsTransparent = true

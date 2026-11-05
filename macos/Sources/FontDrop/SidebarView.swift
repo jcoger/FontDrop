@@ -16,7 +16,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Color.clear.frame(height: 36)                 // the traffic lights sit here; an empty strip, so it drags the window
-                .background(WindowDragHandle())
+                .windowDraggable()
             sectionLabel(Lexicon.brandsLabel)
             brandSwitcher.padding(.bottom, 18)
             sectionLabel("Type")
@@ -36,7 +36,10 @@ struct SidebarView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Lexicon.sidebarJobs)
             Spacer(minLength: 12)
-            StatusReadout()
+            HStack(spacing: 8) {
+                StatusReadout()
+                AppearanceToggle()
+            }
         }
         .padding(12)
         .frame(maxHeight: .infinity, alignment: .top)

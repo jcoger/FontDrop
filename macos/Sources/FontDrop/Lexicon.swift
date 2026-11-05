@@ -290,8 +290,8 @@ enum Lexicon {
         static func candidateTitle(_ job: String) -> String { "\(jobName(job)) candidate" }
         static func currentTitle(_ job: String) -> String { "Current \(jobName(job)) face" }
         static let foundryPage = "Foundry page"
-        static let noSelection = "No family selected"
-        static let noSelectionHelp = "Select a family to try its styles and letters."
+        static let noSelection = "Nothing selected"
+        static let noSelectionHelp = "Pick a face in the grid to see it here."
         // Card marks
         static let tuned = "Tuned"
         static let tunedHelp = "You changed this face's settings. The grid shows its default style."
@@ -389,7 +389,7 @@ enum Lexicon {
             case [.yours, .google, .system]: return "All fonts"
             case [.google]: return "Google Fonts"
             case [.system]: return "Mac system"
-            case []: return "No source"
+            case []: return "Your fonts + Google"       // never stored (the model snaps back to this), but if it ever reached the menu it reads as the default
             default: return sources.sorted { $0.key < $1.key }.map(sourceLabel).joined(separator: " + ")
             }
         }
@@ -520,7 +520,7 @@ enum Lexicon {
         static let showingAll = "Showing every face"
         static let onlyFit = "Only long-text faces"
         static func hiddenByFilters(_ n: Int) -> String { "\(n) hidden by filters" }
-        static let pickOne = "Pick a candidate to see why it pairs."
+        static let pickOne = "Pick a face in the list to see why it pairs."
     }
 
     // MARK: Template colors and layouts (10.x)
@@ -566,7 +566,7 @@ enum Lexicon {
         static func readoutLine(_ scale: TypeScale) -> String {
             scale.locked ? "\(Int(scale.body.rounded())) \u{00B7} \(TypeScale.ratioLabel(scale.ratio))" : Lexicon.auto
         }
-        static let readoutHelp = "Open Set to change the scale"
+        static let readoutHelp = "Show or hide the scale controls"
         static func readoutAccessibility(_ scale: TypeScale) -> String {
             scale.locked ? "Scale, \(Int(scale.body.rounded())) point, ratio \(TypeScale.ratioLabel(scale.ratio)), locked" : "Scale, Auto"
         }
@@ -632,6 +632,17 @@ enum Lexicon {
 
     enum SetScreen {
         static func stageTitle(display: String, text: String) -> String { "Type scale \u{00B7} \(display) with \(text)" }
+        /// Set with one face chosen: "Type scale \u{00B7} Gambarino".
+        static func stageTitleOne(_ name: String) -> String { "Type scale \u{00B7} \(name)" }
+        /// The quiet row where the other face's steps would be (section 26.6).
+        static let chooseText = "Choose a Text face"
+        static let chooseDisplay = "Choose a Display face"
+        static let goToText = "Go to Text"
+        static let goToDisplay = "Go to Display"
+        static let goToTextHelp = "Command-2"
+        static let goToDisplayHelp = "Command-1"
+        static let neitherLabel = "Nothing to set yet"
+        static let neitherLine = "Choose a Display face and a Text face to see the scale."
         static let stepDisplay = "Display"
         static let stepH1 = "H1"
         static let stepH2 = "H2"
@@ -767,6 +778,22 @@ enum Lexicon {
         static let showInFinder = "Show in Finder"
         /// The folder you asked FontDrop to scan is not there.
         static func folderMissing(_ folder: String) -> String { "FontDrop can\u{2019}t find the folder \(folder)." }
+    }
+
+    /// Section 26 (R9a): empty states, Appearance, the inline scale.
+    enum R9 {
+        static let nothingSelected = "Nothing selected"
+        static let noMatchesLabel = "No matches"
+        static let nothingSavedLabel = "Nothing saved"
+        static let couldNotLoadLabel = "Could not load"
+        static let appearanceMenu = "Appearance"
+        static let appearanceSystem = "System"
+        static let appearanceLight = "Light"
+        static let appearanceDark = "Dark"
+        static let switchToLight = "Switch to light"
+        static let switchToDark = "Switch to dark"
+        static let appearanceAccessibility = "Appearance"
+        static let filtersOn = "Filtered"
     }
 
     enum BrandMenu {

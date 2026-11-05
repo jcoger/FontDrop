@@ -48,8 +48,7 @@ struct ReadingStage: View {
         } else if let c = selected, let ctx = model.pairContext(reading: c.family, fallbackPath: c.filePath) {
             StageCanvas(context: ctx, template: model.activeTemplate, zoom: model.stageZoom.factor, size: size)
         } else {
-            Text(Lexicon.Reading.pickOne).font(.callout).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            EmptyScreen(label: Lexicon.R9.nothingSelected, line: Lexicon.Reading.pickOne)
         }
     }
 

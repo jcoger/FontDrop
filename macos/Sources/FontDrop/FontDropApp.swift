@@ -71,6 +71,8 @@ struct FontDropApp: App {
                 Button(Lexicon.Reading.zoomFit) { model.stageZoom.fit() }
                     .keyboardShortcut("0", modifiers: .command)
                     .disabled(!model.canZoomStage)
+                Divider()
+                AppearanceMenu().environment(model)
             }
             CommandMenu(Lexicon.typeMenu) {
                 // Return does the same in the Display grid and the Text list. The menu carries a modified shortcut so
