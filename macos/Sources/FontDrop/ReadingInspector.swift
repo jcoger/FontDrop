@@ -1,34 +1,70 @@
 import FontDropCore
 import SwiftUI
 
-/// The Text inspector, in the order the audit set: why it pairs, the Text playground (open),
-/// the Display playground (collapsed). The shortlist and "Use for Text" live on the stage.
+/// The Text inspector, in the order the look spec sets: the scale readout line, 01 why it pairs, 02 face,
+/// 03 letters. The shortlist and "Use for Text" live on the stage. The sample-text playground left (IA ledger).
 struct ReadingInspector: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+    @State private var showSources = false
 
     var body: some View {
         let selected = model.candidate(model.selectedCandidate)
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 0) {
                 if let c = selected {
                     header(c)
-                    ScaleSection(family: c.family, fallbackPath: c.filePath)
-                    if model.displayFamily != nil { why(c) }
-                    playgrounds(c)
+                    ScaleReadoutLine().padding(.top, 18)
+                    if model.displayFamily != nil { whyModule(c) }
+                    faceModule(c)
+                    lettersModule(c)
                 } else {
-                    Text(Lexicon.Reading.pickOne).font(.callout).foregroundStyle(.secondary)
+                    Text(Lexicon.Reading.pickOne).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
+                        .padding(.top, 60)
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
         }
     }
 
     private func header(_ c: Candidate) -> some View {
         let isCurrent = model.chosen(.reading) == c.family
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(c.family).font(.title3.weight(.semibold))
-            Text(isCurrent ? Lexicon.Reading.currentTitle : Lexicon.Reading.candidateTitle)
-                .font(.caption).foregroundStyle(.secondary)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(c.family).font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.textPrimary.color)
+            Text(isCurrent ? Lexicon.Reading.currentTitle : Lexicon.Reading.candidateTitle).moduleLabel()
+        }
+    }
+
+    // MARK: 01 Why it pairs
+
+    private func whyModule(_ c: Candidate) -> some View {
+        let family = model.familyByName[c.family]
+        let summary = WhySummary.make(c, styleCount: Int(family?.styleCount ?? 0), xHeightNote: inspectorXHeightNote(c))
+        return InspectorSection(title: "01 \u{00B7} \(Lexicon.whyItPairs)") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(summary.verdict).font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.textPrimary.color)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !summary.chips.isEmpty {
+                    FlowLayout(spacing: 8) {
+                        ForEach(Array(summary.chips.enumerated()), id: \.offset) { _, chip in
+                            EvidenceChip(text: chip.text, effect: chip.effect, warning: chip.warning)
+                        }
+                    }
+                }
+                Button { withAnimationIfAllowed { showSources.toggle() } } label: {
+                    HStack(spacing: 4) {
+                        Text(Lexicon.Why.sources)
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                            .rotationEffect(.degrees(showSources ? 90 : 0))
+                    }
+                    .font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(showSources ? "expanded" : "collapsed")
+                if showSources { sources(c) }
+            }
         }
     }
 
@@ -39,58 +75,176 @@ struct ReadingInspector: View {
         return measuredXHeightNote(display: model.face("display", display).resolvedPath, candidate: body.resolvedPath)
     }
 
-    /// Every piece of evidence with its sources: the technical detail the list rows leave out.
-    private func why(_ c: Candidate) -> some View {
-        InspectorSection(title: Lexicon.whyItPairs) {
+    /// Every piece of evidence with its sources: the technical detail the verdict and chips leave out.
+    private func sources(_ c: Candidate) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             if c.evidence.isEmpty {
-                Text("The engine measured nothing notable.").font(.callout).foregroundStyle(.secondary)
+                Text(Lexicon.Why.nothingNotable).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
             }
-            ForEach(Array(c.evidence.enumerated()), id: \.offset) { i, e in
-                if i > 0 { Divider().padding(.vertical, 6) }
+            ForEach(Array(c.evidence.enumerated()), id: \.offset) { _, e in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Image(systemName: symbol(e)).font(.caption).foregroundStyle(tint(e))
-                        Text(Lexicon.whyTitle(e)).font(.caption).foregroundStyle(.secondary)
+                        Image(systemName: symbol(e)).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color)
+                        Text(Lexicon.whyTitle(e)).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
                         if let term = Lexicon.term(forLens: e.lens) { HelpButton(term: term) }
                         Spacer()
                     }
                     let detail = e.lens == "x-height" ? (inspectorXHeightNote(c) ?? Lexicon.whyDetail(e)) : Lexicon.whyDetail(e)
                     if !detail.isEmpty {
-                        Text(detail).font(.callout)
+                        Text(detail).font(.system(size: 13)).foregroundStyle(theme.textPrimary.color)
                             .help(e.lens == "Recommended for text" ? Lexicon.recommendedBy(Lexicon.sources(e.source)) : "")
                     }
                     if e.effect == 0 {
-                        Text(Lexicon.notScored).font(.caption2).foregroundStyle(.secondary)
+                        Text(Lexicon.notScored).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color)
                     } else {
                         let word = Lexicon.strength(e.strength)
                         Text([word, Lexicon.strengthHelp[word]].compactMap { $0 }.joined(separator: " \u{00B7} "))
-                            .font(.caption2).foregroundStyle(.secondary)
+                            .font(.system(size: 11)).foregroundStyle(theme.textSecondary.color)
                     }
-                    let sources = Lexicon.sources(e.source)
-                    if !sources.isEmpty { Text(sources).font(.caption2).foregroundStyle(.tertiary) }
+                    let names = Lexicon.sources(e.source)
+                    if !names.isEmpty { Text(names).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color) }
                 }
             }
         }
+        .padding(.top, 4)
     }
 
     private func symbol(_ e: Evidence) -> String {
         e.effect > 0 ? "plus.circle" : e.effect < 0 ? "minus.circle" : "circle.dashed"
     }
 
-    private func tint(_ e: Evidence) -> Color {
-        e.effect > 0 ? .accentColor : e.effect < 0 ? .orange : .secondary
+    // MARK: 02 Face
+
+    @ViewBuilder
+    private func faceModule(_ c: Candidate) -> some View {
+        if let family = model.familyByName[c.family] {
+            InspectorSection(title: "\(model.displayFamily == nil ? "01" : "02") \u{00B7} \(Lexicon.Why.face)") {
+                PlaygroundGroup(job: "reading", family: family, title: family.name, preview: "", startOpen: true, mode: .face)
+            }
+        }
     }
 
-    /// The candidate's Text playground (open) first, then the Display playground (collapsed unless asked for).
+    // MARK: 03 Letters
+
     @ViewBuilder
-    private func playgrounds(_ c: Candidate) -> some View {
+    private func lettersModule(_ c: Candidate) -> some View {
         if let family = model.familyByName[c.family] {
-            PlaygroundGroup(job: "reading", family: family, title: "Text \u{00B7} \(family.name)",
-                            preview: SampleCopy.paragraphs[0], startOpen: true)
+            InspectorSection(title: "\(model.displayFamily == nil ? "02" : "03") \u{00B7} \(Lexicon.Why.letters)") {
+                LettersStrip(face: model.face("reading", family), tick: model.fontTick)
+            }
         }
-        if let display = model.displayFamily {
-            PlaygroundGroup(job: "display", family: display, title: "Display \u{00B7} \(display.name)",
-                            preview: SampleCopy.displayHeadline, startOpen: model.options.openPlayground)
+    }
+}
+
+// MARK: - Why it pairs, as data
+
+/// The verdict sentence and up to two chips for a candidate, built from the evidence the engine already
+/// produced. No ranking happens here. Pure, so a test can read it.
+struct WhySummary: Equatable {
+    struct Chip: Equatable { var text: String; var effect: Int8; var warning: Bool }
+    var verdict: String
+    var chips: [Chip]
+
+    static func make(_ c: Candidate, styleCount: Int, xHeightNote: String?) -> WhySummary {
+        if c.isSameFamily {
+            var chips: [Chip] = []
+            if styleCount > 0 { chips.append(Chip(text: Lexicon.Why.styles(styleCount), effect: 1, warning: false)) }
+            if let body = c.bodyStyle?.label { chips.append(Chip(text: Lexicon.bodyIn(body), effect: 1, warning: false)) }
+            return WhySummary(verdict: Lexicon.Why.sameFamilyVerdict, chips: Array(chips.prefix(2)))
+        }
+        let all = ReadingRows.dedupedEvidence(c.evidence)
+        let scored = all.filter { $0.effect != 0 }
+        guard let lead = scored.first ?? all.first else {
+            return WhySummary(verdict: Lexicon.Why.nothingNotable, chips: [])
+        }
+        func words(_ e: Evidence) -> String { Lexicon.chip(e, xHeightNote: e.lens == "x-height" ? xHeightNote : nil) }
+        let verdict = "\(Lexicon.whyTitle(lead)). \(Lexicon.sentenceEnd(words(lead)))"
+        let rest = all.filter { $0.lens != lead.lens || $0.detail != lead.detail }.prefix(2).map { e in
+            Chip(text: words(e), effect: e.effect, warning: e.lens == "The middle" || e.lens == "Near-duplicate")
+        }
+        return WhySummary(verdict: verdict, chips: Array(rest))
+    }
+}
+
+// MARK: - Scale readout line
+
+/// The top of the Text inspector: a recessed screen with the brand's scale. Clicking it goes to Set.
+/// The dial itself lives on Set (round R2b).
+struct ScaleReadoutLine: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let scale = model.scale
+        Button { model.screen = .set } label: {
+            HStack(spacing: 10) {
+                Text(Lexicon.Scale.title).moduleLabel()
+                Text(Lexicon.Scale.readoutLine(scale)).font(InstrumentFonts.doto(18)).foregroundStyle(theme.textPrimary.color)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 4)
+                SignalLight(lit: scale.locked)
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+            }
+            .padding(.horizontal, 14).frame(height: 48)
+            .recessed(radius: 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(Lexicon.Scale.readoutHelp)
+        .accessibilityLabel(Lexicon.Scale.readoutAccessibility(scale))
+        .accessibilityHint(Lexicon.Scale.readoutHelp)
+    }
+}
+
+// MARK: - Letters strip
+
+/// Four recessed tiles of the letters that tell faces apart, set in the candidate: Il1, ag, RGQ, 0O.
+struct LettersStrip: View {
+    @Environment(\.theme) private var theme
+    let face: FaceSpec
+    let tick: Int
+
+    static let samples = ["Il1", "ag", "RGQ", "0O"]
+
+    var body: some View {
+        let ratio = CGFloat(21 / max(face.settings.size, 1))
+        HStack(spacing: 8) {
+            ForEach(Self.samples, id: \.self) { sample in
+                FaceText(face: face, text: sample, ratio: ratio, tick: tick, useLineHeight: false)
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                    .foregroundStyle(theme.textPrimary.color)
+                    .frame(maxWidth: .infinity).frame(height: 56)
+                    .recessed(radius: 10)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Lexicon.Why.lettersAccessibility(Self.samples))
+    }
+}
+
+// MARK: - Set inspector
+
+/// The Set screen's inspector: the Scale section, unchanged in behaviour. The dial replaces it in round R2b.
+struct SetInspector: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.brand?.name ?? "FontDrop").font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(theme.textPrimary.color)
+                    Text(Lexicon.Scale.setSubtitle).moduleLabel()
+                }
+                if let reading = model.readingFamily {
+                    ScaleSection(family: reading.name, fallbackPath: reading.filePath).padding(.top, 8)
+                } else {
+                    Text(Lexicon.Scale.needsText).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
+                        .padding(.top, 24)
+                }
+            }
+            .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
         }
     }
 }

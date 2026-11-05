@@ -85,7 +85,7 @@ struct ColorsPopover: View {
                         VStack(spacing: 4) {
                             tile(preset.palette)
                                 .overlay(RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(selected ? Color.accentColor : Color.secondary.opacity(0.3),
+                                    .strokeBorder(selected ? Color.primary : Color.secondary.opacity(0.3),
                                                   lineWidth: selected ? 2 : 1))
                             Text(preset.name).font(.caption).foregroundStyle(.primary)
                         }

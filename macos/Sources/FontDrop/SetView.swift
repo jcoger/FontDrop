@@ -3,6 +3,7 @@ import SwiftUI
 /// The Set screen: today a plain specimen of the pair. Scale, measure and optical-size work is round R5.
 struct SetView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let tick = model.fontTick
@@ -32,6 +33,8 @@ struct SetView: View {
             }
             .padding(24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(theme.stage.color)
         // The saved style (a heavy cut, say) may not be loaded yet. Without its file the text draws invisibly.
         .task(id: "\(model.displayFamily?.name ?? "")/\(model.readingFamily?.name ?? "")") {
             await model.preloadStyles(of: [model.displayFamily?.name, model.readingFamily?.name].compactMap { $0 })

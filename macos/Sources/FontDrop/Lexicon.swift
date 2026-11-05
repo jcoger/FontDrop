@@ -247,6 +247,35 @@ enum Lexicon {
 
     // MARK: Scanning the library (13.x)
 
+    /// The Text inspector's modules (docs/design/2026-11-05-instrument-look.md).
+    enum Why {
+        static let sources = "Sources"
+        static let face = "Face"
+        static let letters = "Letters"
+        static let sameFamilyVerdict = "Same family. Drawn as one set, the safest choice."
+        static let nothingNotable = "The engine measured nothing notable."
+        static func styles(_ n: Int) -> String { n == 1 ? "1 style" : "\(n) styles" }
+        static func lettersAccessibility(_ samples: [String]) -> String { "Letters in this face: " + samples.joined(separator: ", ") }
+    }
+
+    /// Ends a chip's words as a sentence.
+    static func sentenceEnd(_ text: String) -> String { text.hasSuffix(".") ? text : text + "." }
+
+    /// The About window's credits: the two bundled fonts and their licence.
+    static let aboutCredits = "Doto and Geist Mono are bundled under the SIL Open Font License 1.1. The licence texts are in the app's Resources folder."
+
+    enum Features {
+        /// The core's feature group "Letters" is shown as "Small caps and ligatures" (IA decision 4).
+        static func groupTitle(_ group: String) -> String { group == "Letters" ? "Small caps and ligatures" : group }
+    }
+
+    /// The sidebar's status readout (Doto, capitals by style).
+    enum Status {
+        static func counts(families: Int, files: Int) -> String { "\(families) FAM \u{00B7} \(files) FILES" }
+        static let scanning = "UPDATING"
+        static let failed = "UPDATE FAILED"
+    }
+
     enum Scan {
         /// Sidebar footer while a rescan runs.
         static let updating = "Updating your library\u{2026}"
@@ -315,6 +344,8 @@ enum Lexicon {
     enum Reading {
         static func title(_ display: String) -> String { "Text for \(display)" }
         static func onShortlist(_ n: Int) -> String { "\(n) on shortlist" }
+        static func facesCount(_ n: Int) -> String { n == 1 ? "1 face" : "\(n) faces" }
+        static let searchPrompt = "Search families"
         static func subtitle(_ n: Int) -> String { "Text \u{00B7} \(onShortlist(n))" }
         static let current = "Current"
         static let onShortlistTag = "On shortlist"
@@ -384,6 +415,17 @@ enum Lexicon {
         static func sidebarLine(_ scale: TypeScale) -> String {
             scale.locked ? "\(Int(scale.body.rounded())) pt \u{00B7} \(TypeScale.ratioLabel(scale.ratio))" : Lexicon.auto
         }
+
+        /// The scale readout line at the top of the Text inspector: "15 \u{00B7} 1.333", or "Auto".
+        static func readoutLine(_ scale: TypeScale) -> String {
+            scale.locked ? "\(Int(scale.body.rounded())) \u{00B7} \(TypeScale.ratioLabel(scale.ratio))" : Lexicon.auto
+        }
+        static let readoutHelp = "Open Set to change the scale"
+        static func readoutAccessibility(_ scale: TypeScale) -> String {
+            scale.locked ? "Scale, \(Int(scale.body.rounded())) point, ratio \(TypeScale.ratioLabel(scale.ratio)), locked" : "Scale, Auto"
+        }
+        static let setSubtitle = "Type scale \u{00B7} both faces"
+        static let needsText = "Choose a Text face to set the scale."
 
         static let sectionFace = "Spacing and features"
         static let trim = "Trim"

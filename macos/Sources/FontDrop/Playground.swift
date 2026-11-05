@@ -7,15 +7,22 @@ import SwiftUI
 ///
 /// React: a controlled form whose state lives in a store, with `useMemo` caches below it.
 struct PlaygroundGroup: View {
+    /// `.playground` is the Display inspector's group. `.face` is the Text inspector's module: a Style row and a
+    /// "Spacing and features" disclosure, with no specimen (the stage is the specimen).
+    enum Mode { case playground, face }
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+    var mode: Mode = .playground
     let job: String                  // "display" or "reading": picks defaults and the settings key
     let family: FamilySummary
     let title: String                // e.g. "Display \u{00B7} Acme Serif"
     let preview: String              // the text the live specimen at the top draws
     @State private var open: Bool
+    @State private var showAdvanced = false
     @State private var loaded = 0    // bumps when this family's style files finish loading
 
-    init(job: String, family: FamilySummary, title: String, preview: String, startOpen: Bool) {
+    init(job: String, family: FamilySummary, title: String, preview: String, startOpen: Bool, mode: Mode = .playground) {
+        self.mode = mode
         self.job = job; self.family = family; self.title = title; self.preview = preview
         _open = State(initialValue: startOpen)
     }
@@ -30,6 +37,13 @@ struct PlaygroundGroup: View {
         let info = FontLoader.shared.info(path)
         let _ = loaded
 
+        if mode == .face {
+            faceModule(s, info: info)
+                .task(id: family.name) {
+                    await FontLoader.shared.preload(paths: styles.map(\.filePath) + [family.filePath])
+                    loaded += 1
+                }
+        } else {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Button { withAnimationIfAllowed { open.toggle() } } label: {
@@ -47,7 +61,7 @@ struct PlaygroundGroup: View {
                 Spacer()
                 if store.isModified(key, job: job) {
                     Button("Reset") { store.reset(key) }
-                        .buttonStyle(.link).font(.caption)
+                        .buttonStyle(.themeLink).font(.caption)
                         .help("Back to this face's own defaults")
                 }
             }
@@ -74,6 +88,44 @@ struct PlaygroundGroup: View {
         .task(id: family.name) {
             await FontLoader.shared.preload(paths: styles.map(\.filePath) + [family.filePath])
             loaded += 1
+        }
+        }
+    }
+
+    // MARK: Text inspector module
+
+    private func faceModule(_ s: TypeSettings, info: FaceInfo?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            stylePicker(s).frame(minHeight: 28)
+            Button { withAnimationIfAllowed { showAdvanced.toggle() } } label: {
+                HStack {
+                    Text(Lexicon.Scale.sectionFace).font(.system(size: 13))
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                        .rotationEffect(.degrees(showAdvanced ? 90 : 0))
+                        .foregroundStyle(theme.textSecondary.color)
+                }
+                .foregroundStyle(theme.textPrimary.color)
+                .frame(minHeight: 28).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(showAdvanced ? "expanded" : "collapsed")
+            if showAdvanced {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let info {
+                        if !info.axes.isEmpty { axes(info.axes, s) }
+                        numbers(s, titled: false)
+                        features(info.features, s)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    if store.isModified(key, job: job) {
+                        Button("Reset") { store.reset(key) }.buttonStyle(.themeLink).font(.system(size: 12))
+                            .help("Back to this face's own defaults")
+                    }
+                }
+                .padding(.top, 8)
+            }
         }
     }
 
@@ -125,7 +177,8 @@ struct PlaygroundGroup: View {
                     }
                     if custom { Text("Custom").tag(StyleChoice.customID) }
                 }
-                .labelsHidden().frame(maxWidth: 190)
+                .labelsHidden().pickerStyle(.menu).menuStyle(.borderlessButton).fixedSize()
+                .accessibilityLabel("Style")
             } else {
                 Text(choices.first?.label ?? "Regular").font(.callout).foregroundStyle(.secondary)
             }
@@ -148,9 +201,9 @@ struct PlaygroundGroup: View {
         }
     }
 
-    private func numbers(_ s: TypeSettings) -> some View {
+    private func numbers(_ s: TypeSettings, titled: Bool = true) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(Lexicon.Scale.sectionFace).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            if titled { Text(Lexicon.Scale.sectionFace).font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
             slider(Lexicon.Scale.trim, value: Binding(get: { s.trim }, set: { v in store.update(key, job: job) { $0.trim = v } }),
                    range: TypeSettings.trimRange, readout: Lexicon.Scale.trimReadout(s.trim))
                 .help(Lexicon.Scale.trimHelp)
@@ -169,7 +222,7 @@ struct PlaygroundGroup: View {
             let groups = Dictionary(grouping: list, by: \.group)
             ForEach(["Letters", "Figures", "Stylistic sets"].filter { groups[$0] != nil }, id: \.self) { group in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(group).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(Lexicon.Features.groupTitle(group)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     ForEach(groups[group] ?? []) { control in featureRow(control, s) }
                 }
             }
@@ -187,7 +240,7 @@ struct PlaygroundGroup: View {
                     // Back at the font's default: forget the choice instead of storing it.
                     if v == defaultOn { settings.features[k] = nil } else { settings.features[k] = v ? 1 : 0 }
                 } }))
-                .toggleStyle(.switch).controlSize(.small).font(.callout)
+                .toggleStyle(.theme).font(.callout)
         case .choice(let type, let options):
             HStack {
                 Text(c.label).font(.callout)

@@ -13,7 +13,6 @@ struct ReadingView: View {
             HStack(spacing: 0) {
                 ReadingList()
                     .frame(width: ReadingLayout.listWidth(for: geo.size.width))
-                Divider()
                 ReadingStage()
                     .frame(minWidth: 0, maxWidth: .infinity)
             }
@@ -27,18 +26,16 @@ struct ReadingView: View {
 struct ReadingList: View {
     @Environment(AppModel.self) private var model
     @FocusState private var focused: Bool
+    @State private var keyboardNav = false       // the focus ring shows once the arrow keys are used, not after a click
 
     var body: some View {
         let result = model.readingResult
         let rows = ReadingRows.rows(current: model.currentReadingCandidate, shown: result.shown, search: model.search)
         VStack(spacing: 0) {
             ReadingListHead(count: result.shown.count)
-            Divider()
             listBody(rows: rows, result: result)
-            Divider()
             ReadingListFoot(hidden: result.hidden)
         }
-        .background(.background)
         .onAppear { focused = true }
     }
 
@@ -64,13 +61,14 @@ struct ReadingList: View {
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: 2) {
                         ForEach(rows) { c in row(c) }
                     }
+                    .padding(8)
                 }
                 .focusable()
                 .focused($focused)
-                .focusEffectDisabled()
+                .focusEffectDisabled()      // the ring is drawn on the row (CandidateRow), distinct from the pill
                 .onKeyPress(.upArrow) { move(-1, rows) }
                 .onKeyPress(.downArrow) { move(1, rows) }
                 .onChange(of: model.selectedCandidate) { _, id in
@@ -84,17 +82,15 @@ struct ReadingList: View {
         let family = model.familyByName[c.family]
         let onShortlist = model.shortlist("reading").contains(c.family)
         let isCurrent = model.chosen(.reading) == c.family
-        return VStack(spacing: 0) {
-            CandidateRow(candidate: c, family: family,
-                         face: family.map { model.face("reading", $0) } ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading")),
-                         tick: model.fontTick,
-                         reasons: reasons(for: c, family: family),
-                         isSelected: model.selectedCandidate == c.id, isCurrent: isCurrent, onShortlist: onShortlist)
-            Divider()
-        }
+        return CandidateRow(candidate: c, family: family,
+                            face: family.map { model.face("reading", $0) } ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading")),
+                            tick: model.fontTick,
+                            reasons: reasons(for: c, family: family),
+                            isSelected: model.selectedCandidate == c.id, isCurrent: isCurrent, onShortlist: onShortlist,
+                            showFocus: keyboardNav && focused)
         .id(c.id)
         .contentShape(Rectangle())
-        .onTapGesture { model.selectedCandidate = c.id; focused = true }
+        .onTapGesture { keyboardNav = false; model.selectedCandidate = c.id; focused = true }
         .contextMenu {
             Button(onShortlist ? Lexicon.Reading.removeFromShortlist : Lexicon.Reading.addToShortlist) {
                 Task { await model.setShortlist("reading", family: c.family, on: !onShortlist) }
@@ -118,6 +114,7 @@ struct ReadingList: View {
 
     private func move(_ step: Int, _ rows: [Candidate]) -> KeyPress.Result {
         guard model.comparedFamilies.isEmpty else { return .ignored }       // compare shows several; arrows do nothing
+        keyboardNav = true
         if let id = ListNav.move(rows.map(\.id), from: model.selectedCandidate, by: step) { model.selectedCandidate = id }
         return .handled
     }
@@ -136,6 +133,8 @@ struct CandidateRow: View {
     let isSelected: Bool
     let isCurrent: Bool
     let onShortlist: Bool
+    var showFocus = false
+    @Environment(\.theme) private var theme
 
     /// Rows set text at 15 to 16pt, whatever the playground size is, so rows compare fairly.
     private var ratio: CGFloat {
@@ -147,22 +146,29 @@ struct CandidateRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Text(candidate.family).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                    .foregroundStyle(theme.textPrimary.color)
                 Spacer(minLength: 4)
-                if isCurrent { Text(Lexicon.Reading.current).font(.caption2.weight(.semibold)).foregroundStyle(Color.accentColor) }
-                else if onShortlist { Text(Lexicon.Reading.onShortlistTag).font(.caption2.weight(.semibold)).foregroundStyle(Color.accentColor) }
+                if isCurrent { Text(Lexicon.Reading.current).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color) }
+                else if onShortlist { Text(Lexicon.Reading.onShortlistTag).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color) }
                 if family?.isTrial == true { TagPill(text: Lexicon.Reading.trialTag) }
             }
             FaceText(face: face, text: SampleCopy.rowText, ratio: ratio, tick: tick)
                 .lineLimit(2, reservesSpace: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if !reasons.isEmpty {
-                Text(reasons.joined(separator: " \u{00B7} ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(reasons.joined(separator: " \u{00B7} ")).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color).lineLimit(1)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 9)
+        .foregroundStyle(theme.textPrimary.color)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? Color.accentColor.opacity(0.12) : .clear)
-        .overlay(alignment: .leading) { if isSelected { Rectangle().fill(Color.accentColor).frame(width: 3) } }
+        .background(SelectionPill(on: isSelected))
+        .overlay {
+            if showFocus && isSelected {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
+            }
+        }
         .help(hoverHelp)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -179,18 +185,20 @@ struct CandidateRow: View {
 /// The list's head: what it is for, and the questions that filter it. Search stays in the window toolbar.
 struct ReadingListHead: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
     let count: Int
 
     var body: some View {
         @Bindable var model = model
         let hasDisplay = model.displayFamily != nil
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(model.displayFamily.map { Lexicon.Reading.title($0.name) } ?? Screen.reading.title)
-                    .font(.headline).lineLimit(1)
-                Spacer(minLength: 4)
-                Text(countLine).font(.caption).foregroundStyle(.secondary).lineLimit(1).monospacedDigit()
+                    .font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                    .foregroundStyle(theme.textPrimary.color)
+                Text(countLine).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color).lineLimit(1).monospacedDigit()
             }
+            SearchField(prompt: Lexicon.Reading.searchPrompt)
             FlowLayout(spacing: 6) {
                 HeadMenu(title: Lexicon.Reading.sourceLabel, value: SourceScope(model.filter.sources).label) {
                     Picker(Lexicon.Reading.sourceLabel, selection: Binding(
@@ -228,20 +236,21 @@ struct ReadingListHead: View {
             }
             if !hasDisplay {
                 Button(Lexicon.Reading.pickHeadline) { model.screen = .display }
-                    .buttonStyle(.link).font(.caption)
+                    .buttonStyle(.themeLink).font(.caption)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 8)
     }
 
     private var countLine: String {
         let n = model.shortlist("reading").count
-        return n > 0 ? "\(count) \u{00B7} \(Lexicon.Reading.onShortlist(n))" : "\(count)"
+        return n > 0 ? "\(Lexicon.Reading.facesCount(count)) \u{00B7} \(Lexicon.Reading.onShortlist(n))" : Lexicon.Reading.facesCount(count)
     }
 }
 
 /// A small menu chip: "Difference: Distinct".
 struct HeadMenu<Options: View>: View {
+    @Environment(\.theme) private var theme
     let title: String
     let value: String
     @ViewBuilder var options: Options
@@ -250,10 +259,13 @@ struct HeadMenu<Options: View>: View {
         Menu {
             options.pickerStyle(.inline).labelsHidden()
         } label: {
-            (Text(title + ": ").foregroundStyle(.secondary) + Text(value).fontWeight(.medium))
-                .font(.caption)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Capsule().fill(.quaternary.opacity(0.7)))
+            HStack(spacing: 4) {
+                (Text(title + " \u{00B7} ").foregroundStyle(theme.textSecondary.color) + Text(value).foregroundStyle(theme.textPrimary.color))
+                    .font(.system(size: 12))
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .pill()
         }
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
         .accessibilityLabel(title).accessibilityValue(value)
@@ -263,6 +275,7 @@ struct HeadMenu<Options: View>: View {
 /// Under the list: the long-text rule's count with its way out, what the filters hide, and Show more.
 struct ReadingListFoot: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
     let hidden: Int
 
     var body: some View {
@@ -272,27 +285,27 @@ struct ReadingListFoot: View {
                 if showUnfitRow {
                     HStack(spacing: 6) {
                         Text(model.includeUnfitFaces ? Lexicon.Reading.showingAll : Lexicon.Finder.notForLongText(model.notForLongText))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.textSecondary.color)
                             .help(Lexicon.readingFixedWhy)
                         Button(model.includeUnfitFaces ? Lexicon.Reading.onlyFit : Lexicon.showThem) {
                             Task { await model.setIncludeUnfit(!model.includeUnfitFaces) }
                         }
-                        .buttonStyle(.link)
+                        .buttonStyle(.themeLink)
                     }
                 }
                 if hidden > 0 {
                     HStack(spacing: 6) {
-                        Text(Lexicon.Reading.hiddenByFilters(hidden)).foregroundStyle(.secondary)
-                        Button(Lexicon.clearFilters) { model.resetLenses() }.buttonStyle(.link)
+                        Text(Lexicon.Reading.hiddenByFilters(hidden)).foregroundStyle(theme.textSecondary.color)
+                        Button(Lexicon.clearFilters) { model.resetLenses() }.buttonStyle(.themeLink)
                     }
                 }
                 if model.candidatesHasMore {
                     Button(Lexicon.showMore) { Task { await model.showMoreCandidates() } }
-                        .buttonStyle(.link).disabled(model.candidatesLoading)
+                        .buttonStyle(.themeLink).disabled(model.candidatesLoading)
                 }
             }
-            .font(.caption)
-            .padding(.horizontal, 14).padding(.vertical, 7)
+            .font(.system(size: 12))
+            .padding(.horizontal, 20).padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .lineLimit(1)
         }

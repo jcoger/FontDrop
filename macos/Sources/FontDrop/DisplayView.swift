@@ -19,7 +19,6 @@ struct FamilyPickerView: View {
         VStack(spacing: 0) {
         FilterBar()
             .padding(.horizontal, 20).padding(.vertical, 10)
-        Divider()
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -90,6 +89,7 @@ struct FamilyPickerView: View {
 
 /// One family card. Takes plain values and holds no state.
 struct FamilyCard: View {
+    @Environment(\.theme) private var theme
     let family: FamilySummary
     let sample: String
     let tick: Int
@@ -118,7 +118,6 @@ struct FamilyCard: View {
                     if isSaved { StarButton(name: family.name, isOn: true, toggle: toggleSaved) }
                     else { StarButton(name: family.name, isOn: false, toggle: toggleSaved).opacity(0.55) }
                 }
-            Divider()
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(family.name).font(.callout.weight(.semibold)).lineLimit(1)
@@ -127,7 +126,7 @@ struct FamilyCard: View {
                 }
                 Spacer(minLength: 8)
                 if isChosen {
-                    Text(Lexicon.Reading.current).font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
+                    Text(Lexicon.Reading.current).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color)
                 } else if isHidden {
                     TagPill(text: Lexicon.Finder.hidden)
                 } else if family.isTrial {
@@ -140,10 +139,10 @@ struct FamilyCard: View {
             Button(isSaved ? Lexicon.Finder.removeSaved : Lexicon.Finder.save, systemImage: isSaved ? "star.slash" : "star", action: toggleSaved)
             Button(isHidden ? Lexicon.Finder.unhide : Lexicon.Finder.hide, systemImage: isHidden ? "eye" : "eye.slash", action: toggleHidden)
         }
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background.secondary))
-        .overlay(RoundedRectangle(cornerRadius: 12)
-            .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.25),
-                          lineWidth: isSelected ? 2 : 1))
+        .background(RoundedRectangle(cornerRadius: 12).fill(theme.controlGround.color))
+        .overlay { if isSelected {      // board 16 option B: a 1.5 pt ring, grids only
+            RoundedRectangle(cornerRadius: 12).strokeBorder(theme.textPrimary.color, lineWidth: 1.5)
+        } }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
