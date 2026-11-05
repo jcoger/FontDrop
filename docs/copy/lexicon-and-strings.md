@@ -559,3 +559,32 @@ Removed from the Display inspector: the Styles list, the Facts block, Save and H
 ### Gates for section 21
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · R pass
+
+## 22. Set, Text and Faces, and brand delete (R5, 2026-11-05)
+
+The Set screen shows the pair at every step of the scale. Its inspector gains 02 Text and 03 Faces. A brand can be deleted. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 22.1 | set.stage.title | **Type scale · Agrandir with PP Neue Machina** | Display face, then Text face. Wraps to two lines when long |
+| 22.2 | set.step.names | **Display** · **H1** · **H2** · **H3** · **Lead** · **Body** · **Caption** | Board 04. Display to H3 are set in the Display face, Lead to Caption in the Text face. Row label: **H1 · 47 PT**, the face name under it |
+| 22.3 | set.step.lines | **Rooms that stay** · **Small hotels, run upstairs** · **A table for four, held** · **Your name is on the list** · **The kitchen knows, and the first round is poured.** · **Fig. 1 Breakfast on the roof, May.** | The sample line for each step. Body is a paragraph |
+| 22.4 | set.body.label | **66 CH · 1.45** | Under **BODY · 15 PT**: the measure in characters and the line height |
+| 22.5 | set.preview.scaled | **Preview scaled to fit. The size shown is the real size.** | Quiet line under the rows, only when a row had to shrink. Below 760 pt of stage the label sits above its specimen |
+| 22.6 | set.empty | **Choose a Display face to see it here.** · **Choose a Text face to see it here.** | Either face missing |
+| 22.7 | set.text.title | **02 · Text** | Module label |
+| 22.8 | set.measure | **Measure** · readout **66 CH** | Characters per line, counted on the real text. 35 to 90 |
+| 22.9 | set.lineHeight | **Line height** · readout **1.45** · idle note **Follows the measure** | 1.1 to 1.8. Left alone it follows the measure (1.30 at 45 characters, 1.50 at 75) |
+| 22.10 | set.backToAuto | **Back to Auto** | Replaces the idle note once the designer has set the value. Also on optical size |
+| 22.11 | set.measure.rule | **Measure sits inside 55 to 75 characters. Line height follows the measure.** · under 55 **Under 55 characters. Short lines read choppy past a few paragraphs.** · over 75 **Over 75 characters. Long lines lose the eye on the way back.** | Quiet line under the controls |
+| 22.12 | set.measure.help | **Characters per line of body text, counted on the real text in the Text face** · **Body line height. Left alone it follows the measure: tighter for short lines, looser for long ones.** | Hover |
+| 22.13 | set.faces.title | **03 · Faces** | Module label. One block per face: **Display**, **Text**, then the family name |
+| 22.14 | set.faces.opticalSize | **Optical size** · readout **Auto** or **20 PT** | Hover: **Follows the size drawn until you move it** |
+| 22.15 | set.faces.style | **Style** · readout **30** | The face's STYL axis. Hover: **This face blends two styles on one axis** |
+| 22.16 | set.faces.none | **A fixed cut. It has no axes to set.** · **No optical size or style axis. Weight and width are under Style on the Text screen.** | A static face, and a variable face with other axes only |
+| 22.17 | brand.delete | Menu item **Delete brand…** | In the brand switcher, after **Rename…** |
+| 22.18 | brand.delete.confirm | Title **Delete Acme?** · **This removes its picks, shortlist, scale, colors and settings. Your fonts are not touched. This cannot be undone.** · buttons **Delete brand** and **Cancel** | Names the brand. Settings means its sample line and where it was left |
+
+### Gates for section 22
+
+C pass (no em dashes)

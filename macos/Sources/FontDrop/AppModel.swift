@@ -354,9 +354,9 @@ final class AppModel {
         let isolated = options.screenshot != nil || options.bench
         let store = defaults ?? (isolated ? Self.throwawayDefaults() : .standard)
         self.defaults = store
-        typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: !isolated)
-        scaleStore = ScaleStore(dbPath: options.dbPath, persist: !isolated)
-        brandStyle = BrandStyleStore(dbPath: options.dbPath, persist: !isolated, defaults: store)
+        typeSettings = TypeSettingsStore(persist: !isolated)
+        scaleStore = ScaleStore(persist: !isolated)
+        brandStyle = BrandStyleStore(persist: !isolated, defaults: store)
         templateID = store.string(forKey: "readingTemplate") ?? "article"
         if let t = options.template { templateID = t }
         // Screenshot and bench runs start from the standard filter so they repeat.
@@ -370,6 +370,10 @@ final class AppModel {
         if options.sort == "character-first" { lenses.sort = .characterFirst }
         if let d = options.difference, let l = ContrastLens.allCases.first(where: { $0.rawValue.lowercased() == d }) { lenses.contrast = l }
         if let q = options.search { search = q }
+        // A setting changed in the last moment before quitting is still waiting for its save.
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.flushBrandSettings() }
+        }
     }
 
     // MARK: derived
@@ -532,6 +536,9 @@ final class AppModel {
             let t0 = DispatchTime.now()
             let lib = try await Task.detached(priority: .userInitiated) { try Library.open(path: db) }.value
             core = lib
+            // The per-brand stores read the database now (the core imported the old JSON files when it opened),
+            // and write to it from here on.
+            typeSettings.attach(lib); scaleStore.attach(lib); brandStyle.attach(lib)
             let t1 = DispatchTime.now()
             if options.refresh { print("FONTDROP refreshing library...")
                 _ = try await Task.detached(priority: .utility) { try lib.refreshLibrary() }.value
@@ -782,6 +789,29 @@ final class AppModel {
             try await background { try $0.brandUpdate(id: id, name: n, logoSvg: logo) }
             brands = try await background { try $0.brandsList() }
         } catch { report(error) }
+    }
+
+    /// Deletes a brand and everything saved for it: picks, shortlist, scale, colors, face settings, the sample line
+    /// and where it was left. Fonts are not touched. Selects the next brand, or none.
+    func deleteBrand(_ brand: Brand) async {
+        let id = brand.id
+        do {
+            try await background { try $0.brandDelete(id: id) }
+            typeSettings.forget(brand: id); scaleStore.forget(brand: id); brandStyle.forget(brand: id)
+            brands = try await background { try $0.brandsList() }
+            if brandID == id {
+                restoringBrand = true; selectedFamily = nil; restoringBrand = false     // the old brand's selection is not the next one's
+                await selectBrand(brands.first?.id)
+            }
+            defaults.removeObject(forKey: LaunchMemory.key(id))
+            if sampleOverrides.removeValue(forKey: String(id)) != nil { defaults.set(sampleOverrides, forKey: "displaySamples") }
+            if defaults.object(forKey: "lastBrand") as? Int64 == id { defaults.removeObject(forKey: "lastBrand") }
+        } catch { report(error) }
+    }
+
+    /// Writes any per-brand setting still waiting for its save (the app is quitting).
+    func flushBrandSettings() {
+        typeSettings.flush(); scaleStore.flush(); brandStyle.flush()
     }
 
     // MARK: choices and shortlist

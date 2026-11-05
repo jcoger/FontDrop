@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use rusqlite::Connection;
 
 use crate::finder::{self, FamilyQuery, FamilyResults};
-use crate::{db, pairing, userdata};
+use crate::{brand_settings, db, pairing, userdata};
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum CoreError {
@@ -187,6 +187,13 @@ impl Library {
     pub fn open(path: String) -> Result<Arc<Self>, CoreError> {
         let db_path = PathBuf::from(path);
         let conn = db::try_open_db_at(&db_path)?;
+        // First open of this build: copy the old JSON side files (scale, colors, playground) into the tables.
+        // Failing to import must not stop the app from opening; the report is only logged.
+        match brand_settings::import_legacy_json(&conn, &db_path) {
+            Ok(Some(r)) => eprintln!("FONTDROP imported brand settings: {} scales, {} colors, {} faces, {} skipped", r.scales, r.colors, r.faces, r.skipped),
+            Ok(None) => {}
+            Err(e) => eprintln!("FONTDROP brand settings import failed: {e}"),
+        }
         Ok(Arc::new(Library { db_path, conn: Mutex::new(conn) }))
     }
 
@@ -364,6 +371,41 @@ impl Library {
 
     pub fn brand_delete(&self, id: i64) -> Result<(), CoreError> {
         userdata::delete_brand(&*self.lock()?, id).map_err(from_msg)
+    }
+
+    // ── Per-brand type settings (scale, colors, face settings) ───────────────
+
+    pub fn scales_list(&self) -> Result<Vec<brand_settings::BrandScale>, CoreError> {
+        brand_settings::scales(&*self.lock()?).map_err(from_msg)
+    }
+
+    pub fn scale_set(&self, scale: brand_settings::BrandScale) -> Result<(), CoreError> {
+        brand_settings::set_scale(&*self.lock()?, &scale).map_err(from_msg)
+    }
+
+    pub fn colors_list(&self) -> Result<Vec<brand_settings::BrandColors>, CoreError> {
+        brand_settings::colors(&*self.lock()?).map_err(from_msg)
+    }
+
+    pub fn colors_set(&self, colors: brand_settings::BrandColors) -> Result<(), CoreError> {
+        brand_settings::set_colors(&*self.lock()?, &colors).map_err(from_msg)
+    }
+
+    /// Back to the default colors for this brand.
+    pub fn colors_clear(&self, brand: i64) -> Result<(), CoreError> {
+        brand_settings::clear_colors(&*self.lock()?, brand).map_err(from_msg)
+    }
+
+    pub fn faces_list(&self) -> Result<Vec<brand_settings::FaceSettings>, CoreError> {
+        brand_settings::faces(&*self.lock()?).map_err(from_msg)
+    }
+
+    pub fn face_set(&self, face: brand_settings::FaceSettings) -> Result<(), CoreError> {
+        brand_settings::set_face(&*self.lock()?, &face).map_err(from_msg)
+    }
+
+    pub fn face_clear(&self, brand: i64, job: String, family: String) -> Result<(), CoreError> {
+        brand_settings::clear_face(&*self.lock()?, brand, &job, &family).map_err(from_msg)
     }
 
     // ── Shortlist, choices, house style ──────────────────────────────────────

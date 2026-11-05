@@ -5,6 +5,7 @@
 //! - `classifier`, `metrics`: skeleton and proportion measurements
 //! - `pairing`: scoring, buckets, evidence
 //! - `same_family`: offering the Display family itself, with a body style
+//! - `brand_settings`: per-brand scale, colors and face settings, and the one-time import of the old JSON side files
 //! - `userdata`: brands, shortlist per job, choices, house style
 //! - `google_fonts`: catalogue enrichment
 //! - `ffi` (feature `uniffi`): the Swift surface
@@ -12,6 +13,7 @@
 //! Nothing here depends on Tauri. The Tauri shell calls these functions from
 //! its command wrappers; the SwiftUI app calls `ffi::Library`.
 
+pub mod brand_settings;
 pub mod classifier;
 pub mod db;
 pub mod finder;

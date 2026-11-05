@@ -224,7 +224,7 @@ struct LettersStrip: View {
 
 // MARK: - Set inspector
 
-/// The Set screen's inspector: the brand, then the Scale module (dial, Body, footer).
+/// The Set screen's inspector: the brand, then 01 Scale (dial, Body, footer), 02 Text (Measure, Line height) and 03 Faces (axes).
 struct SetInspector: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
@@ -239,6 +239,8 @@ struct SetInspector: View {
                 }
                 if let reading = model.readingFamily {
                     ScaleModule(family: reading.name, fallbackPath: reading.filePath)
+                    TextModule()
+                    FacesModule()
                 } else {
                     Text(Lexicon.Scale.needsText).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
                         .padding(.top, 24)

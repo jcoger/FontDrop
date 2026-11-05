@@ -10,6 +10,7 @@ struct SidebarView: View {
     @State private var newName = ""
     @State private var renaming: Brand?
     @State private var renameText = ""
+    @State private var deleting: Brand?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -39,6 +40,14 @@ struct SidebarView: View {
             TextField("Name", text: $newName)
             Button("Create") { Task { await model.createBrand(newName) } }
             Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog(deleting.map { Lexicon.BrandMenu.confirmTitle($0.name) } ?? "",
+                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                            titleVisibility: .visible, presenting: deleting) { brand in
+            Button(Lexicon.BrandMenu.confirmButton, role: .destructive) { Task { await model.deleteBrand(brand) } }
+            Button(Lexicon.BrandMenu.cancel, role: .cancel) {}
+        } message: { _ in
+            Text(Lexicon.BrandMenu.confirmMessage)
         }
         .alert("Rename brand", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $renameText)
@@ -76,7 +85,10 @@ struct SidebarView: View {
                 }
                 Divider()
                 Button("New brand\u{2026}") { newName = ""; showNewBrand = true }
-                if let current { Button("Rename\u{2026}") { renameText = current.name; renaming = current } }
+                if let current {
+                    Button("Rename\u{2026}") { renameText = current.name; renaming = current }
+                    Button(Lexicon.BrandMenu.delete, role: .destructive) { deleting = current }
+                }
             } label: {
                 HStack(spacing: 10) {
                     Text(String((current?.name ?? "?").prefix(1)).uppercased())

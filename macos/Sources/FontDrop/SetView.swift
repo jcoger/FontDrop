@@ -1,43 +1,31 @@
+import CoreText
+import FontDropCore
 import SwiftUI
 
-/// The Set screen: today a plain specimen of the pair. Scale, measure and optical-size work is round R5.
+/// The Set screen (board 04): the brand's pair at every step of the scale. Each row names the step, its size in
+/// points and the face that sets it, then shows a real line of text at that size. The Body row is a paragraph at the
+/// brand's measure and line height. It updates as the dial, Body, Measure and Line height move.
+///
+/// A row that is too wide for the stage shrinks its preview, never its numbers: the label still says the true size.
+/// React: a table of rows, each computing its own `transform: scale()` from the width it was given.
 struct SetView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
 
-    var body: some View {
-        let tick = model.fontTick
-        // The same sizes the Scale module reads out: locked, body x ratio to the step; Auto, what Fit solved to.
-        let solved = model.readingFamily.flatMap { model.solvedSizes(reading: $0.name, fallbackPath: $0.filePath) }
-        let headlinePt = min(solved?.headline ?? 84, 140)
-        let bodyPt = solved?.body ?? TypeScale.boardBody
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 24) {
-                    pairing("Display", model.displayFamily?.name)
-                    pairing("Text", model.readingFamily?.name)
-                }
+    private let labelWidth: CGFloat = 148
+    private let gutter: CGFloat = 20
+    private let pad: CGFloat = 28
+    /// Under this stage width the label sits above its specimen, so the specimen keeps the whole column.
+    private let stackBelow: CGFloat = 760
 
-                if let display = model.displayFamily {
-                    FaceText(face: model.face("display", display), text: SampleCopy.displayHeadline,
-                             ratio: CGFloat(headlinePt / max(model.face("display", display).settings.size, 1)), tick: tick)
-                        .lineLimit(3)
-                } else {
-                    Text("Choose a Display face to see it here.").foregroundStyle(.secondary)
-                }
-                if let reading = model.readingFamily {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(SampleCopy.paragraphs, id: \.self) { p in
-                            FaceText(face: model.face("reading", reading), text: p,
-                                     ratio: CGFloat(bodyPt / max(model.face("reading", reading).settings.size, 1)), tick: tick)
-                        }
-                    }
-                    .frame(maxWidth: 560, alignment: .leading)
-                } else {
-                    Text("Choose a Text face to see it here.").foregroundStyle(.secondary)
-                }
+    private func isStacked(_ width: CGFloat) -> Bool { width < stackBelow }
+
+    var body: some View {
+        GeometryReader { geo in
+            ScrollView {
+                content(width: geo.size.width)
+                    .frame(width: geo.size.width, alignment: .leading)
             }
-            .padding(24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.stage.color)
@@ -47,10 +35,161 @@ struct SetView: View {
         }
     }
 
-    private func pairing(_ job: String, _ family: String?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(job).font(.caption).foregroundStyle(.secondary)
-            Text(family ?? "None yet").font(.title3.weight(.semibold))
+    @ViewBuilder
+    private func content(width: CGFloat) -> some View {
+        let tick = model.fontTick
+        if let display = model.displayFamily, let reading = model.readingFamily {
+            let sizes = SetSizes.resolve(model: model, reading: reading)
+            let displayFace = model.face("display", display), textFace = model.face("reading", reading)
+            let stacked = isStacked(width)
+            let specWidth = max(width - 2 * pad - (stacked ? 0 : labelWidth + gutter), 120)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Lexicon.SetScreen.stageTitle(display: display.name, text: reading.name))
+                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.textPrimary.color)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 18)
+                ForEach(ScaleStep.stageOrder) { step in
+                    row(step, sizes: sizes, display: (display.name, displayFace), text: (reading.name, textFace),
+                        specWidth: specWidth, stacked: stacked, tick: tick)
+                }
+                scaledNote(sizes: sizes, display: displayFace, text: textFace, specWidth: specWidth)
+            }
+            .padding(.horizontal, pad).padding(.top, 52).padding(.bottom, 32)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                if model.displayFamily == nil { Text(Lexicon.SetScreen.needsDisplay) }
+                if model.readingFamily == nil { Text(Lexicon.SetScreen.needsText) }
+            }
+            .font(.system(size: 14)).foregroundStyle(theme.textSecondary.color)
+            .padding(.horizontal, pad).padding(.top, 64)
         }
+    }
+
+    // MARK: Rows
+
+    private func line(for step: ScaleStep) -> String {
+        switch step {
+        case .display: Lexicon.SetScreen.displayLine
+        case .h1: Lexicon.SetScreen.h1Line
+        case .h2: Lexicon.SetScreen.h2Line
+        case .h3: Lexicon.SetScreen.h3Line
+        case .lead: Lexicon.SetScreen.leadLine
+        case .body: SampleCopy.paragraphs.joined(separator: " ")
+        case .caption: Lexicon.SetScreen.captionLine
+        }
+    }
+
+    private func row(_ step: ScaleStep, sizes: SetSizes, display: (name: String, face: FaceSpec), text: (name: String, face: FaceSpec),
+                     specWidth: CGFloat, stacked: Bool, tick: Int) -> some View {
+        let pt = sizes.size(step)
+        let who = step.isDisplayFace ? display : text
+        let plan = SetRowPlan.make(step: step, pt: pt, face: who.face, text: line(for: step), specWidth: Double(specWidth), sizes: sizes)
+        let specimen = FaceText(face: who.face, text: line(for: step), ratio: CGFloat(plan.drawnPt / max(who.face.settings.size, 1)),
+                                tick: tick, trackBias: 0, leading: plan.leading)
+            .lineLimit(step == .body ? nil : 1)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: CGFloat(plan.drawnWidth ?? Double(specWidth)), alignment: .leading)
+            .foregroundStyle(theme.textPrimary.color)
+            .accessibilityLabel("\(step.label), \(Lexicon.SetScreen.points(pt)), \(who.name)")
+            .accessibilityValue(line(for: step))
+        let label = VStack(alignment: .leading, spacing: 3) {
+            Text("\(step.label) \u{00B7} \(Lexicon.SetScreen.points(pt))").moduleLabel().lineLimit(1).minimumScaleFactor(0.7)
+            if step == .body {
+                Text("\(sizes.measure) \(Lexicon.SetScreen.measureUnit) \u{00B7} " + String(format: "%.2f", sizes.lineHeight))
+                    .moduleLabel()
+            }
+            Text(who.name).font(.system(size: 11)).foregroundStyle(theme.textSecondary.color)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+        }
+        return VStack(alignment: .leading, spacing: 0) {
+            Rectangle().fill(theme.sliderTrack.color).frame(height: 1)
+            if stacked {
+                VStack(alignment: .leading, spacing: 8) { label; specimen }.padding(.vertical, 14)
+            } else {
+                HStack(alignment: .top, spacing: gutter) {
+                    label.frame(width: labelWidth, alignment: .leading).padding(.top, 4)
+                    specimen
+                }
+                .padding(.vertical, 14)
+            }
+        }
+    }
+
+    /// One quiet line when any preview was scaled to fit.
+    @ViewBuilder
+    private func scaledNote(sizes: SetSizes, display: FaceSpec, text: FaceSpec, specWidth: CGFloat) -> some View {
+        let scaled = ScaleStep.stageOrder.contains { step in
+            SetRowPlan.make(step: step, pt: sizes.size(step), face: step.isDisplayFace ? display : text, text: line(for: step),
+                            specWidth: Double(specWidth), sizes: sizes).factor < 0.999
+        }
+        if scaled {
+            Text(Lexicon.SetScreen.previewScaled).moduleLabel().padding(.top, 12)
+        }
+    }
+}
+
+/// The sizes Set draws: body and ratio as the Scale module reads them (locked: the brand's; Auto: what Fit solved to),
+/// and the measure and line height for body text.
+struct SetSizes {
+    var body: Double
+    var ratio: Double
+    var measure: Int
+    var lineHeight: Double
+
+    func size(_ step: ScaleStep) -> Double { body * pow(ratio, Double(step.rawValue)) }
+
+    @MainActor
+    static func resolve(model: AppModel, reading: FamilySummary) -> SetSizes {
+        let scale = model.scale
+        let solved = model.solvedSizes(reading: reading.name, fallbackPath: reading.filePath)
+        let auto = solved.flatMap { DialMath.autoRatio(headline: $0.headline, body: $0.body, steps: $0.headlineStep) }
+        return SetSizes(body: scale.locked ? scale.body : (solved?.body ?? scale.body),
+                        ratio: scale.locked ? scale.ratio : (auto ?? scale.ratio),
+                        measure: TextRules.measure(scale), lineHeight: TextRules.lineHeight(scale))
+    }
+}
+
+/// How one row is drawn: the leading, the preview factor that makes it fit, and the width it takes.
+struct SetRowPlan {
+    var leading: Double
+    /// 1 when the row fits at its true size.
+    var factor: Double
+    /// The point size actually drawn (true size times the factor).
+    var drawnPt: Double
+    /// The column width for the body paragraph; nil for one-line rows.
+    var drawnWidth: Double?
+
+    @MainActor
+    static func make(step: ScaleStep, pt: Double, face: FaceSpec, text: String, specWidth: Double, sizes: SetSizes) -> SetRowPlan {
+        let base = max(face.settings.size, 1)
+        guard let first = FontLoader.shared.styledFont(face, ratio: CGFloat(pt / base)) else {
+            return SetRowPlan(leading: 1.2, factor: 1, drawnPt: pt, drawnWidth: nil)
+        }
+        // The font at a drawn size. Width is not a straight line of size: a face with an optical size axis draws
+        // wider letters when it is small, so the fit is checked at the size it will really be drawn.
+        func font(at drawn: Double) -> CTFont { FontLoader.shared.styledFont(face, ratio: CGFloat(drawn / base)) ?? first }
+        func lineWidth(at drawn: Double) -> Double { TextRules.lineWidth(text, font: font(at: drawn), trackingEm: face.settings.tracking) }
+        func column(at drawn: Double) -> Double {
+            TextRules.columnWidth(measure: sizes.measure,
+                                  advance: TextRules.averageAdvance(of: text, font: font(at: drawn), trackingEm: face.settings.tracking))
+        }
+        /// Shrinks the factor until `width(pt * f)` fits `room`, a few passes.
+        func fit(room: Double, width: (Double) -> Double) -> Double {
+            var f = TextRules.previewScale(width: width(pt), available: room)
+            for _ in 0..<4 where f < 1 {
+                let w = width(pt * f)
+                if w <= room { break }
+                f *= room / w
+            }
+            return f
+        }
+        if step == .body {
+            // The column is `measure` characters of this text at this size. Shrinking it whole keeps every line break.
+            let f = fit(room: specWidth, width: { column(at: $0) })
+            return SetRowPlan(leading: sizes.lineHeight, factor: f, drawnPt: pt * f, drawnWidth: min(column(at: pt * f), specWidth))
+        }
+        // A little under the full width: the widest line must not touch the edge.
+        let f = fit(room: specWidth * 0.98, width: { lineWidth(at: $0) })
+        return SetRowPlan(leading: TextRules.headingLeading(step: step.rawValue), factor: f, drawnPt: pt * f, drawnWidth: nil)
     }
 }
