@@ -10,6 +10,7 @@
 		051EC4767C8DE6C604B97841 /* HeroProduct.swift in Sources */ = {isa = PBXBuildFile; fileRef = 744705D2B3BEC8D76876176F /* HeroProduct.swift */; };
 		0767A49B10332718FAE300E6 /* FontLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383DFDA5412103E4B0F4E62E /* FontLoader.swift */; };
 		09D9C2664F48BA423431B2F7 /* Lenses.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0868E170DE9E1D9990C8DDB /* Lenses.swift */; };
+		0BB99925C3C327B0397634EB /* DisplayInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 642751C0D7946737616EDED8 /* DisplayInspector.swift */; };
 		111EF9F312EE5025D2EA7496 /* FilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1333ACC5522C98EAAB7F599F /* FilterBar.swift */; };
 		119C0B28D1FCE012A42E1843 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */; };
 		1BEBEA433B2E9441B721269B /* grain.png in Resources */ = {isa = PBXBuildFile; fileRef = 16A4D140095A36B2445D34C1 /* grain.png */; };
@@ -65,6 +66,7 @@
 		B2EC8EFC5EF12BC52FCD9004 /* ColorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1392F04AD1B9B11E2372CB55 /* ColorMath.swift */; };
 		B80971C81AEFD5780D2EDDD3 /* DialAccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20828FE1C6947E4F642A8BCD /* DialAccessibilityTests.swift */; };
 		BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366C8EEFF62B64D9A353D0A3 /* Components.swift */; };
+		C2F1DB50F75EC09D66FB917D /* Alternates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67F17487BC96156EC11FECFB /* Alternates.swift */; };
 		C39BD445A03AC2AC55850378 /* AppUITemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1EF282224F001EA5646D3C /* AppUITemplate.swift */; };
 		C5735C77CBB583EEAC75BF3B /* TypeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB0EA488E17E1380FBAA940 /* TypeScale.swift */; };
 		CA87540FA673258AE190470B /* PosterFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643595791572FA0A0CB216C3 /* PosterFit.swift */; };
@@ -84,6 +86,7 @@
 		F62FF30D06B8AAF0E74EF4CD /* TemplateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402C3808858D795319E8CBDF /* TemplateTests.swift */; };
 		F6650614951D7782EB09F411 /* ArticleTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274C50217AF2739DFFFEA384 /* ArticleTemplate.swift */; };
 		F876D3ACD3B8A296D16E8BB5 /* Playground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EF19A45A446759D5A06581E /* Playground.swift */; };
+		F9AB5C3444EBC063B91C15C1 /* SimplifyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4D1F8FA6C3C448851F8AD3 /* SimplifyTests.swift */; };
 		FE14B7D88340A9FB8A780026 /* ReadingLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = F964490AF2FE7054CA26ED7E /* ReadingLogic.swift */; };
 		FF51E5A10EDFE2B480988E93 /* RescanAndClearTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A986121FCC102B0FA12D9B /* RescanAndClearTests.swift */; };
 /* End PBXBuildFile section */
@@ -130,11 +133,14 @@
 		56AF77AC06F0CB3272C638C8 /* TemplateFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateFitTests.swift; sourceTree = "<group>"; };
 		56E24347D2961718B7171E05 /* FontDrop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FontDrop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5BC2927B9A5603695A0C7FBE /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		5C4D1F8FA6C3C448851F8AD3 /* SimplifyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplifyTests.swift; sourceTree = "<group>"; };
 		5FE4BEA412AE90CBB12868B2 /* PosterLayered.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterLayered.swift; sourceTree = "<group>"; };
 		6046E775A350959D59C8B1AC /* ReadingStageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingStageTests.swift; sourceTree = "<group>"; };
 		634794C976B9676703946C88 /* Board.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Board.swift; sourceTree = "<group>"; };
+		642751C0D7946737616EDED8 /* DisplayInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayInspector.swift; sourceTree = "<group>"; };
 		643595791572FA0A0CB216C3 /* PosterFit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterFit.swift; sourceTree = "<group>"; };
 		64B041FDB2E185CBFC11CC53 /* ReadingStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingStage.swift; sourceTree = "<group>"; };
+		67F17487BC96156EC11FECFB /* Alternates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Alternates.swift; sourceTree = "<group>"; };
 		6E50B9E2B84A4525E66D1022 /* OFL-Doto.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Doto.txt"; sourceTree = "<group>"; };
 		72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorsPopover.swift; sourceTree = "<group>"; };
 		744705D2B3BEC8D76876176F /* HeroProduct.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroProduct.swift; sourceTree = "<group>"; };
@@ -247,6 +253,7 @@
 				6046E775A350959D59C8B1AC /* ReadingStageTests.swift */,
 				94A986121FCC102B0FA12D9B /* RescanAndClearTests.swift */,
 				AC4E2EF4D0A0D90BD4D091EA /* SameFamilyTests.swift */,
+				5C4D1F8FA6C3C448851F8AD3 /* SimplifyTests.swift */,
 				56AF77AC06F0CB3272C638C8 /* TemplateFitTests.swift */,
 				402C3808858D795319E8CBDF /* TemplateTests.swift */,
 			);
@@ -273,6 +280,7 @@
 		B3519EDEABD95CAEDDA2693E /* FontDrop */ = {
 			isa = PBXGroup;
 			children = (
+				67F17487BC96156EC11FECFB /* Alternates.swift */,
 				52F2FED0504D056B840CF694 /* AppModel.swift */,
 				2A800DE57A154D964A780F27 /* Bench.swift */,
 				03FCE0C902BCCC8183838589 /* BrandStyleStore.swift */,
@@ -280,6 +288,7 @@
 				1392F04AD1B9B11E2372CB55 /* ColorMath.swift */,
 				72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */,
 				366C8EEFF62B64D9A353D0A3 /* Components.swift */,
+				642751C0D7946737616EDED8 /* DisplayInspector.swift */,
 				AC6E77BB45421A8FFD863484 /* DisplayReasons.swift */,
 				8F9E53CD974A61BC39BBE4D1 /* DisplaySortMenu.swift */,
 				AF45315ED86D1A62A42E9D5D /* DisplayView.swift */,
@@ -462,6 +471,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2F1DB50F75EC09D66FB917D /* Alternates.swift in Sources */,
 				842E06CDE29AA56AB26A8FE9 /* AppDashboard.swift in Sources */,
 				D838D95AF20557F5EC65E074 /* AppDetail.swift in Sources */,
 				85CC14800D695A6D6CCB72C8 /* AppModel.swift in Sources */,
@@ -477,6 +487,7 @@
 				A3DBFA936E8FE6AD78B4969A /* ColorsPopover.swift in Sources */,
 				BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */,
 				54EC61E22A75D210DD5A5F40 /* Copy.swift in Sources */,
+				0BB99925C3C327B0397634EB /* DisplayInspector.swift in Sources */,
 				95EE4A284A5CC8C9EBA6303D /* DisplayReasons.swift in Sources */,
 				B1E74AC6DD431E1FA7E45EC3 /* DisplaySortMenu.swift in Sources */,
 				A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */,
@@ -539,6 +550,7 @@
 				DB5A8E1944294858E657D5CA /* ReadingStageTests.swift in Sources */,
 				FF51E5A10EDFE2B480988E93 /* RescanAndClearTests.swift in Sources */,
 				3CC84A4FA94EFC19170C5695 /* SameFamilyTests.swift in Sources */,
+				F9AB5C3444EBC063B91C15C1 /* SimplifyTests.swift in Sources */,
 				4F22CE47FB1AF88A77F120BF /* TemplateFitTests.swift in Sources */,
 				F62FF30D06B8AAF0E74EF4CD /* TemplateTests.swift in Sources */,
 			);

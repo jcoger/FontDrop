@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The Sort menu on the Display filter bar. It exists once a Text face is chosen: Your fonts first, or Pairs with that face.
+/// The Sort menu in the Display top row, beside Search. It exists once a Text face is chosen: Your fonts first, or Pairs with that face.
 struct DisplaySortMenu: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         if model.screen == .display, let text = model.readingFamily {
@@ -13,10 +14,17 @@ struct DisplaySortMenu: View {
                 }
                 .pickerStyle(.inline)
             } label: {
-                Text("\(Lexicon.sortLabel) \u{00B7} " + (model.displaySort == .pairsWith ? Lexicon.Pairs.sortPairsWith(text.name) : Lexicon.Pairs.sortLibrary))
-                    .font(.callout).lineLimit(1)
+                HStack(spacing: 4) {
+                    (Text("\(Lexicon.sortLabel) \u{00B7} ").foregroundStyle(theme.textSecondary.color)
+                     + Text(model.displaySort == .pairsWith ? Lexicon.Pairs.sortPairsWith(text.name) : Lexicon.Pairs.sortLibrary)
+                        .foregroundStyle(theme.textPrimary.color))
+                        .font(.system(size: 13)).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .pill()
             }
-            .menuIndicator(.visible)
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
             .fixedSize()
             .help(Lexicon.Pairs.sortHelp)
         }

@@ -266,6 +266,36 @@ enum Lexicon {
         static func lettersAccessibility(_ samples: [String]) -> String { "Letters in this face: " + samples.joined(separator: ", ") }
     }
 
+    /// Round R4 (section 21): Display's inspector, the one-row bars and the Tuned mark.
+    enum R4 {
+        // Display inspector modules
+        static let sample = "Sample"
+        static let alternates = "Alternates"
+        static let samplePlaceholder = "Type your own line. Defaults to the brand name."
+        static let sampleClear = "Back to the brand name"
+        static let alternatesHint = "Alternate letters show as the glyph. Codes on hover."
+        static let noAlternates = "This face has no alternate letters."
+        static func showAllAlternates(_ n: Int) -> String { "Show all \(n)" }
+        static let showFewer = "Show fewer"
+        static func alternateHelp(name: String, code: String) -> String { name.isEmpty ? code : "\(name) \u{00B7} \(code)" }
+        static func alternateAccessibility(set: Int, letters: [String], name: String) -> String {
+            let named = name.isEmpty ? "Stylistic set \(set)" : name
+            return letters.isEmpty ? named : "\(named), changes \(letters.joined(separator: ", "))"
+        }
+        static func candidateTitle(_ job: String) -> String { "\(jobName(job)) candidate" }
+        static func currentTitle(_ job: String) -> String { "Current \(jobName(job)) face" }
+        static let foundryPage = "Foundry page"
+        static let noSelection = "No family selected"
+        static let noSelectionHelp = "Select a family to try its styles and letters."
+        // Card marks
+        static let tuned = "Tuned"
+        static let tunedHelp = "You changed this face's settings. The grid shows its default style."
+        // Heads
+        static func filters(_ active: Int) -> String { active > 0 ? "Filters \u{00B7} \(active)" : "Filters" }
+        static let filtersHelp = "Source, Difference, Structure and Foundry"
+        static func familiesLine(brand: String, count: Int) -> String { "\(brand) set in \(count.formatted()) \(count == 1 ? "family" : "families")" }
+    }
+
     /// Ends a chip's words as a sentence.
     static func sentenceEnd(_ text: String) -> String { text.hasSuffix(".") ? text : text + "." }
 
@@ -344,8 +374,25 @@ enum Lexicon {
             switch s { case .yours: "Your fonts"; case .google: "Google Fonts"; case .system: "Mac system" }
         }
         static func kindLabel(_ k: Kind) -> String {
-            switch k { case .serif: "Serif"; case .sans: "Sans"; case .script: "Script"; case .display: "Display"; case .mono: "Mono" }
+            switch k { case .serif: "Serif"; case .sans: "Sans"; case .script: "Script"; case .display: "Decorative"; case .mono: "Mono" }
         }
+        /// 21.2: the first segment of the kind control.
+        static let kindAll = "All"
+        /// 21.1: the label of the source menu. Saved wins, since it narrows whatever the sources are.
+        static func sourceMenuValue(_ sources: Set<Source>, savedOnly: Bool) -> String {
+            if savedOnly { return saved }
+            switch sources {
+            case [.yours]: return "Your fonts"
+            case [.yours, .google]: return "Your fonts + Google"
+            case [.yours, .google, .system]: return "All fonts"
+            case [.google]: return "Google Fonts"
+            case [.system]: return "Mac system"
+            case []: return "No source"
+            default: return sources.sorted { $0.key < $1.key }.map(sourceLabel).joined(separator: " + ")
+            }
+        }
+        static let sourceMenuHelp = "Where the fonts come from, or only the ones you saved"
+        static func kindHelp(_ kind: String, count: Int?) -> String { count.map { "\(kind), \($0.formatted()) families" } ?? kind }
         static func traitLabel(_ t: Trait) -> String {
             switch t {
             case .italic: "Italic"; case .variable: "Variable"; case .condensed: "Condensed"

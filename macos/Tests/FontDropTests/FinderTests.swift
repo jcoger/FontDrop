@@ -72,7 +72,7 @@ final class FinderTests: XCTestCase {
 
     func testChipWordsFollowTheLexicon() {
         XCTAssertEqual(Source.all.map(Lexicon.Finder.sourceLabel), ["Your fonts", "Google Fonts", "Mac system"])
-        XCTAssertEqual(Kind.all.map(Lexicon.Finder.kindLabel), ["Serif", "Sans", "Script", "Display", "Mono"])
+        XCTAssertEqual(Kind.all.map(Lexicon.Finder.kindLabel), ["Serif", "Sans", "Script", "Decorative", "Mono"])
         XCTAssertEqual(Trait.all.map(Lexicon.Finder.traitLabel), ["Italic", "Variable", "Condensed", "Wide", "Trial"])
         XCTAssertEqual([Lexicon.Finder.hide, Lexicon.Finder.unhide, Lexicon.Finder.saved], ["Hide", "Unhide", "Saved"])
         XCTAssertEqual(Lexicon.Finder.notForLongText(42), "42 not made for long text")

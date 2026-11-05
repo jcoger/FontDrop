@@ -535,3 +535,27 @@ Open for the owner: the engine reads "a sans with character" as "not a basic" (w
 ### Gates for section 20
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · R pass
+
+## 21. Simplify (R4, 2026-11-05)
+
+One row for the Display filters, one row for the Text list head, a Display inspector with one job per module. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 21.1 | display.source.menu | **Your fonts + Google** · **Your fonts** · **All fonts** · **Saved** (menu label) · items **Your fonts**, **Google Fonts**, **Mac system**, **Saved** with a quiet count | One menu replaces three source chips and the Saved chip. The label names what the grid shows. Saved wins the label, since it narrows every source. Hover: **Where the fonts come from, or only the ones you saved** |
+| 21.2 | display.kind.control | **All** · **Serif** · **Sans** · **Script** · **Decorative** · **Mono** | Segmented, one at a time. In a narrow column it becomes a menu with the same words. Hover on a segment: **Serif, 116 families**. The chip counts left the surface (UX audit C4) |
+| 21.3 | kind.display | **Decorative** | The kind "Display" is renamed (UX audit C2, IA collision table). Display is a job only. The engine's kind key stays `display` |
+| 21.4 | display.subtitle | **Acme set in 405 families** | Only what is on screen (S5, C4). The Pairs with subtitle (20.4) stays |
+| 21.5 | card.tuned | Tag **Tuned** · hover **You changed this face's settings. The grid shows its default style.** | Every card draws its default style, so cards compare equally (U2) |
+| 21.6 | text.filters | **Filters** · **Filters · 2** | One menu holds Source, Difference, Structure and Foundry. The number counts what narrows the list. Hover: **Source, Difference, Structure and Foundry**. Sort stays its own menu, showing only its value (**Best match**) |
+| 21.7 | inspector.display.modules | **01 Sample** · **02 Face** · **03 Alternates** · **04 Letters** | Module labels, as on the Text inspector. Face holds Style and **Spacing and features** (the same disclosure) |
+| 21.8 | inspector.display.header | **Current Display face · 16 styles** · **Display candidate · 16 styles** · adds **Trial** | The quiet line under the name. The foundry link (or **Get the license** for a trial) sits under it. Save and Hide left the inspector (S1): the star shows on hover, Hide is in the card's menu |
+| 21.9 | sample.placeholder | **Type your own line. Defaults to the brand name.** · clear button **Back to the brand name** | Empty means the brand name. Kept per brand |
+| 21.10 | alternates | Tiles show the changed letters. Hover: **Alt a · ss01** or **ss03**. Hint **Alternate letters show as the glyph. Codes on hover.** · **Show all 12** · **Show fewer** · **This face has no alternate letters.** | The font's own name for a set when it has one. Never "ss01" on the surface (S6) |
+| 21.11 | inspector.display.empty | **No family selected** · **Select a family to try its styles and letters.** | Replaces "styles, axes and x-height", which the inspector no longer lists |
+
+Removed from the Display inspector: the Styles list, the Facts block, Save and Hide, the 11 raw stylistic-set switches.
+
+### Gates for section 21
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · R pass
