@@ -257,8 +257,82 @@ pub fn try_open_db_at(db_path: &Path) -> Result<Connection, rusqlite::Error> {
     // busy_timeout: the background scan writes while the UI reads and edits.
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;")?;
     conn.execute_batch(CREATE_TABLE)?;
+    backup_before_upgrade(&conn, db_path);
     try_run_migrations(&conn)?;
     Ok(conn)
+}
+
+/// How many upgrade backups stay beside the library.
+pub const BACKUPS_KEPT: usize = 2;
+
+/// True when opening this library now would change what is in it: a schema migration, or a reclassify of every font
+/// (a new CLASSIFIER_VERSION). A new, empty library has nothing to protect.
+fn upgrade_pending(conn: &Connection) -> Option<i64> {
+    let version: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0)).ok()?;
+    let fonts: i64 = conn.query_row("SELECT COUNT(*) FROM fonts", [], |r| r.get(0)).unwrap_or(0);
+    if version == 0 && fonts == 0 {
+        return None;
+    }
+    let stamped: i64 = meta_get(conn, "classifier_version").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let migrating = version < MIGRATIONS.len() as i64;
+    let reclassifying = fonts > 0 && stamped < CLASSIFIER_VERSION;
+    (migrating || reclassifying).then_some(version)
+}
+
+/// Before an upgrade touches the library, copies it with SQLite's backup API to `<db>.backup-v<old user_version>.db`
+/// beside it, and keeps the two newest such copies. A failed backup is logged and the open goes on: the upgrade is
+/// not blocked by a full disk. Returns the backup's path when one was written.
+pub fn backup_before_upgrade(conn: &Connection, db_path: &Path) -> Option<std::path::PathBuf> {
+    let version = upgrade_pending(conn)?;
+    let mut name = db_path.as_os_str().to_owned();
+    name.push(format!(".backup-v{version}.db"));
+    let target = std::path::PathBuf::from(name);
+    match write_backup(conn, &target) {
+        Ok(()) => {
+            eprintln!("FONTDROP backup written before upgrade: {}", target.display());
+            prune_backups(db_path, BACKUPS_KEPT);
+            Some(target)
+        }
+        Err(e) => {
+            eprintln!("FONTDROP backup before upgrade failed ({e}); continuing");
+            None
+        }
+    }
+}
+
+fn write_backup(conn: &Connection, target: &Path) -> Result<(), String> {
+    let mut tmp = target.as_os_str().to_owned();
+    tmp.push(".partial");
+    let tmp = std::path::PathBuf::from(tmp);
+    let _ = std::fs::remove_file(&tmp);
+    {
+        let mut dst = Connection::open(&tmp).map_err(|e| e.to_string())?;
+        let backup = rusqlite::backup::Backup::new(conn, &mut dst).map_err(|e| e.to_string())?;
+        backup
+            .run_to_completion(256, std::time::Duration::from_millis(0), None)
+            .map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&tmp, target).map_err(|e| e.to_string())
+}
+
+/// Deletes all but the `keep` newest `<db>.backup-v*.db` files.
+fn prune_backups(db_path: &Path, keep: usize) {
+    let (Some(dir), Some(file)) = (db_path.parent(), db_path.file_name().and_then(|f| f.to_str())) else { return };
+    let prefix = format!("{file}.backup-v");
+    let mut found: Vec<(std::time::SystemTime, std::path::PathBuf)> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| {
+            let n = e.file_name().to_string_lossy().into_owned();
+            n.starts_with(&prefix) && n.ends_with(".db")
+        })
+        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
+        .collect();
+    found.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_, path) in found.into_iter().skip(keep) {
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 /// Panicking convenience for the app shell, which has no way to run without a DB.
@@ -1029,6 +1103,9 @@ pub fn refresh_library_in(db_path: &Path, folders: Option<&[PathBuf]>) -> Result
 
 #[cfg(test)]
 mod scan_tests;
+
+#[cfg(test)]
+mod backup_tests;
 
 #[cfg(test)]
 mod tests {
