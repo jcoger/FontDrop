@@ -651,3 +651,4 @@ Strings moved into `Lexicon` or changed. No new wording for the designer except 
 | 25.4 | chrome.newBrand | **New brand** · **New brand...** | Lexicon.newBrand. Alert title, the plus button's help and VoiceOver name, and the menu item (with an ellipsis) |
 | 25.5 | view.zoom | **Zoom in** | Command-= in the View menu. Command-+ also works (no menu item of its own) |
 | 25.6 | export.tailwind | **--font-weight-display-style** · **--font-weight-text-style** | In the Tailwind export. They make the classes `font-display-style` and `font-text-style`. The old names `--font-weight-display` and `--font-weight-text` made no class, and `font-display` is the family |
+| 25.7 | finder.showAllFonts | **Show all fonts** | R8. Button in the Saved empty state. Sets the scope back to Your fonts + Google |

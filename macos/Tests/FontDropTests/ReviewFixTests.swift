@@ -7,7 +7,7 @@ import XCTest
 @MainActor
 final class ReviewFixTests: XCTestCase {
     private func tempDB() -> String { NSTemporaryDirectory() + "fontdrop-r7b-\(UUID().uuidString).db" }
-    private func suite() -> UserDefaults { UserDefaults(suiteName: "fontdrop-r7b-tests-\(UUID().uuidString)")! }
+    private func suite() -> UserDefaults { makeTestSuite("fontdrop-r7b-tests") }
 
     private func model(db: String? = nil, defaults: UserDefaults? = nil, folder: String? = nil) async -> AppModel {
         var args = ["FontDrop", "--db", db ?? tempDB()]

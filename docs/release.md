@@ -59,3 +59,11 @@ One asset: `macos/Sources/FontDrop/Resources/Assets.xcassets/AppIcon.appiconset`
 6. Open the New brand sheet and press Command-Z. The library's picks do not change.
 7. Hide the sidebar (Control-Command-S). The search row and the Text list head clear the traffic lights. Quit and reopen: it stays hidden.
 8. On Text, Command-= zooms in the stage, and so does Command-+.
+
+## Test leftovers
+
+Before R8, test runs left `fontdrop-*` suites in `~/Library/Preferences`. New runs clean up after themselves. To remove the old ones once:
+
+```bash
+for d in $(defaults domains | tr "," "\n" | grep "fontdrop-"); do defaults delete "$d"; done
+```

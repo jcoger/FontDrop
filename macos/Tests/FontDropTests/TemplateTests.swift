@@ -80,7 +80,7 @@ final class TemplateTests: XCTestCase {
     // MARK: Variants and the style store
 
     private func makeStore(_ suite: String) -> BrandStyleStore {
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = makeTestSuite(named: suite)
         return BrandStyleStore(persist: true, defaults: defaults)
     }
 

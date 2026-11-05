@@ -100,7 +100,11 @@ struct FamilyPickerView: View {
             ProgressView(Lexicon.Scan.scanningFonts)
                 .frame(maxWidth: .infinity, minHeight: 240)
         } else if model.filter.savedOnly && model.search.isEmpty && model.filter.kinds.isEmpty && model.filter.traits.isEmpty {
-            ContentUnavailableView(Lexicon.Finder.savedEmpty, systemImage: "star")
+            ContentUnavailableView {
+                Label(Lexicon.Finder.savedEmpty, systemImage: "star")
+            } actions: {
+                Button(Lexicon.Finder.showAllFonts) { model.showAllFonts() }
+            }
         } else {
             ContentUnavailableView {
                 Label(Lexicon.Finder.noMatches, systemImage: "line.3.horizontal.decrease.circle")

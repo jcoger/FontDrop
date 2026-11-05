@@ -85,7 +85,7 @@ final class DialMathTests: XCTestCase {
 @MainActor
 final class LaunchMemoryTests: XCTestCase {
     private func tempDB() -> String { NSTemporaryDirectory() + "fontdrop-memory-\(UUID().uuidString).db" }
-    private func suite() -> UserDefaults { UserDefaults(suiteName: "fontdrop-memory-tests-\(UUID().uuidString)")! }
+    private func suite() -> UserDefaults { makeTestSuite("fontdrop-memory-tests") }
 
     func testSetWithNoFacesFallsBackToDisplay() {
         XCTAssertEqual(LaunchMemory.landingScreen(stored: .set, hasDisplay: false, hasText: false), .display)

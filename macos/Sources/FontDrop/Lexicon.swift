@@ -415,6 +415,7 @@ enum Lexicon {
         static let removeSaved = "Remove from Saved"
         /// 9.5: the chip counts what the filters show; the sidebar counts every saved family.
         static let savedChipHelp = "Saved fonts in this view"
+        static let showAllFonts = "Show all fonts"
         static let savedEmpty = "Nothing saved yet. Star a family to keep it here."
         static let searchPrompt = "Search name, foundry or designer"
         static let noMatches = "No families match these filters."

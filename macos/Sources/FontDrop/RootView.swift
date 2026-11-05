@@ -258,6 +258,66 @@ enum WindowChrome {
         w.styleMask.insert(.fullSizeContentView)
         w.isMovableByWindowBackground = false
         w.title = "FontDrop"
+        WindowButtons.install(on: w)
+    }
+
+    /// The traffic lights sit this far from the sidebar panel's left and top edges (the panel is 8 pt from the window's).
+    static let buttonInset: CGFloat = 20
+    static let panelGutter: CGFloat = 8
+}
+
+/// Puts the close, minimise and zoom buttons inside the sidebar panel (board 17), and keeps them there.
+/// AppKit lays them out again on resize and when full screen ends, so this runs after each of those.
+/// The strip they sit in is made tall enough to hold them: a button outside its parent's frame cannot be clicked.
+@MainActor
+final class WindowButtons {
+    private static var placers: [ObjectIdentifier: WindowButtons] = [:]
+    private weak var window: NSWindow?
+    private var tokens: [NSObjectProtocol] = []
+
+    static func install(on window: NSWindow) {
+        let key = ObjectIdentifier(window)
+        if let existing = placers[key] { existing.place(); return }
+        let p = WindowButtons(window)
+        placers[key] = p
+        p.place()
+    }
+
+    private init(_ window: NSWindow) {
+        self.window = window
+        let names: [Notification.Name] = [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification,
+                                          NSWindow.didExitFullScreenNotification, NSWindow.didBecomeKeyNotification,
+                                          NSWindow.didChangeScreenNotification, NSWindow.didDeminiaturizeNotification]
+        for n in names {
+            tokens.append(NotificationCenter.default.addObserver(forName: n, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.place(); DispatchQueue.main.async { self?.place() } }
+            })
+        }
+    }
+
+    /// Frames for the three buttons, from the top-left of the strip that holds them. Pure, for the test.
+    static func layout(buttonSize: CGSize, step: CGFloat, stripHeight: CGFloat) -> [CGPoint] {
+        let x0 = WindowChrome.panelGutter + WindowChrome.buttonInset
+        let y = stripHeight - (WindowChrome.panelGutter + WindowChrome.buttonInset) - buttonSize.height
+        return (0..<3).map { CGPoint(x: x0 + CGFloat($0) * step, y: y) }
+    }
+
+    func place() {
+        guard let w = window, !w.styleMask.contains(.fullScreen),
+              let close = w.standardWindowButton(.closeButton),
+              let mini = w.standardWindowButton(.miniaturizeButton),
+              let zoom = w.standardWindowButton(.zoomButton),
+              let titlebar = close.superview, let container = titlebar.superview,
+              let content = w.contentView else { return }
+        let size = close.frame.size
+        let step = max(mini.frame.minX - close.frame.minX, size.width + 6)
+        let stripHeight = WindowChrome.panelGutter + WindowChrome.buttonInset + size.height + WindowChrome.panelGutter
+        let top = content.frame.maxY
+        let frame = NSRect(x: 0, y: top - stripHeight, width: container.superview?.bounds.width ?? w.frame.width, height: stripHeight)
+        if container.frame != frame { container.frame = frame }
+        if titlebar.frame != container.bounds { titlebar.frame = container.bounds }
+        let points = Self.layout(buttonSize: size, step: step, stripHeight: stripHeight)
+        for (b, p) in zip([close, mini, zoom], points) where b.frame.origin != p { b.setFrameOrigin(p) }
     }
 }
 
