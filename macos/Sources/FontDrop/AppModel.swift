@@ -517,6 +517,15 @@ final class AppModel {
     }
 
     var savedCount: Int { allEntries.values.filter(\.saved).count }
+    /// The scope back to Your fonts + Google, Saved off. Kinds and traits stay as they are.
+    func showAllFonts() { filter.sources = FinderFilter.standard.sources; filter.savedOnly = false }
+    /// The family the Display inspector shows: the selected one if the grid shows it, else the chosen face for the job,
+    /// else nothing. A face the grid cannot show is never described as a candidate.
+    func inspectedFamily(job: String) -> FamilySummary? {
+        if let name = selectedFamily, visibleFamilies.contains(where: { $0.name == name }), let f = familyByName[name] { return f }
+        if let name = choices[job], let f = familyByName[name] { return f }
+        return nil
+    }
     func isSaved(_ name: String) -> Bool { allEntries[name]?.saved ?? false }
     func isHidden(_ name: String) -> Bool { allEntries[name]?.hidden ?? false }
 
@@ -622,6 +631,8 @@ final class AppModel {
     func applyLibrary(_ fams: [FamilySummary], _ fonts: [FontFile]) async {
         installLibrary(fams, fonts)
         await reloadEntries()
+        // Saved with nothing saved is an empty grid with no way out: fall back to the standard scope.
+        if filter.savedOnly && savedCount == 0 && !options.savedOnly { filter.savedOnly = false }
         await refreshFinder()
     }
 
@@ -784,6 +795,7 @@ final class AppModel {
             let b = try await background { try $0.brandCreate(name: n) }
             brands = try await background { try $0.brandsList() }
             if first { takeUnbrandedSettings(into: b.id) }
+            filter.sources = FinderFilter.standard.sources; filter.savedOnly = false     // a new brand starts on Your fonts + Google
             await selectBrand(b.id, restore: false)
             return b.id
         } catch { report(error); return nil }

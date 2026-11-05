@@ -21,7 +21,7 @@ final class LaunchPathTests: XCTestCase {
         return dir
     }
 
-    private func suite() -> UserDefaults { UserDefaults(suiteName: "fontdrop-launch-tests-\(UUID().uuidString)")! }
+    private func suite() -> UserDefaults { makeTestSuite("fontdrop-launch-tests") }
 
     // MARK: The launch path
 

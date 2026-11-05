@@ -22,13 +22,12 @@ final class FinderTests: XCTestCase {
     }
 
     func testFilterIsRemembered() {
-        let suite = UserDefaults(suiteName: "fontdrop-tests-\(UUID().uuidString)")!
+        let suite = makeTestSuite("fontdrop-tests")
         XCTAssertEqual(FinderFilter.load(from: suite), .standard, "nothing saved yet: the standard filter")
         var f = FinderFilter.standard
         f.sources = [.system]
         f.kinds = [.serif, .mono]
         f.traits = [.variable]
-        f.savedOnly = true
         f.showHidden = true
         f.save(to: suite)
         XCTAssertEqual(FinderFilter.load(from: suite), f)

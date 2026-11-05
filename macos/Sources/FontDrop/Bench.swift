@@ -7,7 +7,7 @@ import QuartzCore
 //       [--template article|hero|appui|poster] [--open-playground]
 //       [--difference close|distinct|strong|any] [--page <n>  (Reading candidates asked of the core, default 40)] [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common|character-first] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
-//       FD_WINDOW=WxH sets the capture window size (default 1360x860). --inspector / --no-inspector force the inspector.
+//       FD_NO_SIDEBAR=1 hides the sidebar. FD_NEW_BRAND=<name> makes a brand after setting a Saved scope. FD_WINDOW=WxH sets the capture window size (default 1360x860). --inspector / --no-inspector force the inspector.
 //       Reading flags: --demo-shortlist, --compare, --zoom, --trim-display, --trim-reading, --body-size, --ratio, FD_LOCK=1, --pick-reading (see applyReadingFlags).
 //   --bench
 //       Measures load time and scroll frame times on the Display grid and Reading, prints "BENCH ..." lines, quits.
@@ -220,6 +220,13 @@ enum ScreenshotRunner {
         let env = ProcessInfo.processInfo.environment
         if args.contains("--no-inspector") || env["FD_NO_INSPECTOR"] != nil { model.inspectorTouched = true; model.showInspector = false }
         if args.contains("--inspector") || env["FD_INSPECTOR"] != nil { model.inspectorTouched = true; model.showInspector = true }
+        if env["FD_NO_SIDEBAR"] != nil { model.showSidebar = false }
+        // FD_NEW_BRAND=<name>: make a brand after a dirty scope (Saved, system fonts) to show it starts on the full grid.
+        if let name = env["FD_NEW_BRAND"] {
+            model.filter.sources = [.system]; model.filter.savedOnly = true
+            await model.createBrand(name)
+            await model.finderSettled()
+        }
         if model.screen == .reading {
             var waited = 0
             while model.candidates.isEmpty && model.candidatesError == nil && waited < 300 {

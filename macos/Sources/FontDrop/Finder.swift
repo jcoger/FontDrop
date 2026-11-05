@@ -78,7 +78,7 @@ struct FinderFilter: Equatable {
         let stored = Stored(sources: Source.all.filter(sources.contains).map(\.key),
                             kinds: Kind.all.filter(kinds.contains).map(\.key),
                             traits: Trait.all.filter(traits.contains).map(\.key),
-                            savedOnly: savedOnly, showHidden: showHidden)
+                            savedOnly: false, showHidden: showHidden)      // Saved is a session filter, never remembered
         if let data = try? JSONEncoder().encode(stored) { defaults.set(data, forKey: Self.storageKey) }
     }
 
@@ -86,9 +86,12 @@ struct FinderFilter: Equatable {
     static func load(from defaults: UserDefaults = .standard) -> FinderFilter {
         guard let data = defaults.data(forKey: storageKey),
               let stored = try? JSONDecoder().decode(Stored.self, from: data) else { return .standard }
-        return FinderFilter(sources: Set(stored.sources.compactMap(Source.init(key:))),
-                            kinds: Set(stored.kinds.compactMap(Kind.init(key:))),
-                            traits: Set(stored.traits.compactMap(Trait.init(key:))),
-                            savedOnly: stored.savedOnly, showHidden: stored.showHidden)
+        let filter = FinderFilter(sources: Set(stored.sources.compactMap(Source.init(key:))),
+                                  kinds: Set(stored.kinds.compactMap(Kind.init(key:))),
+                                  traits: Set(stored.traits.compactMap(Trait.init(key:))),
+                                  savedOnly: false, showHidden: stored.showHidden)
+        // Older builds remembered "Saved only" across launches and opened to an empty grid. Clear it once, here.
+        if stored.savedOnly { filter.save(to: defaults) }
+        return filter
     }
 }

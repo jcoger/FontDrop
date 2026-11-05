@@ -99,7 +99,9 @@ enum ReadingLayout {
     static let inspectorWidth: CGFloat = 330
 
     /// The strip left of the content that keeps it clear of the traffic lights while the sidebar is hidden.
-    static let hiddenInset: CGFloat = 68
+    /// The lights start 28 pt from the window edge (8 pt gutter + `WindowChrome.buttonInset`) and span 54 pt, so they
+    /// end at 82. The content starts at 8 + this inset, a few points past that.
+    static let hiddenInset: CGFloat = 84
 
     static func hiddenSidebarInset(sidebarShown: Bool) -> CGFloat { sidebarShown ? 0 : hiddenInset }
 

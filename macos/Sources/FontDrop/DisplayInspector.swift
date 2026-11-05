@@ -1,3 +1,4 @@
+import CoreText
 import FontDropCore
 import SwiftUI
 
@@ -12,8 +13,8 @@ struct FamilyInspector: View {
     let screen: Screen
 
     var body: some View {
-        if let name = model.selectedFamily, let family = model.familyByName[name] {
-            let job = screen.job ?? "display"
+        let job = screen.job ?? "display"
+        if let family = model.inspectedFamily(job: job) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header(family, job: job)
@@ -78,13 +79,12 @@ struct SampleModule: View {
     var body: some View {
         let face = model.face(job, family)
         VStack(alignment: .leading, spacing: 10) {
-            FaceText(face: face, text: model.sampleText, ratio: CGFloat(44 / max(face.settings.size, 1)),
-                     tick: model.fontTick, useLineHeight: false)
-                .lineLimit(1).minimumScaleFactor(0.3)
+            SampleField(face: face, text: model.sampleText, tick: model.fontTick)
                 .foregroundStyle(theme.textPrimary.color)
-                .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-                .padding(.horizontal, 14)
+                .frame(height: SampleFit.fieldHeight)
+                .frame(maxWidth: .infinity)
                 .recessed(radius: 12)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(model.sampleText)
             HStack(spacing: 6) {
                 TextField(Lexicon.R4.samplePlaceholder, text: Binding(get: { model.customSample ?? "" }, set: { model.setSample($0) }),
@@ -98,6 +98,54 @@ struct SampleModule: View {
                         .help(Lexicon.R4.sampleClear)
                         .accessibilityLabel(Lexicon.R4.sampleClear)
                 }
+            }
+        }
+    }
+}
+
+/// The number behind the Sample field: how far the line is scaled to fit. (Its letters, not its line box, are centred
+/// by a baseline alignment guide in `SampleField`.)
+enum SampleFit {
+    static let fieldHeight: CGFloat = 76
+    static let sidePadding: CGFloat = 16
+    static let baseSize: CGFloat = 44
+
+    /// 1 when the line fits in `width`; else the factor that makes it fit on one line.
+    static func scale(lineWidth: CGFloat, width: CGFloat) -> CGFloat {
+        guard lineWidth > width, lineWidth > 0 else { return 1 }
+        return max(0.05, width / lineWidth)
+    }
+}
+
+/// The big sample line. One line, left aligned, scaled down to fit the field's width, and centred vertically on its letters.
+struct SampleField: View {
+    let face: FaceSpec
+    let text: String
+    let tick: Int
+
+    var body: some View {
+        GeometryReader { geo in
+            let ratio0 = SampleFit.baseSize / max(CGFloat(face.settings.size), 1)
+            let width = geo.size.width - SampleFit.sidePadding * 2
+            if let base = FontLoader.shared.styledFont(face, ratio: ratio0) {
+                let size = CTFontGetSize(base)
+                let kern = CGFloat(face.settings.tracking) * size
+                let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: base, .kern: kern]))
+                let lineWidth = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+                let s = SampleFit.scale(lineWidth: lineWidth, width: width)
+                let font = s < 0.999 ? CTFontCreateCopyWithAttributes(base, size * s, nil, nil) : base
+                let cap = CTFontGetCapHeight(font)
+                FaceText(face: face, text: text, ratio: ratio0 * s, tick: tick, useLineHeight: false)
+                    .lineLimit(1).fixedSize()
+                    // The view's own baseline, not a line-box guess: the capital band's middle sits on the frame's middle.
+                    .alignmentGuide(VerticalAlignment.center) { d in d[VerticalAlignment.firstTextBaseline] - cap / 2 }
+                    .frame(width: width, height: geo.size.height, alignment: .leading)
+                    .padding(.leading, SampleFit.sidePadding)
+            } else {
+                FaceText(face: face, text: text, ratio: ratio0, tick: tick, useLineHeight: false)
+                    .lineLimit(1)
+                    .frame(width: width, height: geo.size.height, alignment: .leading)
+                    .padding(.leading, SampleFit.sidePadding)
             }
         }
     }

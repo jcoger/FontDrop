@@ -17,7 +17,7 @@ final class SetFaceStyleTests: XCTestCase {
 
     private func makeModel(folder: String) async -> AppModel {
         let path = NSTemporaryDirectory() + "fontdrop-export-\(UUID().uuidString).db"
-        let defaults = UserDefaults(suiteName: "fontdrop-export-\(UUID().uuidString)")!
+        let defaults = makeTestSuite("fontdrop-export")
         let model = AppModel(options: LaunchOptions(arguments: ["FontDrop", "--db", path, "--scan-folders", folder], environment: [:]), defaults: defaults)
         await model.bootstrap()
         await model.createBrand("Acme")

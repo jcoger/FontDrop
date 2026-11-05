@@ -106,7 +106,7 @@ final class EitherWayInTests: XCTestCase {
 
     private func makeModel(folder: String) async -> AppModel {
         let path = NSTemporaryDirectory() + "fontdrop-eitherway-\(UUID().uuidString).db"
-        let defaults = UserDefaults(suiteName: "fontdrop-eitherway-\(UUID().uuidString)")!
+        let defaults = makeTestSuite("fontdrop-eitherway")
         let model = AppModel(options: LaunchOptions(arguments: ["FontDrop", "--db", path, "--scan-folders", folder], environment: [:]), defaults: defaults)
         await model.bootstrap()
         await model.createBrand("Test brand")
