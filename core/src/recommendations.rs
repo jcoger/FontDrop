@@ -70,7 +70,8 @@ pub fn parse(text: &str) -> Vec<Rec> {
 pub fn key(name: &str) -> String {
     let mut k: String = name.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect();
     if let Some(rest) = k.strip_prefix("test") { if rest.len() > 2 { k = rest.to_string(); } }
-    for suffix in ["trial", "test"] {
+    // "Inter Variable", "Fraunces VF": the same family, named for the kind of file.
+    for suffix in ["trial", "test", "variable", "vf"] {
         if let Some(rest) = k.strip_suffix(suffix) { if rest.len() > 2 { k = rest.to_string(); } }
     }
     for suffix in ["text", "txt"] {
@@ -126,6 +127,9 @@ mod tests {
         assert_eq!(key("Freight Text"), "freight");
         assert_eq!(key("Test Martina Plantijn"), "martinaplantijn");
         assert_eq!(key("Inter"), "inter");
+        assert_eq!(key("Inter Variable"), "inter");
+        assert_eq!(key("Fraunces VF"), "fraunces");
+        assert!(for_family("Inter Variable").is_some());
         assert_eq!(key("Test"), "test", "a bare Test stays");
         // A recommended "Tiempos Text" is found for a library "Tiempos" and the reverse.
         assert!(for_family("Tiempos Text Trial").is_some());
