@@ -174,6 +174,29 @@ func applyReadingFlags(_ model: AppModel) async {
     if args.contains("--compare") || value("--compare") != nil { model.compareMode = true }
 }
 
+/// Display-screen flags, applied before the capture:
+///   --pick-reading <family>      choose this Text face (in the DB copy)
+///   --clear <job>                clear the Display or Text face (in the DB copy)
+///   --display-sort pairs|library the Display grid's sort (default: automatic, Pairs with once a Text face is chosen and no Display face is)
+/// Then waits for the Pairs with ranks, so the capture never shows the grid half-sorted.
+@MainActor
+func applyDisplayFlags(_ model: AppModel) async {
+    let args = CommandLine.arguments
+    func value(_ flag: String) -> String? {
+        if let i = args.firstIndex(of: flag), i + 1 < args.count { return args[i + 1] }
+        return ProcessInfo.processInfo.environment["FD_" + flag.dropFirst(2).uppercased().replacingOccurrences(of: "-", with: "_")]
+    }
+    if let f = value("--pick-reading") { await model.choose("reading", family: f) }
+    if let job = value("--clear") { await model.clear(job) }
+    switch value("--display-sort") {
+    case "pairs": model.displaySortChoice = .pairsWith
+    case "library": model.displaySortChoice = .library
+    default: break
+    }
+    var waited = 0
+    while model.displayPairsLoading && waited < 300 { try? await Task.sleep(for: .milliseconds(100)); waited += 1 }
+}
+
 @MainActor
 enum ScreenshotRunner {
     static func runIfRequested(model: AppModel) async {
@@ -204,7 +227,9 @@ enum ScreenshotRunner {
             }
             await applyReadingFlags(model)
         } else {
-            model.selectedFamily = model.options.select ?? model.chosen(model.screen) ?? model.visibleFamilies.first?.name
+            await applyDisplayFlags(model)
+            model.selectedFamily = model.options.select ?? model.chosen(model.screen)
+                ?? (model.screen == .display ? model.displayGridFamilies : model.visibleFamilies).first?.name
             if model.screen == .set, let r = model.readingFamily {
                 applyScaleFlags(model, family: (r.name, r.filePath))
             }

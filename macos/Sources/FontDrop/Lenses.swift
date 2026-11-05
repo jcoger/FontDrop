@@ -52,7 +52,7 @@ struct Candidate: Identifiable, Hashable {
     let id: String            // font_id
     let family: String
     let filePath: String
-    let pairType: String      // contrast | uniform | middle | superfamily | uncertain
+    let pairType: String      // contrast | plain | uniform | middle | superfamily | uncertain
     let evidence: [Evidence]
     let order: Int
     /// Google popularity rank, 1 = most used. Nil: Google does not list the family (often paid or trial faces).
@@ -90,7 +90,7 @@ struct Candidate: Identifiable, Hashable {
 
     /// Same hand: shared skeleton, "both pen-made / constructed", or a uniform pair.
     var isSameHand: Bool { has("Skeleton") || has("Same hand") || pairType == "uniform" }
-    var isCrossedHands: Bool { !isSameHand && (pairType == "contrast" || pairType == "middle") }
+    var isCrossedHands: Bool { !isSameHand && (pairType == "contrast" || pairType == "middle" || pairType == "plain") }
     var sharesFoundry: Bool { has("Foundry") }
 
     /// "within 5%" -> 5. Nil when the engine had no x-height evidence (gap over 10%, or unmeasured).
@@ -132,7 +132,7 @@ enum LensEngine {
         switch l.contrast {
         case .any: break
         case .close: if c.pairType != "uniform" { return false }
-        case .distinct: if c.pairType != "contrast" { return false }
+        case .distinct: if c.pairType != "contrast" && c.pairType != "plain" { return false }
         case .strong:
             // Contrast pairs that also differ in texture or cross hands: the far end.
             if c.pairType != "contrast" || !(c.has("Texture") || c.isCrossedHands) { return false }

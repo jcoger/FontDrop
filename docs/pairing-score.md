@@ -268,6 +268,24 @@ Changing a font's skeleton immediately re-scores all its pairings.
 
 ---
 
+## Roles: Display and Text (R3, Nov 2026)
+
+The score is the same from either side. `score_pair(a, b)` and `score_pair(b, a)` give the same number, pair type and evidence (the x-height and cap-height gaps are measured against the larger of the two, so neither face is "the reference"). The Text list scores (Display face, candidate); the Display list for a chosen Text face scores (candidate, Text face). A pair therefore has one score from both directions. Tests: `the_pair_score_is_the_same_from_either_side`, `display_list_and_text_list_agree_on_a_pair`.
+
+What is deliberately not symmetric, in one place (`pairing.rs`, "Roles"):
+
+| Rule | Applies to | Why |
+|---|---|---|
+| Long-text fitness (`unfit_for_reading`) | Text side only | Says what a face needs to set a paragraph. Any family may be a headline |
+| Dependable faces first (`workhorse.rs`) | Text list only | Same |
+| Type-guide boost (`recommendations.rs`) | Text list only | Guides recommend body faces |
+| Display-only rules | none today | The Display list is every family, ranked by the pair score |
+| `plain` pairs (D7) | by role | Whether a plain sans reads as a clear difference depends on which face is the headline |
+
+**D7, plain pairs.** Under a sans Display face with character, a dependable sans Text face is a clear difference, not "uniform" or "the middle". The pair type is `plain`, it passes Difference: Distinct, and its base score is the contrast base (70). Conditions, all required: both sans; the engine called the pair uniform, middle or uncertain; the Text face is a workhorse; the Display face is not a basic (a workhorse that is also widely used on Google Fonts or named for text by the type guides); no near-duplicate flag. The workhorse signals measure width, x-height, stroke contrast and weights, so a quirky face with plain proportions (Agrandir, PP Museum) passes them. That is why "has character" is "not a basic", not "not a workhorse". Among plain pairs, a Text face whose mean advance sits near the library median gets up to +8 (typical proportions first).
+
+---
+
 ## Data sources
 
 | Data | Source | When populated |
