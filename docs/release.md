@@ -46,3 +46,16 @@ FontDrop is not sandboxed (it reads `~/Library/Fonts` and the shared library), s
 ## The app icon
 
 One asset: `macos/Sources/FontDrop/Resources/Assets.xcassets/AppIcon.appiconset`. The 1024 px source is `macos/Resources/AppIcon-source.png`. To change the icon, replace the source and run `macos/scripts/make-app-icon.sh`, which rewrites every size with `sips`.
+
+## Keyboard check before a release
+
+`macos/Tests/FontDropUITests/KeyboardUITests.swift` presses real keys and scrolls on a temp library with one brand and two fonts. Run it with `xcodebuild test -project macos/FontDrop.xcodeproj -scheme FontDropUI -destination 'platform=macOS'`. The test runner needs Automation permission (macOS asks once, in a dialog). Where that dialog cannot be answered, the run stops with "Timed out while enabling automation mode". Then do this by hand, on a library copy, without clicking anything first:
+
+1. Open FontDrop. Press Down, then Return. The sidebar's Display row now names a face.
+2. Press Command-2. Press Down, then Return. The Text row names a face.
+3. Press Command-3. Hover the dial and scroll down until it reads 1.2. Scroll up once: 1.25. Scroll up again: 1.333. Each scroll is one stop.
+4. Type a search that hides the selected face, press Return and Space. Nothing is chosen, no preview opens.
+5. Drag the dial, the Body slider and the colour area. The window does not move. Drag the empty strip at the top of the sidebar: it does.
+6. Open the New brand sheet and press Command-Z. The library's picks do not change.
+7. Hide the sidebar (Control-Command-S). The search row and the Text list head clear the traffic lights. Quit and reopen: it stays hidden.
+8. On Text, Command-= zooms in the stage, and so does Command-+.

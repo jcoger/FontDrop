@@ -76,7 +76,6 @@ schemes:
       targets:
         FontDrop: all
         FontDropTests: [test]
-        FontDropUITests: [test]
     run:
       config: Debug
       # Uncomment to run against a copy of the library instead of the live one:
@@ -86,4 +85,14 @@ schemes:
       config: Debug
       targets:
         - FontDropTests
+  # The key-event tests drive the real app and need Automation permission for the test runner, so they live in their
+  # own scheme: `xcodebuild test -scheme FontDropUI`. The FontDrop scheme stays runnable with no permission prompt.
+  FontDropUI:
+    build:
+      targets:
+        FontDrop: all
+        FontDropUITests: [test]
+    test:
+      config: Debug
+      targets:
         - FontDropUITests
