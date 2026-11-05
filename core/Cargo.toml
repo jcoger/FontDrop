@@ -2,7 +2,7 @@
 name = "fontdrop_core"
 version = "0.1.0"
 edition = "2021"
-description = "FontDrop engine: library DB, scan, classifier, pairing, user data. Shared by the Tauri app and (through UniFFI) the SwiftUI app."
+description = "FontDrop engine: library DB, scan, classifier, pairing, user data. Used by the SwiftUI app through UniFFI."
 
 [lib]
 name = "fontdrop_core"
@@ -14,8 +14,8 @@ path = "src/bin/uniffi-bindgen.rs"
 required-features = ["bindgen"]
 
 [features]
-# `uniffi` compiles the Swift surface (src/ffi.rs). Off by default so the Tauri
-# app does not carry the FFI scaffolding; core/build-swift.sh turns it on.
+# `uniffi` compiles the Swift surface (src/ffi.rs). Off by default so plain
+# `cargo test` stays light; core/build-swift.sh turns it on.
 uniffi = ["dep:uniffi", "dep:thiserror"]
 bindgen = ["uniffi", "uniffi/cli"]
 

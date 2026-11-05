@@ -38,7 +38,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: FontDrop
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
-        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_NSHumanReadableCopyright: "\u00A9 2026 Dyno Labs"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon   # the one replaceable icon: Sources/FontDrop/Resources/Assets.xcassets/AppIcon.appiconset
         ENABLE_APP_SANDBOX: NO     # reads ~/Library/Fonts and the shared library DB
   FontDropTests:
     type: bundle.unit-test

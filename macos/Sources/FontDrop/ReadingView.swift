@@ -71,6 +71,17 @@ struct ReadingList: View {
                 .focusEffectDisabled()      // the ring is drawn on the row (CandidateRow), distinct from the pill
                 .onKeyPress(.upArrow) { move(-1, rows) }
                 .onKeyPress(.downArrow) { move(1, rows) }
+                .onKeyPress(keys: [.return]) { press in
+                    guard press.modifiers.isEmpty, model.canUseSelected else { return .ignored }
+                    Task { await model.useSelected() }
+                    return .handled
+                }
+                .onKeyPress(keys: [.space]) { press in
+                    guard press.modifiers.isEmpty, model.selectedFaceName != nil else { return .ignored }
+                    model.togglePreview()
+                    return .handled
+                }
+                .onChange(of: model.focusListTick) { _, _ in focused = true }
                 .onChange(of: model.selectedCandidate) { _, id in
                     if let id { proxy.scrollTo(id) }         // no animation: flipping candidates is a hard cut
                 }

@@ -221,6 +221,11 @@ final class AppModel {
     var compareMode = false
     /// How far the stage board is zoomed from Fit.
     var stageZoom = StageZoom()
+    /// The large preview of a face (Space), or nil.
+    var preview: FacePreviewState?
+    /// Each bump asks the search box (command-F) or the list (Escape in the search box) to take the keyboard.
+    var focusSearchTick = 0
+    var focusListTick = 0
     /// The designer opened or closed the inspector themselves, so the window size stops deciding.
     var inspectorTouched = false
     /// The window's width, for the inspector rule below.
@@ -335,6 +340,11 @@ final class AppModel {
 
     /// What "Undo" restores for each job: the face chosen before the last choice (nil = nothing).
     private(set) var undoChoice: [String: String?] = [:]
+    /// One face choice or clear, for the Edit menu's Undo and Redo (command-Z, shift-command-Z). `before` and `after`
+    /// are family names, nil meaning no face.
+    struct ChoiceStep: Equatable { let job: String; let before: String?; let after: String? }
+    private(set) var choiceHistory: [ChoiceStep] = []
+    private(set) var choiceRedo: [ChoiceStep] = []
     /// Bumps on every choice. The inspector watches it to play the success animation.
     private(set) var choicePulse = 0
 
@@ -739,7 +749,7 @@ final class AppModel {
         brandID = id
         if let id { defaults.set(id, forKey: "lastBrand") }
         resetCandidates(); candidateLimit = Self.candidatePage
-        undoChoice = [:]
+        undoChoice = [:]; choiceHistory = []; choiceRedo = []
         restoreCandidateFamily = nil
         await reloadBrandData()
         if restore, let id { restoreBrandState(id) }
@@ -825,7 +835,10 @@ final class AppModel {
         do {
             let previous = choices[job]
             try await background { try $0.choose(brand: id, job: job, family: family) }
-            if previous != family { undoChoice[job] = .some(previous) }
+            if previous != family {
+                undoChoice[job] = .some(previous)
+                choiceHistory.append(ChoiceStep(job: job, before: previous, after: family)); choiceRedo = []
+            }
             choices[job] = family
             choicePulse += 1
             if job == "reading" { typeSettings.adoptSuggestion(settingsKey("reading", family), job: "reading") }
@@ -840,6 +853,7 @@ final class AppModel {
             try await background { try $0.choiceClear(brand: id, job: job) }
             choices[job] = nil
             undoChoice[job] = .some(current)
+            choiceHistory.append(ChoiceStep(job: job, before: current, after: nil)); choiceRedo = []
             if job == "display" { resetCandidates() }
             if job == "reading" { compareMode = false }
         } catch { report(error) }
@@ -867,10 +881,50 @@ final class AppModel {
                 choices[job] = nil
             }
             if job == "display" { resetCandidates() }
+            if let i = choiceHistory.lastIndex(where: { $0.job == job }) { choiceRedo.append(choiceHistory.remove(at: i)) }
         } catch { report(error) }
     }
 
     func canUndo(_ job: String) -> Bool { undoChoice[job] != nil }
+
+    // MARK: undo and redo across both faces (Edit menu)
+
+    var canUndoLast: Bool { brandID != nil && !choiceHistory.isEmpty }
+    var canRedoLast: Bool { brandID != nil && !choiceRedo.isEmpty }
+    /// What the Edit menu says it will undo: "Undo Display face" and so on. Nil when there is nothing.
+    var undoLastLabel: String? { choiceHistory.last.map { Lexicon.Keyboard.undoItem(job: $0.job, cleared: $0.after == nil) } }
+    var redoLastLabel: String? { choiceRedo.last.map { Lexicon.Keyboard.redoItem(job: $0.job, cleared: $0.after == nil) } }
+
+    /// Writes one job's face (or no face) without recording history. The caller moves the step between the stacks.
+    private func setChoice(_ job: String, to family: String?) async throws {
+        guard let id = brandID else { return }
+        if let family { try await background { try $0.choose(brand: id, job: job, family: family) } }
+        else { try await background { try $0.choiceClear(brand: id, job: job) } }
+        choices[job] = family
+        if job == "display" { resetCandidates() }
+        if job == "reading", family == nil { compareMode = false }
+    }
+
+    /// Command-Z: takes back the latest choice or clear, whichever face it was on.
+    func undoLast() async {
+        guard let step = choiceHistory.last else { return }
+        do {
+            try await setChoice(step.job, to: step.before)
+            choiceHistory.removeLast(); choiceRedo.append(step)
+            undoChoice[step.job] = nil
+        } catch { report(error) }
+    }
+
+    /// Shift-command-Z: does the step again.
+    func redoLast() async {
+        guard let step = choiceRedo.last else { return }
+        do {
+            try await setChoice(step.job, to: step.after)
+            choiceRedo.removeLast(); choiceHistory.append(step)
+            if step.job == "reading", let f = step.after { typeSettings.adoptSuggestion(settingsKey("reading", f), job: "reading") }
+            choicePulse += 1
+        } catch { report(error) }
+    }
 
     func setShortlist(_ job: String, family: String, on: Bool) async {
         guard let id = brandID else { pending = .shortlist(job: job, family: family, on: on); return }

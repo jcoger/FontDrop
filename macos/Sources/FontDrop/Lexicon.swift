@@ -299,9 +299,6 @@ enum Lexicon {
     /// Ends a chip's words as a sentence.
     static func sentenceEnd(_ text: String) -> String { text.hasSuffix(".") ? text : text + "." }
 
-    /// The About window's credits: the two bundled fonts and their licence.
-    static let aboutCredits = "Doto and Geist Mono are bundled under the SIL Open Font License 1.1. The licence texts are in the app's Resources folder."
-
     enum Features {
         /// The core's feature group "Letters" is shown as "Small caps and ligatures" (IA decision 4).
         static func groupTitle(_ group: String) -> String { group == "Letters" ? "Small caps and ligatures" : group }
@@ -720,6 +717,50 @@ enum Lexicon {
             let optical = opticalSize.map { "\(Int($0.rounded())) pt" } ?? "Auto"
             return "\(role): trim " + String(format: "%.2f", trim) + " \u{00B7} tracking \(track)% \u{00B7} optical size \(optical)"
         }
+    }
+
+    // MARK: Keyboard, About and first-launch problems (R7, docs/copy section 24)
+
+    enum Keyboard {
+        /// Edit menu: "Undo Display face" or "Undo clear Text face". The bare word when there is nothing to take back.
+        static func undoItem(job: String, cleared: Bool) -> String { "Undo " + (cleared ? "clear " : "") + "\(jobName(job)) face" }
+        static func redoItem(job: String, cleared: Bool) -> String { "Redo " + (cleared ? "clear " : "") + "\(jobName(job)) face" }
+        static let redo = "Redo"
+        static let find = "Find a Font"
+        /// View menu: a large look at the selected face (Space).
+        static let previewFace = "Preview Face"
+        static let closePreview = "Close Preview"
+        static let previewHint = "Space or Escape closes. Return uses it."
+        static let previewHeadline = "Good type fits the job."
+        static let previewLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 &?!@#%"
+        static let previewParagraph = "Set it plainly, give it room, and let the words carry the weight. A text face is judged by how little you notice it."
+        static func previewAccessibility(_ name: String) -> String { "Preview of \(name). Escape closes." }
+        static func stepLabel(_ label: String, up: Bool) -> String { (up ? "Increase " : "Decrease ") + label }
+        /// The one reason the menu items for a face are off.
+        static let nothingSelected = "Select a face first"
+        static func selectedAnnouncement(_ name: String) -> String { "\(name) selected" }
+    }
+
+    enum About {
+        /// The two bundled fonts, then the two type guides the Recommended for text list comes from.
+        static let fonts = "Doto and Geist Mono are bundled under the SIL Open Font License 1.1. The licence texts are in the app\u{2019}s Resources folder."
+        static let guides = "Recommended for text uses published advice from Typewolf and Butterick\u{2019}s Practical Typography."
+        static let credits = fonts + "\n\n" + guides
+        static let copyright = "\u{00A9} 2026 Dyno Labs"
+    }
+
+    /// The library could not be opened. Plain words, what happened, what to do.
+    enum LibraryProblem {
+        static let titleNewer = "This library is from a newer FontDrop"
+        static let bodyNewer = "A newer version of FontDrop saved it. This version left it alone so nothing is lost. Update FontDrop, then open it again."
+        static let titleReadOnly = "FontDrop can\u{2019}t save its library here"
+        static func bodyReadOnly(_ folder: String) -> String { "This folder is read-only: \(folder). Make it writable, then open FontDrop again." }
+        static let titleOther = "FontDrop couldn\u{2019}t open its library"
+        static func bodyOther(_ file: String) -> String { "Quit and open FontDrop again. If it keeps happening, move this file to the Desktop and FontDrop will make a new library: \(file)" }
+        static let quit = "Quit FontDrop"
+        static let showInFinder = "Show in Finder"
+        /// The folder you asked FontDrop to scan is not there.
+        static func folderMissing(_ folder: String) -> String { "FontDrop can\u{2019}t find the folder \(folder)." }
     }
 
     enum BrandMenu {

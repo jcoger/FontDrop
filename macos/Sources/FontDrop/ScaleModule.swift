@@ -102,14 +102,15 @@ struct BodyControl: View {
             }
             .accessibilityHidden(true)
             VStack(spacing: 4) {
-                BodySlider(value: value, range: TypeScale.bodyRange, enabled: scale.locked, onChange: onChange)
+                BodySlider(value: value, range: TypeScale.bodyRange, enabled: scale.locked, numberField: false, onChange: onChange)
                 HStack {
-                    Text("\(Int(TypeScale.bodyRange.lowerBound))")
+                    Text("\(Int(TypeScale.bodyRange.lowerBound))").moduleLabel().accessibilityHidden(true)
                     Spacer()
-                    Text("\(Int(TypeScale.bodyRange.upperBound))")
+                    NumberField(label: Lexicon.Scale.body, value: value, range: TypeScale.bodyRange, step: 1, unit: "pt",
+                                enabled: scale.locked, onChange: onChange)
+                    Spacer()
+                    Text("\(Int(TypeScale.bodyRange.upperBound))").moduleLabel().accessibilityHidden(true)
                 }
-                .moduleLabel()
-                .accessibilityHidden(true)
             }
         }
         .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.controlsOffHelp)
@@ -126,11 +127,26 @@ struct BodySlider: View {
     var step: Double = 1
     var label = Lexicon.Scale.body
     var valueText: (Double) -> String = Lexicon.Scale.bodyReadout
+    /// A typed number with steppers beside the track (R7). Off where the caller draws its own (the Body control).
+    var numberField = true
+    var decimals = 0
+    var unit: String?
+    var autoText: String?
     let onChange: (Double) -> Void
 
     private let thumb: CGFloat = 16
 
     var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            track
+            if numberField {
+                NumberField(label: label, value: value, range: range, step: step, decimals: decimals, unit: unit,
+                            enabled: enabled, autoText: autoText, onChange: onChange)
+            }
+        }
+    }
+
+    private var track: some View {
         GeometryReader { geo in
             let usable = max(geo.size.width - thumb, 1)
             let t = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
