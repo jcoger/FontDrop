@@ -58,6 +58,8 @@ pub struct FamilySummary {
     pub foundry_url: Option<String>,
     /// OS/2 vendor code, e.g. a foundry's four-letter tag.
     pub vendor: Option<String>,
+    /// Foundry name from the font files' name tables, e.g. "Pangram Pangram".
+    pub foundry: Option<String>,
 }
 
 /// One font file row, for the flat "every font" list.
@@ -227,6 +229,7 @@ impl Library {
                 is_trial: f.is_trial,
                 foundry_url: f.foundry_url,
                 vendor: f.vendor,
+                foundry: f.foundry,
             })
             .collect())
     }
