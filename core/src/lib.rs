@@ -20,6 +20,7 @@ pub mod google_list;
 pub mod metrics;
 pub mod names;
 pub mod pairing;
+pub mod progress;
 pub mod recommendations;
 pub mod same_family;
 pub mod userdata;

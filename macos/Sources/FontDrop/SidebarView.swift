@@ -20,6 +20,16 @@ struct SidebarView: View {
             VStack(spacing: 2) {
                 ForEach(Screen.sidebar) { screen in row(screen) }
             }
+            // Arrow keys move between Display, Text and Set once the list has keyboard focus (Tab, or full keyboard access).
+            .focusable()
+            .onKeyPress(keys: [.upArrow, .downArrow]) { press in
+                let all = Screen.sidebar
+                guard let i = all.firstIndex(of: model.screen) else { model.screen = all[0]; return .handled }
+                model.screen = all[min(max(i + (press.key == .downArrow ? 1 : -1), 0), all.count - 1)]
+                return .handled
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(Lexicon.sidebarJobs)
             Spacer(minLength: 12)
             StatusReadout()
         }
@@ -113,6 +123,7 @@ struct SidebarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityLabel(rowAccessibility(screen))
         .contextMenu {
             if let job = screen.job {
                 Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }
@@ -122,6 +133,13 @@ struct SidebarView: View {
                 }
             }
         }
+    }
+
+    private func rowAccessibility(_ screen: Screen) -> String {
+        guard screen.job != nil, let name = model.chosen(screen) else {
+            return screen == .set ? "\(screen.title), \(Lexicon.Scale.sidebarLine(model.scale))" : screen.title
+        }
+        return model.isMissing(screen) ? Lexicon.Launch.notInstalledAccessibility(screen.title, name) : "\(screen.title), \(name)"
     }
 
     /// Set: the brand's scale on a second line, like Display and Text show their face.
@@ -141,6 +159,8 @@ struct SidebarView: View {
             if let family {
                 FontText(path: family.filePath, text: family.name, size: 12, tick: model.fontTick)
                     .foregroundStyle(theme.textSecondary.color).lineLimit(1)
+            } else if chosen != nil, model.isMissing(screen) {
+                Text(Lexicon.Launch.notInstalled).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             } else if let chosen {
                 Text(chosen).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             } else if let job = screen.job, model.canUndo(job) {
@@ -166,8 +186,14 @@ struct StatusReadout: View {
             case .idle:
                 Text(Lexicon.Status.counts(families: model.families.count, files: model.fontCount))
             case .running:
+                let p = model.scanProgressNow
+                if p.files > 0 {
+                    Text(Lexicon.Status.scanProgress(read: Int((p.fraction * Double(p.files)).rounded()), of: p.files))
+                } else {
+                    Text(Lexicon.Status.scanning)
+                }
+                Spacer(minLength: 0)
                 SignalLight(lit: true)
-                Text(Lexicon.Status.scanning)
             case .failed:
                 Text(Lexicon.Status.failed)
                 Button(Lexicon.Scan.retry) { Task { await model.retryScan() } }
@@ -181,7 +207,7 @@ struct StatusReadout: View {
         .lineLimit(1).minimumScaleFactor(0.8)
         .padding(.horizontal, 12).frame(height: 40)
         .recessed(radius: 12)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(model.scanState == .running ? Lexicon.Scan.updating
                             : "\(model.fontCount.formatted()) fonts, \(model.families.count.formatted()) families")
     }

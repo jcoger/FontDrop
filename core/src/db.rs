@@ -320,8 +320,10 @@ pub fn enrich_from_name_tables(conn: &Connection) {
             .unwrap_or_default(),
         Err(_) => return,
     };
+    crate::progress::begin(1, rows.len() as u32);
     let tx = conn.unchecked_transaction().ok(); // one commit for the loop
     for (font_id, path) in rows {
+        crate::progress::tick();
         let meta = read_name_meta(Path::new(&path));
         // A file we cannot open counts as covering Latin: never hide what we could not check.
         let (vendor, manufacturer, designer, trial, url, variable, latin, style, wght_max, ital_axis) = match meta {
@@ -457,7 +459,9 @@ pub fn classify_all(conn: &Connection) {
     let now = now_iso();
     let tx = conn.unchecked_transaction().ok(); // one commit for the loop
 
+    crate::progress::begin(2, rows.len() as u32);
     for (font_id, file_path, family_name, category) in &rows {
+        crate::progress::tick();
         let result = classifier::classify_font(Path::new(file_path), family_name);
 
         // Serif from the outlines when measurable; the category field says
@@ -579,7 +583,9 @@ pub fn enrich_metrics(conn: &Connection) {
     let now = now_iso();
     let tx = conn.unchecked_transaction().ok(); // one commit for the loop
 
+    crate::progress::begin(3, rows.len() as u32);
     for (font_id, file_path, family_name, stroke_contrast, x_height) in &rows {
+        crate::progress::tick();
         let m = metrics::extract_extended_metrics(
             Path::new(file_path),
             family_name,
@@ -651,6 +657,10 @@ pub fn populate_from(conn: &Connection, scan_targets: &[(PathBuf, &str)]) {
     let mut private: Vec<String> = Vec::new();
     for (dir, source) in scan_targets {
         scan_dir_for_db(dir, source, &mut scanned, &mut private);
+    }
+    {
+        let families: std::collections::HashSet<&str> = scanned.iter().map(|f| f.font_family.as_str()).collect();
+        crate::progress::found(scanned.len() as u32, families.len() as u32);
     }
 
     let now = now_iso();
@@ -942,6 +952,7 @@ pub fn refresh_library(db_path: &Path) -> Result<u32, String> {
 /// Google steps (network) are skipped, so a test scans a fixture folder and nothing else.
 pub fn refresh_library_in(db_path: &Path, folders: Option<&[PathBuf]>) -> Result<u32, String> {
     let conn = try_open_db_at(db_path).map_err(|e| e.to_string())?;
+    crate::progress::start();
     match folders {
         Some(dirs) => {
             let targets: Vec<(PathBuf, &str)> = dirs.iter().map(|d| (d.clone(), "user")).collect();
@@ -952,6 +963,7 @@ pub fn refresh_library_in(db_path: &Path, folders: Option<&[PathBuf]>) -> Result
     enrich_from_name_tables(&conn);
     classify_all(&conn);
     enrich_metrics(&conn);
+    crate::progress::finish();
     if folders.is_none() {
         let data_dir = db_path.parent().unwrap_or_else(|| Path::new("."));
         crate::google_fonts::enrich_from_google(&conn, data_dir, false);

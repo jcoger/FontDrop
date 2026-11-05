@@ -15,6 +15,7 @@ struct LaunchOptions {
     var refresh = false
     var screenshot: String?
     var screen: Screen = .display
+    var screenGiven = false      // --screen was passed: it beats the remembered screen
     var appearance: String?      // "light" | "dark"
     var brand: String?
     var select: String?          // family to select (Display) or candidate (Reading)
@@ -54,7 +55,7 @@ struct LaunchOptions {
         }
         refresh = arguments.contains("--refresh")
         screenshot = value("--screenshot")
-        if let s = value("--screen"), let sc = Screen(rawValue: s) { screen = sc }
+        if let s = value("--screen"), let sc = Screen(rawValue: s) { screen = sc; screenGiven = true }
         appearance = value("--appearance")
         brand = value("--brand")
         select = value("--select")
@@ -151,9 +152,10 @@ final class AppModel {
     private(set) var phase: Phase = .loading
 
     // Navigation and search
-    var screen: Screen = .display
+    var screen: Screen = .display { didSet { if screen != oldValue { rememberBrandState() } } }
     var search = "" { didSet { if search != oldValue { scheduleFinder() } } }
     var showInspector = true
+    var showSidebar = true
 
     // Library (read once, then filtered in memory)
     private(set) var families: [FamilySummary] = []          // user-installed first, then by name
@@ -186,7 +188,7 @@ final class AppModel {
     private(set) var shortlists: [String: [String]] = [:]    // job -> families
 
     // Display (and UI, Mono) grid
-    var selectedFamily: String?
+    var selectedFamily: String? { didSet { if selectedFamily != oldValue { rememberBrandState() } } }
 
     /// Source, kind and trait chips, Saved and Show hidden. Remembered between launches.
     var filter: FinderFilter {
@@ -204,7 +206,7 @@ final class AppModel {
     private(set) var candidates: [Candidate] = []
     private(set) var candidatesLoading = false
     private(set) var candidatesError: String?
-    var selectedCandidate: String?
+    var selectedCandidate: String? { didSet { if selectedCandidate != oldValue { rememberBrandState() } } }
     private var candidatesKey: String?
     /// Whether the Reading list holds an answer for the current controls. For tests.
     var candidatesKey_forTests: String? { candidatesKey }
@@ -254,7 +256,67 @@ final class AppModel {
 
     /// Which presentation template Reading draws (`TemplateDescriptor.all` in Templates/Template.swift).
     var templateID: String = "article" {
-        didSet { defaults.set(templateID, forKey: "readingTemplate") }
+        didSet { defaults.set(templateID, forKey: "readingTemplate"); if templateID != oldValue { rememberBrandState() } }
+    }
+
+    // MARK: per-brand memory (launch)
+
+    /// True while a brand is being switched to or restored: the changes it makes are not the designer's.
+    private var restoringBrand = false
+    /// The family to put the Text selection back on once the candidate list arrives.
+    private var restoreCandidateFamily: String?
+
+    /// Saves where this brand stands: screen, Display selection, Text selection, template.
+    private func rememberBrandState() {
+        guard !restoringBrand, phase == .ready, let id = brandID else { return }
+        var memory = LaunchMemory.load(defaults, brand: id) ?? BrandMemory()
+        memory.screen = screen.rawValue
+        if let f = selectedFamily { memory.display = f }
+        if let c = candidate(selectedCandidate)?.family { memory.candidate = c }
+        memory.template = templateID
+        LaunchMemory.save(memory, defaults, brand: id)
+    }
+
+    /// Puts this brand's last screen, selections and template back. A brand with nothing stored opens on Display.
+    private func restoreBrandState(_ id: Int64) {
+        let memory = LaunchMemory.load(defaults, brand: id)
+        screen = LaunchMemory.landingScreen(stored: memory?.screen.flatMap(Screen.init(rawValue:)),
+                                            hasDisplay: choices["display"] != nil, hasText: choices["reading"] != nil)
+        if let t = memory?.template, Templates.all.contains(where: { $0.id == t }) { templateID = t }
+        selectedFamily = memory?.display ?? choices["display"]
+        restoreCandidateFamily = memory?.candidate
+    }
+
+    // MARK: first run and empty library
+
+    /// How far the scan has got, polled from the core while it runs.
+    private(set) var scanProgressNow = (fraction: 0.0, files: 0, families: 0)
+    /// "Start with Display" or "Start with Text" was pressed: the scan screen is done for this launch.
+    private(set) var scanScreenDismissed = false
+
+    /// First run: no brands and no fonts read yet, while the library scans. The content area shows the scan screen.
+    var showsScanScreen: Bool {
+        phase == .ready && brands.isEmpty && families.isEmpty && scanState == .running && !scanScreenDismissed
+    }
+
+    /// The scan finished and found no fonts at all. A screenshot or bench run never scans, so for those the library as
+    /// opened is the final answer.
+    var libraryIsEmpty: Bool {
+        phase == .ready && families.isEmpty && scanState == .idle && (rescanDone || options.bench || options.screenshot != nil)
+    }
+
+    /// No inspector on first run or with no fonts: there is nothing to inspect.
+    var hidesInspector: Bool { showsScanScreen || libraryIsEmpty }
+
+    func startWith(_ screen: Screen) {
+        scanScreenDismissed = true
+        self.screen = screen
+    }
+
+    /// The brand chose this face for the job, and the library no longer has it.
+    func isMissing(_ screen: Screen) -> Bool {
+        guard phase == .ready, !families.isEmpty, let name = chosen(screen) else { return false }
+        return familyByName[name] == nil
     }
 
     /// Playground settings per brand + job + family.
@@ -400,7 +462,7 @@ final class AppModel {
             let saved = defaults.object(forKey: "lastBrand") as? Int64
             let wanted = options.brand.flatMap { n in brands.first { $0.name == n }?.id }
             await selectBrand(options.noBrand ? nil : (wanted ?? brands.first { $0.id == saved }?.id ?? brands.first?.id))
-            screen = options.screen
+            if options.screenGiven { screen = options.screen }
             phase = .ready
 
             // Fonts load here, off the main thread, in batches. Cards redraw as each batch lands.
@@ -450,6 +512,15 @@ final class AppModel {
         scanState = .running
         defer { rescanDone = true }
         let folders = options.scanFolders
+        // The core counts files as it works. Ask it a few times a second while the scan runs.
+        let poll = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                let p = FontDropCore.scanProgress()
+                self?.scanProgressNow = (p.fraction, Int(p.files), Int(p.families))
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+        }
+        defer { poll.cancel() }
         do {
             try await Task.detached(priority: .utility) {
                 if let folders { _ = try lib.refreshLibraryFolders(folders: folders) } else { _ = try lib.refreshLibrary() }
@@ -558,12 +629,18 @@ final class AppModel {
 
     // MARK: brands
 
-    func selectBrand(_ id: Int64?) async {
+    /// Switches brand. `restore` puts back that brand's last screen, selections and template (the default). A brand
+    /// just made for a choice in progress keeps the screen it was made on.
+    func selectBrand(_ id: Int64?, restore: Bool = true) async {
+        restoringBrand = true
+        defer { restoringBrand = false }
         brandID = id
         if let id { defaults.set(id, forKey: "lastBrand") }
         resetCandidates(); candidateLimit = Self.candidatePage
         undoChoice = [:]
+        restoreCandidateFamily = nil
         await reloadBrandData()
+        if restore, let id { restoreBrandState(id) }
     }
 
     private func reloadBrandData() async {
@@ -588,7 +665,7 @@ final class AppModel {
         do {
             let b = try await background { try $0.brandCreate(name: n) }
             brands = try await background { try $0.brandsList() }
-            await selectBrand(b.id)
+            await selectBrand(b.id, restore: false)
             return b.id
         } catch { report(error); return nil }
     }
@@ -750,8 +827,10 @@ final class AppModel {
     /// rescanned; the family name does not). Falls back to the --select flag, then the first row.
     private func reselect(_ list: [Candidate], keeping family: String?) {
         let preferred = options.select.flatMap { s in list.first { $0.family == s }?.id }
+        let keeping = family ?? restoreCandidateFamily.flatMap { r in list.contains { $0.family == r } ? r : nil }
+        restoreCandidateFamily = nil
         selectedCandidate = CandidateSelection.pick(list.map { ($0.id, $0.family) }, current: selectedCandidate,
-                                                    keeping: family, preferred: preferred,
+                                                    keeping: keeping, preferred: preferred,
                                                     first: readingResult.shown.first?.id)
     }
 
@@ -875,6 +954,15 @@ final class AppModel {
         }
         updateScale { $0.locked = true }
     }
+
+    /// The dial turned to a stop. Turning locks the scale; the first turn starts from what Auto gave, so nothing jumps.
+    func setRatio(_ ratio: Double, reading name: String, fallbackPath: String? = nil) {
+        if !scale.locked { lockScale(reading: name, fallbackPath: fallbackPath) }
+        updateScale { $0.ratio = ratio }
+    }
+
+    /// Pressing the dial: the sizes go back to Auto. The saved body and ratio stay for the next lock.
+    func returnToAuto() { updateScale { $0.locked = false } }
 
     /// Loads every style file of these families, so a face set to a non-regular style draws at once.
     func preloadStyles(of names: [String]) async {

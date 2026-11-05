@@ -7,6 +7,10 @@ struct SetView: View {
 
     var body: some View {
         let tick = model.fontTick
+        // The same sizes the Scale module reads out: locked, body x ratio to the step; Auto, what Fit solved to.
+        let solved = model.readingFamily.flatMap { model.solvedSizes(reading: $0.name, fallbackPath: $0.filePath) }
+        let headlinePt = min(solved?.headline ?? 84, 140)
+        let bodyPt = solved?.body ?? TypeScale.boardBody
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 24) {
@@ -15,7 +19,8 @@ struct SetView: View {
                 }
 
                 if let display = model.displayFamily {
-                    FaceText(face: model.face("display", display), text: SampleCopy.displayHeadline, ratio: 1.3, tick: tick)
+                    FaceText(face: model.face("display", display), text: SampleCopy.displayHeadline,
+                             ratio: CGFloat(headlinePt / max(model.face("display", display).settings.size, 1)), tick: tick)
                         .lineLimit(3)
                 } else {
                     Text("Choose a Display face to see it here.").foregroundStyle(.secondary)
@@ -23,7 +28,8 @@ struct SetView: View {
                 if let reading = model.readingFamily {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(SampleCopy.paragraphs, id: \.self) { p in
-                            FaceText(face: model.face("reading", reading), text: p, ratio: 1.1, tick: tick)
+                            FaceText(face: model.face("reading", reading), text: p,
+                                     ratio: CGFloat(bodyPt / max(model.face("reading", reading).settings.size, 1)), tick: tick)
                         }
                     }
                     .frame(maxWidth: 560, alignment: .leading)

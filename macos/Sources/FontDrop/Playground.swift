@@ -160,25 +160,38 @@ struct PlaygroundGroup: View {
             Text("Style").font(.callout)
             Spacer()
             if choices.count > 1 {
-                Picker("Style", selection: Binding(
-                    get: { current },
-                    set: { new in
-                        guard let pick = choices.first(where: { $0.id == new }) else { return }   // "Custom" is a status, not a choice
-                        store.update(key, job: job) {
-                            $0.stylePath = (pick.path == family.filePath ? nil : pick.path)
-                            $0.axes = pick.axes      // an instance sets its axes; a plain file clears them
+                // Plain text and an up-down chevron, not a bordered control (board 17).
+                let currentLabel = choices.first { $0.id == current }?.label ?? (custom ? "Custom" : "Regular")
+                Menu {
+                    Picker("Style", selection: Binding(
+                        get: { current },
+                        set: { new in
+                            guard let pick = choices.first(where: { $0.id == new }) else { return }   // "Custom" is a status, not a choice
+                            store.update(key, job: job) {
+                                $0.stylePath = (pick.path == family.filePath ? nil : pick.path)
+                                $0.axes = pick.axes      // an instance sets its axes; a plain file clears them
+                            }
+                        })) {
+                        ForEach(plain) { Text($0.label).tag($0.id) }
+                        ForEach(groupOrder, id: \.self) { path in
+                            Section(groups[path]?.first?.group ?? "Variable") {
+                                ForEach(groups[path] ?? []) { Text($0.label).tag($0.id) }
+                            }
                         }
-                    })) {
-                    ForEach(plain) { Text($0.label).tag($0.id) }
-                    ForEach(groupOrder, id: \.self) { path in
-                        Section(groups[path]?.first?.group ?? "Variable") {
-                            ForEach(groups[path] ?? []) { Text($0.label).tag($0.id) }
-                        }
+                        if custom { Text("Custom").tag(StyleChoice.customID) }
                     }
-                    if custom { Text("Custom").tag(StyleChoice.customID) }
+                    .pickerStyle(.inline).labelsHidden()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(currentLabel).font(.callout).foregroundStyle(theme.textSecondary.color)
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(theme.textSecondary.color)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .labelsHidden().pickerStyle(.menu).menuStyle(.borderlessButton).fixedSize()
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
                 .accessibilityLabel("Style")
+                .accessibilityValue(currentLabel)
             } else {
                 Text(choices.first?.label ?? "Regular").font(.callout).foregroundStyle(.secondary)
             }

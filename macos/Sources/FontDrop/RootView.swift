@@ -10,14 +10,24 @@ struct RootView: View {
         ZStack {
             WindowBackdrop()
             HStack(spacing: 8) {
-                SidebarView()
-                    .frame(width: 235)
-                    .modifier(PanelChrome(fill: \.glassSidebar, radius: 24))
+                if model.showSidebar {
+                    SidebarView()
+                        .frame(width: 235)
+                        .modifier(PanelChrome(fill: \.glassSidebar, radius: 24))
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Sidebar")
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
                 ContentPanel { ContentRouter() }
-                if model.showInspector {
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(model.screen.title)
+                if model.showInspector && !model.hidesInspector {
                     InspectorRouter()
                         .frame(width: 330)
                         .modifier(PanelChrome(fill: \.glassInspector, radius: 24))
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Inspector")
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .padding(8)
@@ -29,6 +39,8 @@ struct RootView: View {
                 .onAppear { model.windowWidth = geo.size.width }
                 .onChange(of: geo.size.width) { _, w in model.windowWidth = w }
         })
+        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .snappy(duration: 0.22), value: model.showSidebar)
+        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .snappy(duration: 0.22), value: model.showInspector)
         .onChange(of: model.screen) { _, _ in model.applyInspectorRule() }
         .onChange(of: model.windowWidth) { _, _ in model.applyInspectorRule() }
         .overlay { phaseOverlay }
@@ -64,11 +76,17 @@ struct ContentRouter: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        switch model.screen {
-        case .display, .ui, .mono: FamilyPickerView(screen: model.screen)
-        case .reading: ReadingView()
-        case .set: SetView()
-        case .colors: EmptyView()
+        if model.showsScanScreen {
+            ScanScreen()
+        } else if model.libraryIsEmpty {
+            EmptyLibraryState()
+        } else {
+            switch model.screen {
+            case .display, .ui, .mono: FamilyPickerView(screen: model.screen)
+            case .reading: ReadingView()
+            case .set: SetView()
+            case .colors: EmptyView()
+            }
         }
     }
 }
@@ -120,7 +138,7 @@ struct ContentPanel<Content: View>: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         VStack(spacing: 0) {
-            if model.screen == .display || model.screen == .ui || model.screen == .mono { DisplayTopRow() }
+            if (model.screen == .display || model.screen == .ui || model.screen == .mono) && !model.hidesInspector { DisplayTopRow() }
             content
         }
         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
@@ -199,6 +217,8 @@ struct WindowConfigurator: NSViewRepresentable {
             w.styleMask.insert(.fullSizeContentView)
             w.isMovableByWindowBackground = true
             w.title = "FontDrop"
+            // No control starts with the keyboard focus ring: it appears when you tab or arrow into one.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { w.makeFirstResponder(nil) }
         }
         return view
     }

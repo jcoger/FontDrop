@@ -489,3 +489,24 @@ A pass · B pass · C pass (no em dashes) · F pass after 17.7 · R pass
 | 18.9 | Text list head | "Text for Agrandir" / **37 faces · 1 on shortlist**; search field "Search families"; menus read "Difference · Distinct" | Search moved from the window toolbar into the content |
 | 18.10 | About window credits | "Doto and Geist Mono are bundled under the SIL Open Font License 1.1. The licence texts are in the app's Resources folder." | Fonts in Resources: Doto.ttf, GeistMono.ttf, OFL-Doto.txt, OFL-GeistMono.txt |
 | 18.11 | Menu | **Show or hide inspector** (option-command-I) | The window toolbar is gone, so the inspector button lives in the stage bar and the Display top row |
+
+## 19. The dial, launch and native behaviour, round R2b
+
+| # | Where | String | Note |
+|---|---|---|---|
+| 19.1 | Set inspector, dial readout | **RATIO**, Doto value (**1.333**), interval name | Geist Mono caps under the value |
+| 19.2 | Interval names | **MINOR THIRD** (1.2), **MAJOR THIRD** (1.25), **FOURTH** (1.333), **FIFTH** (1.5), **GOLDEN** (1.618) | Name only; the number is the Doto value above it |
+| 19.3 | Dial header, right | Lit light + **LOCKED**, or hollow light + **AUTO** | Replaces the Lock switch |
+| 19.4 | Auto caption | **AUTO · BETWEEN STOPS** (a stop's own name when Auto lands on one) | Value prints to two places in Auto ("1.32") |
+| 19.5 | Body | **BODY**, Doto value, ruler, **9** and **24** | In Auto the value is what Auto solved to and the slider rests |
+| 19.6 | Scale footer | **HEADLINE 84 PT · 5.6×** left; **PRESS FOR AUTO** right (locked) or **TURN TO LOCK** (Auto) | Headline is the template on stage |
+| 19.7 | VoiceOver, dial | Label "Ratio", value "1.333, locked" or "Auto"; hint "Adjust to choose a ratio and lock the sizes. Press to return to Auto."; action **Return to Auto** | |
+| 19.8 | Sidebar readout while scanning | **1204 / 4549 FILES** with a red light | Falls back to **UPDATING** until files are counted |
+| 19.9 | First run, scan screen | **SCANNING YOUR FONTS**, **27%**, Doto counter, **OF 4549 FILES · 188 FAMILIES FOUND** | The core counts files; "families found" is the total on disk, not a running count |
+| 19.10 | First run, invitation | **Start with a headline face, or a text face.** / "Fonts show up as they are read. When you pick one, FontDrop asks which brand it is for." | Buttons **Start with Display** (primary) and **Start with Text** |
+| 19.11 | Sidebar row, chosen face missing | **Not installed** (under the job name) | VoiceOver: "Display, Agrandir, not installed" |
+| 19.12 | Empty library | **No fonts found** / "FontDrop reads the fonts installed on this Mac. Add some in Font Book, then come back." / **Open Font Book** | Shown after a finished scan with no fonts |
+| 19.13 | View menu | **Show Sidebar** / **Hide Sidebar** (control-command-S), **Show Inspector** / **Hide Inspector** (option-command-I) | Replaces "Show or hide inspector" (18.11) |
+| 19.14 | VoiceOver landmarks | **Sidebar**, the screen name (Display, Text, Set) for the content, **Inspector**; the three jobs as one list "Display, Text and Set" | |
+
+Plain words. No em dashes.

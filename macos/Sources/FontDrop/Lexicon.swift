@@ -221,6 +221,12 @@ enum Lexicon {
     /// 17.7: the variable font's optical size axis. Auto follows the size drawn.
     static let opticalSize = "Optical size"
     static let auto = "Auto"
+    // View menu
+    static let sidebarJobs = "Display, Text and Set"
+    static let showSidebar = "Show Sidebar"
+    static let hideSidebar = "Hide Sidebar"
+    static let showInspector = "Show Inspector"
+    static let hideInspector = "Hide Inspector"
 
     // MARK: Brand sheet and empty states (6.x)
 
@@ -273,6 +279,8 @@ enum Lexicon {
     enum Status {
         static func counts(families: Int, files: Int) -> String { "\(families) FAM \u{00B7} \(files) FILES" }
         static let scanning = "UPDATING"
+        /// Sidebar readout while a scan counts files: "1204 / 4549 FILES".
+        static func scanProgress(read: Int, of total: Int) -> String { "\(read) / \(total) FILES" }
         static let failed = "UPDATE FAILED"
     }
 
@@ -285,6 +293,46 @@ enum Lexicon {
         static let retryHelp = "Scan your font folders again"
         /// Display and Text while the library is empty and a scan is working on it.
         static let scanningFonts = "Scanning your fonts\u{2026}"
+    }
+
+    /// First run, empty library, edge states (round R2b, spec "Launch").
+    enum Launch {
+        static let scanTitle = "Scanning your fonts"
+        static func percent(_ fraction: Double) -> String { "\(Int((fraction * 100).rounded()))%" }
+        static func ofFiles(_ files: Int, families: Int) -> String { "of \(files) files \u{00B7} \(families) families found" }
+        static let headline = "Start with a headline face, or a text face."
+        static let body = "Fonts show up as they are read. When you pick one, FontDrop asks which brand it is for."
+        static let startDisplay = "Start with Display"
+        static let startText = "Start with Text"
+        static func scanAccessibility(_ fraction: Double, read: Int, of total: Int) -> String {
+            "Scanning your fonts, \(Int((fraction * 100).rounded())) percent, \(read) of \(total) files"
+        }
+        /// A face this brand chose that is no longer on this Mac. The sidebar row says so under its name.
+        static let notInstalled = "Not installed"
+        static func notInstalledAccessibility(_ job: String, _ family: String) -> String { "\(job), \(family), not installed" }
+        static let emptyTitle = "No fonts found"
+        static let emptyBody = "FontDrop reads the fonts installed on this Mac. Add some in Font Book, then come back."
+        static let openFontBook = "Open Font Book"
+    }
+
+    /// The ratio dial on Set (spec "Dial", board 13).
+    enum Dial {
+        static let label = "Ratio"
+        static let locked = "Locked"
+        static let betweenStops = "Auto \u{00B7} between stops"
+        static let pressForAuto = "Press for Auto"
+        static let turnToLock = "Turn to lock"
+        static let returnToAuto = "Return to Auto"
+        static let hint = "Adjust to choose a ratio and lock the sizes. Press to return to Auto."
+        static let minorThird = "Minor third"
+        static let majorThird = "Major third"
+        static let fourth = "Fourth"
+        static let fifth = "Fifth"
+        static let golden = "Golden"
+        /// VoiceOver value: "1.333, locked" or "Auto".
+        static func accessibilityValue(_ scale: TypeScale, autoRatio: Double?) -> String {
+            scale.locked ? "\(TypeScale.ratioLabel(scale.ratio)), locked" : "Auto"
+        }
     }
 
     // MARK: Finding fonts (8.x)
@@ -411,6 +459,10 @@ enum Lexicon {
             "Headline \(Int(pt.rounded())) pt \u{00B7} " + String(format: "%.1f", times) + "\u{00D7} body"
         }
         static func bodyLine(_ pt: Double) -> String { "Body \(Int(pt.rounded())) pt" }
+        /// The footer under the Body slider: "Headline 84 pt \u{00B7} 5.6\u{00D7}" (set in caps by its label style).
+        static func footer(headline: Double, times: Double) -> String {
+            "Headline \(Int(headline.rounded())) pt \u{00B7} " + String(format: "%.1f", times) + "\u{00D7}"
+        }
         /// The sidebar's second line under Set: "15 pt \u{00B7} 1.333", or Auto while the scale is not locked.
         static func sidebarLine(_ scale: TypeScale) -> String {
             scale.locked ? "\(Int(scale.body.rounded())) pt \u{00B7} \(TypeScale.ratioLabel(scale.ratio))" : Lexicon.auto
