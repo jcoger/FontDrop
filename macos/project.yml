@@ -1,0 +1,72 @@
+# XcodeGen spec. `xcodegen generate` (run by build.sh) writes FontDrop.xcodeproj from this file.
+# The .xcodeproj is committed too, so Xcode opens it without XcodeGen installed.
+name: FontDrop
+options:
+  bundleIdPrefix: co.dynolabs.fontdrop
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  FontDropCore:
+    path: FontDropCore
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ARCHS: arm64                  # the Rust core XCFramework is Apple Silicon only (core/build-swift.sh)
+    ONLY_ACTIVE_ARCH: YES
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"        # sign to run locally; no team needed
+    ENABLE_HARDENED_RUNTIME: NO
+    MARKETING_VERSION: "0.2"
+    CURRENT_PROJECT_VERSION: "2"
+
+targets:
+  FontDrop:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/FontDrop
+    dependencies:
+      - package: FontDropCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.dynolabs.fontdrop.mac
+        PRODUCT_NAME: FontDrop
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: FontDrop
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        ENABLE_APP_SANDBOX: NO     # reads ~/Library/Fonts and the shared library DB
+  FontDropTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/FontDropTests
+    dependencies:
+      - target: FontDrop
+      - package: FontDropCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.dynolabs.fontdrop.mac.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/FontDrop.app/Contents/MacOS/FontDrop"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  FontDrop:
+    build:
+      targets:
+        FontDrop: all
+        FontDropTests: [test]
+    run:
+      config: Debug
+      # Uncomment to run against a copy of the library instead of the live one:
+      # environmentVariables:
+      #   FONTDROP_DB: /path/to/fontdrop-copy.db
+    test:
+      config: Debug
+      targets:
+        - FontDropTests

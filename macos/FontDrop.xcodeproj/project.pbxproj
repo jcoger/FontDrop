@@ -1,0 +1,520 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0767A49B10332718FAE300E6 /* FontLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383DFDA5412103E4B0F4E62E /* FontLoader.swift */; };
+		09D9C2664F48BA423431B2F7 /* Lenses.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0868E170DE9E1D9990C8DDB /* Lenses.swift */; };
+		1ECCE961F8D70A1A21B78FA9 /* FontDropApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74898072DE04330A09146301 /* FontDropApp.swift */; };
+		1F182ADA6660560FBA4B31A4 /* LensEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */; };
+		201BC0FD0B3319B368AE0E75 /* FontDropCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8F504F5DAE932D120F502306 /* FontDropCore */; };
+		43FED4DEA46C9DF6368F11EB /* FontDropCore in Frameworks */ = {isa = PBXBuildFile; productRef = 295C722A69BA7B3CEFA2757F /* FontDropCore */; };
+		488A20D66A2AF6C28185B587 /* Bench.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A800DE57A154D964A780F27 /* Bench.swift */; };
+		4A2C61B950C635A4BFF5C8BC /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE7A979ECF90F6A4E70E4C23 /* SidebarView.swift */; };
+		5DC6F62FE17CA1E883D535E7 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 371548664C8BCD8568AEC37D /* RootView.swift */; };
+		737C49FB0527F9614BC9087E /* SetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0739C30EB01B17F65A09622B /* SetView.swift */; };
+		85CC14800D695A6D6CCB72C8 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F2FED0504D056B840CF694 /* AppModel.swift */; };
+		94EB6B4053168E149D7E80AF /* ReadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 190B6319A33F446C461B1F70 /* ReadingView.swift */; };
+		A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF45315ED86D1A62A42E9D5D /* DisplayView.swift */; };
+		BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366C8EEFF62B64D9A353D0A3 /* Components.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B265A5E21318087A0BE4D22A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 163ED80E23E01A7CBA8BC880 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0B2BF46E910A9F12DFF72E91;
+			remoteInfo = FontDrop;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0739C30EB01B17F65A09622B /* SetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetView.swift; sourceTree = "<group>"; };
+		0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensEngineTests.swift; sourceTree = "<group>"; };
+		190B6319A33F446C461B1F70 /* ReadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingView.swift; sourceTree = "<group>"; };
+		2A800DE57A154D964A780F27 /* Bench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bench.swift; sourceTree = "<group>"; };
+		366C8EEFF62B64D9A353D0A3 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		371548664C8BCD8568AEC37D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		383DFDA5412103E4B0F4E62E /* FontLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontLoader.swift; sourceTree = "<group>"; };
+		4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FontDropTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		52F2FED0504D056B840CF694 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		56E24347D2961718B7171E05 /* FontDrop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FontDrop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		74898072DE04330A09146301 /* FontDropApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontDropApp.swift; sourceTree = "<group>"; };
+		833E80B4FB518DF123A1E244 /* FontDropCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = FontDropCore; path = FontDropCore; sourceTree = SOURCE_ROOT; };
+		AF45315ED86D1A62A42E9D5D /* DisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayView.swift; sourceTree = "<group>"; };
+		E0868E170DE9E1D9990C8DDB /* Lenses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Lenses.swift; sourceTree = "<group>"; };
+		FE7A979ECF90F6A4E70E4C23 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8A52DFC9C60C930D208A7F86 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				43FED4DEA46C9DF6368F11EB /* FontDropCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F47638DFDDD4CE95EABC2974 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				201BC0FD0B3319B368AE0E75 /* FontDropCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3FB94B01C1EC96C304D1E689 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				B3519EDEABD95CAEDDA2693E /* FontDrop */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		8DE61A4CEAF1A615A7BDECC5 /* FontDropTests */ = {
+			isa = PBXGroup;
+			children = (
+				0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */,
+			);
+			path = FontDropTests;
+			sourceTree = "<group>";
+		};
+		9182C31103545F0B301427AE /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				833E80B4FB518DF123A1E244 /* FontDropCore */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		ABDF31EC9A414BF6F0D5C770 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				56E24347D2961718B7171E05 /* FontDrop.app */,
+				4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B3519EDEABD95CAEDDA2693E /* FontDrop */ = {
+			isa = PBXGroup;
+			children = (
+				52F2FED0504D056B840CF694 /* AppModel.swift */,
+				2A800DE57A154D964A780F27 /* Bench.swift */,
+				366C8EEFF62B64D9A353D0A3 /* Components.swift */,
+				AF45315ED86D1A62A42E9D5D /* DisplayView.swift */,
+				74898072DE04330A09146301 /* FontDropApp.swift */,
+				383DFDA5412103E4B0F4E62E /* FontLoader.swift */,
+				E0868E170DE9E1D9990C8DDB /* Lenses.swift */,
+				190B6319A33F446C461B1F70 /* ReadingView.swift */,
+				371548664C8BCD8568AEC37D /* RootView.swift */,
+				0739C30EB01B17F65A09622B /* SetView.swift */,
+				FE7A979ECF90F6A4E70E4C23 /* SidebarView.swift */,
+			);
+			path = FontDrop;
+			sourceTree = "<group>";
+		};
+		CCCD99DA5FB1ADDCDAAC06D5 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				8DE61A4CEAF1A615A7BDECC5 /* FontDropTests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		FCC83E09E1CA88D6AF6A325A = {
+			isa = PBXGroup;
+			children = (
+				9182C31103545F0B301427AE /* Packages */,
+				3FB94B01C1EC96C304D1E689 /* Sources */,
+				CCCD99DA5FB1ADDCDAAC06D5 /* Tests */,
+				ABDF31EC9A414BF6F0D5C770 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0B2BF46E910A9F12DFF72E91 /* FontDrop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC672E7DDA899AC34DA1F5B7 /* Build configuration list for PBXNativeTarget "FontDrop" */;
+			buildPhases = (
+				76E9FCEA8E9FD25E6BBF0FDE /* Sources */,
+				8A52DFC9C60C930D208A7F86 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FontDrop;
+			packageProductDependencies = (
+				295C722A69BA7B3CEFA2757F /* FontDropCore */,
+			);
+			productName = FontDrop;
+			productReference = 56E24347D2961718B7171E05 /* FontDrop.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3BA405026722A52C83DDDD7F /* FontDropTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6DD02A738DF401F59D08F0A9 /* Build configuration list for PBXNativeTarget "FontDropTests" */;
+			buildPhases = (
+				9155863AD2EAF42ED7853267 /* Sources */,
+				F47638DFDDD4CE95EABC2974 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CA18610BA4A03640AB738DF7 /* PBXTargetDependency */,
+			);
+			name = FontDropTests;
+			packageProductDependencies = (
+				8F504F5DAE932D120F502306 /* FontDropCore */,
+			);
+			productName = FontDropTests;
+			productReference = 4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		163ED80E23E01A7CBA8BC880 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0B2BF46E910A9F12DFF72E91 = {
+						ProvisioningStyle = Automatic;
+					};
+					3BA405026722A52C83DDDD7F = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 61C78CF475908EBF29969E3C /* Build configuration list for PBXProject "FontDrop" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = FCC83E09E1CA88D6AF6A325A;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				76955D248207D5084EF4114D /* XCLocalSwiftPackageReference "FontDropCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = ABDF31EC9A414BF6F0D5C770 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0B2BF46E910A9F12DFF72E91 /* FontDrop */,
+				3BA405026722A52C83DDDD7F /* FontDropTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		76E9FCEA8E9FD25E6BBF0FDE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				85CC14800D695A6D6CCB72C8 /* AppModel.swift in Sources */,
+				488A20D66A2AF6C28185B587 /* Bench.swift in Sources */,
+				BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */,
+				A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */,
+				1ECCE961F8D70A1A21B78FA9 /* FontDropApp.swift in Sources */,
+				0767A49B10332718FAE300E6 /* FontLoader.swift in Sources */,
+				09D9C2664F48BA423431B2F7 /* Lenses.swift in Sources */,
+				94EB6B4053168E149D7E80AF /* ReadingView.swift in Sources */,
+				5DC6F62FE17CA1E883D535E7 /* RootView.swift in Sources */,
+				737C49FB0527F9614BC9087E /* SetView.swift in Sources */,
+				4A2C61B950C635A4BFF5C8BC /* SidebarView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9155863AD2EAF42ED7853267 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1F182ADA6660560FBA4B31A4 /* LensEngineTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CA18610BA4A03640AB738DF7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0B2BF46E910A9F12DFF72E91 /* FontDrop */;
+			targetProxy = B265A5E21318087A0BE4D22A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3A4F3B7177887F7A131061C1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = co.dynolabs.fontdrop.mac.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FontDrop.app/Contents/MacOS/FontDrop";
+			};
+			name = Debug;
+		};
+		404E2F078E27D421F8DAF786 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4366CC10E49521B474E42630 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = co.dynolabs.fontdrop.mac.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FontDrop.app/Contents/MacOS/FontDrop";
+			};
+			name = Release;
+		};
+		5A31F6240B92C1FE8E7F22AD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = FontDrop;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = co.dynolabs.fontdrop.mac;
+				PRODUCT_NAME = FontDrop;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		8D47D570AFC43E482048172F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A52E855916C401BD0B360A16 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = FontDrop;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = co.dynolabs.fontdrop.mac;
+				PRODUCT_NAME = FontDrop;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		61C78CF475908EBF29969E3C /* Build configuration list for PBXProject "FontDrop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				404E2F078E27D421F8DAF786 /* Debug */,
+				8D47D570AFC43E482048172F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6DD02A738DF401F59D08F0A9 /* Build configuration list for PBXNativeTarget "FontDropTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3A4F3B7177887F7A131061C1 /* Debug */,
+				4366CC10E49521B474E42630 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AC672E7DDA899AC34DA1F5B7 /* Build configuration list for PBXNativeTarget "FontDrop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A52E855916C401BD0B360A16 /* Debug */,
+				5A31F6240B92C1FE8E7F22AD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		76955D248207D5084EF4114D /* XCLocalSwiftPackageReference "FontDropCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = FontDropCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		295C722A69BA7B3CEFA2757F /* FontDropCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FontDropCore;
+		};
+		8F504F5DAE932D120F502306 /* FontDropCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FontDropCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 163ED80E23E01A7CBA8BC880 /* Project object */;
+}

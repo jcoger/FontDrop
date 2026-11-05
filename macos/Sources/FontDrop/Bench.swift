@@ -1,15 +1,90 @@
 import AppKit
-import QuartzCore
 import Darwin
-import FontDropCore
+import QuartzCore
 
-/// `--bench`: measures load, font prefetch, and scroll frame times, prints "BENCH ..." lines, quits.
-/// Scrolling drives the real NSScrollView behind the SwiftUI list/grid at a fixed speed (pt/s),
-/// so the frame times include layout, lazy row creation and font loading.
+// Developer tools, off unless a flag is passed:
+//   --screenshot <png> [--screen display|reading|set] [--appearance light|dark] [--brand <name>] [--select <family>]
+//       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
+//   --bench
+//       Measures load time and scroll frame times on the Display grid and Reading, prints "BENCH ..." lines, quits.
+
+// MARK: - Screenshot
+
+/// Captures this app's own window, with the toolbar and glass materials (cacheDisplay cannot draw those).
+@MainActor
+func capture(window: NSWindow) throws -> CGImage {
+    // CGWindowListCreateImage is marked unavailable in the macOS 15+ SDK but still exists at runtime.
+    typealias Fn = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+    guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else {
+        throw NSError(domain: "FontDrop", code: 1, userInfo: [NSLocalizedDescriptionKey: "CGWindowListCreateImage unavailable"])
+    }
+    let fn = unsafeBitCast(sym, to: Fn.self)
+    // 8 = kCGWindowListOptionIncludingWindow, 1 = kCGWindowImageBoundsIgnoreFraming
+    guard let img = fn(.null, 8, UInt32(window.windowNumber), 1)?.takeRetainedValue() else {
+        throw NSError(domain: "FontDrop", code: 3, userInfo: [NSLocalizedDescriptionKey: "capture returned nil"])
+    }
+    return img
+}
+
+@MainActor
+enum ScreenshotRunner {
+    static func runIfRequested(model: AppModel) async {
+        guard let path = model.options.screenshot else { return }
+        while !(model.fontsReady) {
+            if case .failed(let m) = model.phase { print("SCREENSHOT failed: \(m)"); NSApp.terminate(nil); return }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        switch model.options.appearance {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
+        if let window = NSApp.windows.first(where: { $0.isVisible }) {
+            window.setContentSize(NSSize(width: 1360, height: 860))
+        }
+        model.screen = model.options.screen
+        if CommandLine.arguments.contains("--no-inspector") { model.showInspector = false }
+        if model.screen == .reading {
+            while model.candidates.isEmpty && model.candidatesError == nil && model.displayFamily != nil {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        } else {
+            model.selectedFamily = model.options.select ?? model.chosen(model.screen) ?? model.visibleFamilies.first?.name
+        }
+        try? await Task.sleep(for: .seconds(3))
+        NSApp.windows.first(where: { $0.isVisible })?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        try? await Task.sleep(for: .seconds(1))
+        NSApp.windows.first(where: { $0.isVisible })?.displayIfNeeded()
+        guard let window = NSApp.windows.first(where: { $0.isVisible }) else {
+            print("SCREENSHOT failed: no window"); NSApp.terminate(nil); return
+        }
+        print("SCREENSHOT diag visible=\(window.isVisible) occ=\(window.occlusionState.rawValue) key=\(window.isKeyWindow) frame=\(window.frame) screen=\(String(describing: window.screen?.frame)) layer=\(String(describing: window.contentView?.layer))")
+        if CommandLine.arguments.contains("--dump-views") {
+            func walk(_ v: NSView, _ d: Int) {
+                print(String(repeating: " ", count: d) + "\(type(of: v)) \(v.frame) hidden=\(v.isHidden) layer=\(v.layer.map { "\(type(of: $0)) sub=\($0.sublayers?.count ?? 0)" } ?? "nil")")
+                if d < 9 { v.subviews.forEach { walk($0, d + 1) } }
+            }
+            walk(window.contentView!, 0)
+        }
+        do {
+            let rep = NSBitmapImageRep(cgImage: try capture(window: window))
+            try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+            print("SCREENSHOT written \(path) (\(rep.pixelsWide)x\(rep.pixelsHigh))")
+        } catch {
+            print("SCREENSHOT failed: \(error)")
+        }
+        fflush(stdout)
+        NSApp.terminate(nil)
+    }
+}
+
+// MARK: - Bench
+
 @MainActor
 enum Bench {
     static let speed: Double = 6000      // pt/s, a fast trackpad flick
-    static let maxSeconds: Double = 30
+    static let maxSeconds: Double = 40
 
     static func log(_ s: String) {
         print("BENCH " + s)
@@ -27,103 +102,32 @@ enum Bench {
         return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
     }
 
-    /// Main-thread watchdog: when the main thread has not ticked for 3 s, run /usr/bin/sample on ourselves.
-    nonisolated(unsafe) static var heartbeat = CACurrentMediaTime()
-    static func startWatchdog() {
-        let pid = ProcessInfo.processInfo.processIdentifier
-        let dir = ProcessInfo.processInfo.environment["BENCH_OUT"] ?? NSTemporaryDirectory()
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in Bench.heartbeat = CACurrentMediaTime() }
-        let t = Thread {
-            var n = 0
-            while true {
-                Thread.sleep(forTimeInterval: 0.5)
-                if CACurrentMediaTime() - heartbeat > 3, n < 3 {
-                    n += 1
-                    let p = Process()
-                    p.executableURL = URL(fileURLWithPath: "/usr/bin/sample")
-                    p.arguments = ["\(pid)", "2", "-file", "\(dir)/stall-\(n).txt"]
-                    try? p.run(); p.waitUntilExit()
-                    print("BENCH main thread stalled >3s, sample written to \(dir)/stall-\(n).txt"); fflush(stdout)
-                    Thread.sleep(forTimeInterval: 5)
-                }
-            }
+    static func runIfRequested(model: AppModel) async {
+        guard model.options.bench else { return }
+        while !model.fontsReady {
+            if case .failed(let m) = model.phase { log("failed: \(m)"); NSApp.terminate(nil); return }
+            try? await Task.sleep(for: .milliseconds(100))
         }
-        t.start()
-    }
-
-    /// `--screenshot <png>`: waits for data and pairs, renders the window in-process (no screen-recording
-    /// permission needed), writes a PNG, quits. Optional `--select <family name>`.
-    static func screenshot(store: Store, path: String) async {
-        while store.families.isEmpty && store.loadError == nil { try? await Task.sleep(for: .milliseconds(100)) }
-        let args = CommandLine.arguments
-        if let i = args.firstIndex(of: "--select"), i + 1 < args.count,
-           let f = store.families.first(where: { $0.name == args[i + 1] }) { store.selection = f.id }
-        if let i = args.firstIndex(of: "--mode"), i + 1 < args.count,
-           let m = BrowseMode.allCases.first(where: { $0.rawValue == args[i + 1] }) { store.mode = m }
-        try? await Task.sleep(for: .seconds(4))
-        guard let view = NSApp.windows.first(where: { $0.isVisible })?.contentView,
-              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { log("screenshot failed"); NSApp.terminate(nil); return }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
-        log("screenshot written \(path) (\(rep.pixelsWide)x\(rep.pixelsHigh))")
-        NSApp.terminate(nil)
-    }
-
-    static func run(store: Store) async {
-        if CommandLine.arguments.contains("--watch") { startWatchdog() }   // sampling itself perturbs timings
-        // wait for data
-        while store.families.isEmpty && store.loadError == nil { try? await Task.sleep(for: .milliseconds(100)) }
+        if let window = NSApp.windows.first(where: { $0.isVisible }) {
+            window.setContentSize(NSSize(width: 1360, height: 860))
+        }
         try? await Task.sleep(for: .seconds(1))
-        log("db=\(store.dbPath)")
-        for t in store.timings { log(String(format: "load %@ = %.1f ms", t.label, t.ms)) }
-        log(String(format: "memory after data load: %.0f MB footprint", footprintMB()))
+        log("db=\(model.dbPath)")
+        log("families=\(model.families.count) fonts=\(model.fontCount)")
+        for t in model.timings { log(String(format: "load %@ = %.1f ms", t.label, t.ms)) }
+        log(String(format: "memory after load: %.0f MB footprint, fonts cached %d", footprintMB(), FontLoader.shared.cachedCount))
 
-        // pair query latency, 5 families
-        var pairMs: [Double] = []
-        guard let lib = store.core else { return }
-        for f in store.families.prefix(60).filter({ $0.styleCount > 2 }).prefix(5) {
-            let id = f.fontId
-            let m: Double = await Task.detached {
-                let t0 = DispatchTime.now()
-                _ = try? lib.fontPairs(fontId: id, excludedIds: [], job: nil)
-                return ms(t0, DispatchTime.now())
-            }.value
-            pairMs.append(m)
+        // Display grid: every family, fonts preloaded, 5 passes.
+        model.screen = .display
+        model.category = .all
+        try? await Task.sleep(for: .seconds(1.5))
+        for pass in 1...5 {
+            let m0 = footprintMB()
+            let stats = await scrollPass()
+            log("scroll display grid pass \(pass): \(stats) | mem \(String(format: "%.0f", m0)) -> \(String(format: "%.0f", footprintMB())) MB")
         }
-        log("font_pairs ms (5 families): " + pairMs.map { String(format: "%.0f", $0) }.joined(separator: ", "))
-        log(String(format: "memory idle: %.0f MB", footprintMB()))
-
-        // scroll passes
-        if CommandLine.arguments.contains("--hot") {
-            // Experiment: every font already cached, so rows never write @State from a task.
-            for f in store.fonts { _ = FontLoader.shared.load(path: f.filePath, preferredText: f.family) }
-            log("hot: \(FontLoader.shared.cachedCount) fonts preloaded")
-            for mode in [BrowseMode.sidebar, .grid, .flat, .flat, .grid, .sidebar] {
-                store.mode = mode
-                try? await Task.sleep(for: .seconds(1.5))
-                log("hot scroll mode=\(mode.rawValue) \(await scrollPass())")
-            }
-            log("DONE")
-            NSApp.terminate(nil)
-            return
-        }
-        let only = CommandLine.arguments.contains("--prefetch-only")
-        for mode in BrowseMode.allCases where !only {
-            for pass in ["cold", "warm"] {
-                if pass == "cold" { FontLoader.shared.clear() }
-                store.mode = mode
-                try? await Task.sleep(for: .seconds(1.5))
-                let m0 = footprintMB()
-                let stats = await scrollPass()
-                log("scroll mode=\(mode.rawValue) cache=\(pass) \(stats) | mem \(String(format: "%.0f", m0)) -> \(String(format: "%.0f", footprintMB())) MB | fonts cached \(FontLoader.shared.cachedCount)")
-            }
-        }
-
-        // jump test: what a scrollbar drag or "scroll to letter" costs
-        for mode in BrowseMode.allCases {
-            store.mode = mode
-            try? await Task.sleep(for: .seconds(1.5))
-            guard let sv = biggestScrollView(), let doc = sv.documentView else { continue }
+        // Jumps: what a scrollbar drag costs.
+        if let sv = biggestScrollView(), let doc = sv.documentView {
             let maxY = max(0, doc.frame.height - sv.contentView.bounds.height)
             var out: [String] = []
             for frac in [0.5, 0.9, 0.2] {
@@ -133,10 +137,20 @@ enum Bench {
                 try? await Task.sleep(for: .milliseconds(100))
                 out.append(String(format: "%.0f%%: %.0f ms", frac * 100, ms(t0, DispatchTime.now()) - 100))
             }
-            log("jump mode=\(mode.rawValue) \(out.joined(separator: ", ")) (cold-ish cache)")
+            log("jump display grid \(out.joined(separator: ", "))")
         }
 
-        await prefetchAll(store: store)
+        // Reading, if a Display face is chosen.
+        if model.displayFamily != nil {
+            let t0 = DispatchTime.now()
+            model.screen = .reading
+            while model.candidates.isEmpty && model.candidatesError == nil { try? await Task.sleep(for: .milliseconds(50)) }
+            log(String(format: "reading: %d candidates ready in %.0f ms after switching screens", model.candidates.count, ms(t0, DispatchTime.now())))
+            try? await Task.sleep(for: .seconds(1.5))
+            for pass in 1...3 {
+                log("scroll reading pass \(pass): \(await scrollPass())")
+            }
+        }
         log(String(format: "memory end: %.0f MB", footprintMB()))
         log("DONE")
         NSApp.terminate(nil)
@@ -162,6 +176,7 @@ enum Bench {
         }
         let clip = sv.contentView
         let maxY = max(0, doc.frame.height - clip.bounds.height)
+        guard maxY > 0 else { return "ERROR nothing to scroll (content fits)" }
         let driver = Driver(scrollView: sv, maxY: maxY, speed: speed, deadline: maxSeconds)
         let link = win.contentView!.displayLink(target: driver, selector: #selector(Driver.tick(_:)))
         link.add(to: .main, forMode: .common)
@@ -170,6 +185,8 @@ enum Bench {
         return driver.summary(distance: maxY)
     }
 
+    /// Scrolls the real NSScrollView behind the SwiftUI view at a fixed speed on a display link,
+    /// and records the time between frames.
     @MainActor
     final class Driver: NSObject {
         let sv: NSScrollView
@@ -191,7 +208,6 @@ enum Bench {
         @objc func tick(_ link: CADisplayLink) {
             guard !finished else { return }
             let now = link.timestamp
-            Bench.heartbeat = CACurrentMediaTime()
             interval = link.targetTimestamp - link.timestamp
             if last == 0 { last = now; start = now; return }
             let dt = now - last
@@ -217,60 +233,6 @@ enum Bench {
             return String(format: "frames=%d refresh=%.1fms p50=%.1f p95=%.1f p99=%.1f max=%.1fms late(>1.5x)=%d (%.1f%%) severe(>3x)=%d scrolled=%.0f/%.0fpt",
                           dts.count, nominal, p(0.5), p(0.95), p(0.99), s.last! * 1000,
                           late, Double(late) / Double(dts.count) * 100, severe, min(y, distance), distance)
-        }
-    }
-
-    // MARK: prefetch
-
-    static func prefetchAll(store: Store) async {
-        FontLoader.shared.clear()
-        FontLoader.profile = true
-        let paths: [String] = store.fonts.map(\.filePath)
-        let fams: [String] = store.fonts.map(\.family)
-        let before = footprintMB()
-        let t0 = DispatchTime.now()
-        let times: [Double] = await Task.detached { () -> [Double] in
-            // 8 workers over the list
-            let n = paths.count, workers = 8
-            return await withTaskGroup(of: [Double].self) { g in
-                for w in 0..<workers {
-                    g.addTask {
-                        var out: [Double] = []
-                        var i = w
-                        while i < n {
-                            let a = DispatchTime.now()
-                            _ = FontLoader.shared.load(path: paths[i], preferredText: fams[i])
-                            out.append(ms(a, DispatchTime.now()))
-                            i += workers
-                        }
-                        return out
-                    }
-                }
-                var all: [Double] = []
-                for await part in g { all += part }
-                return all
-            }
-        }.value
-        let total = ms(t0, DispatchTime.now())
-        let s = times.sorted()
-        func p(_ q: Double) -> Double { s[min(s.count - 1, Int(Double(s.count) * q))] }
-        let fails = FontLoader.shared.failures
-        let noDesc = fails.filter { $0.value == .noDescriptors }
-        let noGlyph = fails.filter { $0.value == .noGlyphs }
-        log(String(format: "prefetch %d font files, 8 workers: total %.0f ms, per-file p50=%.2f p95=%.2f max=%.1f ms | mem %.0f -> %.0f MB",
-                   paths.count, total, p(0.5), p(0.95), s.last ?? 0, before, footprintMB()))
-        log("fail: Core Text could not read \(noDesc.count); loaded but no glyphs for name or sample \(noGlyph.count)")
-        let names = Dictionary(store.fonts.map { ($0.filePath, $0.name) }, uniquingKeysWith: { a, _ in a })
-        let slow = FontLoader.shared.steps.sorted { ($0.descriptors + $0.create + $0.cover) > ($1.descriptors + $1.create + $1.cover) }.prefix(15)
-        log("slowest 15 files (ms: descriptors / CTFontCreate / glyph probe, file size):")
-        for st in slow {
-            let size = ((try? FileManager.default.attributesOfItem(atPath: st.path)[.size] as? Int) ?? 0) ?? 0
-            log(String(format: "  %7.0f / %7.0f / %7.0f  %6.1f MB  %@", st.descriptors, st.create, st.cover, Double(size) / 1_048_576, st.path))
-        }
-        let sum = FontLoader.shared.steps.reduce((0.0, 0.0, 0.0)) { ($0.0 + $1.descriptors, $0.1 + $1.create, $0.2 + $1.cover) }
-        log(String(format: "summed worker time ms: descriptors %.0f, CTFontCreate %.0f, glyph probe %.0f", sum.0, sum.1, sum.2))
-        for (path, f) in fails.sorted(by: { $0.key < $1.key }).prefix(40) {
-            log("  \(f == .noDescriptors ? "unreadable" : "noglyphs") \(names[path] ?? "?") :: \(path)")
         }
     }
 }

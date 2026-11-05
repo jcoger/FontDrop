@@ -164,7 +164,9 @@ impl Library {
              FROM fonts",
         )?;
         let mut best: HashMap<String, Best> = HashMap::new();
-        let mut counts: HashMap<String, u32> = HashMap::new();
+        // Styles counted once even when a library holds both .otf and .ttf
+        // copies of the same style (common): keyed by file stem.
+        let mut styles: HashMap<String, HashSet<String>> = HashMap::new();
         let mut trial: HashSet<String> = HashSet::new();
         // First non-empty value seen in any file, as a fallback for the family.
         let mut any_url: HashMap<String, String> = HashMap::new();
@@ -186,7 +188,7 @@ impl Library {
         })?;
         for row in rows {
             let (id, family, path, file_name, style, weight, skeleton, serif, is_trial, url, vendor) = row?;
-            *counts.entry(family.clone()).or_default() += 1;
+            styles.entry(family.clone()).or_default().insert(file_stem(&file_name));
             if is_trial != 0 {
                 trial.insert(family.clone());
             }
@@ -204,7 +206,7 @@ impl Library {
         let mut out: Vec<FamilySummary> = best
             .into_iter()
             .map(|(name, b)| FamilySummary {
-                style_count: counts[&name],
+                style_count: styles.get(&name).map_or(1, |s| s.len() as u32),
                 is_trial: trial.contains(&name),
                 foundry_url: b.url.filter(|u| !u.is_empty()).or_else(|| any_url.remove(&name)),
                 vendor: b.vendor.filter(|v| !v.is_empty()).or_else(|| any_vendor.remove(&name)),
@@ -222,9 +224,12 @@ impl Library {
     /// Every font file, sorted by family then weight (flat list).
     pub fn list_fonts(&self) -> Result<Vec<FontFile>, CoreError> {
         let conn = self.lock()?;
-        let mut stmt =
-            conn.prepare("SELECT font_id, font_family, name, file_path, weight FROM fonts")?;
-        let mut out: Vec<FontFile> = stmt
+        // .otf first so it wins the de-duplication below
+        let mut stmt = conn.prepare(
+            "SELECT font_id, font_family, name, file_path, weight FROM fonts
+             ORDER BY CASE WHEN lower(file_name) LIKE '%.otf' THEN 0 ELSE 1 END",
+        )?;
+        let all: Vec<FontFile> = stmt
             .query_map([], |r| {
                 Ok(FontFile {
                     font_id: r.get(0)?,
@@ -235,6 +240,15 @@ impl Library {
                 })
             })?
             .collect::<Result<_, _>>()?;
+        // One entry per style: drop a .ttf when the same style exists as .otf.
+        let mut seen: HashSet<(String, String)> = HashSet::new();
+        let mut out: Vec<FontFile> = all
+            .into_iter()
+            .filter(|f| {
+                let file = f.file_path.rsplit('/').next().unwrap_or(&f.file_path);
+                seen.insert((f.family.clone(), file_stem(file)))
+            })
+            .collect();
         out.sort_by(|a, b| {
             a.family.to_lowercase().cmp(&b.family.to_lowercase()).then(a.weight.cmp(&b.weight))
         });
@@ -359,5 +373,15 @@ impl Library {
 impl Library {
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, Connection>, CoreError> {
         self.conn.lock().map_err(|_| CoreError::Db("library lock poisoned".into()))
+    }
+}
+
+/// File name without extension, lowercased: "PPRightSerif-SpatialFine.otf"
+/// and ".ttf" are the same style.
+fn file_stem(file_name: &str) -> String {
+    let lower = file_name.to_lowercase();
+    match lower.rfind('.') {
+        Some(i) => lower[..i].to_string(),
+        None => lower,
     }
 }
