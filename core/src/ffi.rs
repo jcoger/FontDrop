@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 
+use crate::finder::{self, FamilyQuery, FamilyResults};
 use crate::{db, pairing, userdata};
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -133,21 +134,6 @@ pub struct Library {
     conn: Mutex<Connection>,
 }
 
-fn is_slanted(file_name: &str, style: &str) -> bool {
-    let l = file_name.to_lowercase();
-    style == "italic" || l.contains("italic") || l.contains("oblique") || l.contains("kursiv")
-}
-
-struct Best {
-    id: String,
-    path: String,
-    dist: i64,
-    skeleton: String,
-    serif: bool,
-    url: Option<String>,
-    vendor: Option<String>,
-}
-
 #[uniffi::export]
 impl Library {
     /// Open (creating if missing) the library DB file at `path`.
@@ -170,67 +156,52 @@ impl Library {
     /// the name the font file declares about itself (see `names::read_family_name`).
     pub fn list_families(&self) -> Result<Vec<FamilySummary>, CoreError> {
         let conn = self.lock()?;
-        let mut stmt = conn.prepare(
-            "SELECT font_id, font_family, file_path, file_name, style, weight, skeleton,
-                    flesh_serif, COALESCE(is_trial, 0), foundry_url, vendor_id
-             FROM fonts",
-        )?;
-        let mut best: HashMap<String, Best> = HashMap::new();
-        // Styles counted once even when a library holds both .otf and .ttf
-        // copies of the same style (common): keyed by file stem.
-        let mut styles: HashMap<String, HashSet<String>> = HashMap::new();
-        let mut trial: HashSet<String> = HashSet::new();
-        // First non-empty value seen in any file, as a fallback for the family.
-        let mut any_url: HashMap<String, String> = HashMap::new();
-        let mut any_vendor: HashMap<String, String> = HashMap::new();
-        let rows = stmt.query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, String>(4)?,
-                r.get::<_, i64>(5)?,
-                r.get::<_, String>(6)?,
-                r.get::<_, i64>(7)?,
-                r.get::<_, i64>(8)?,
-                r.get::<_, Option<String>>(9)?,
-                r.get::<_, Option<String>>(10)?,
-            ))
-        })?;
-        for row in rows {
-            let (id, family, path, file_name, style, weight, skeleton, serif, is_trial, url, vendor) = row?;
-            styles.entry(family.clone()).or_default().insert(file_stem(&file_name));
-            if is_trial != 0 {
-                trial.insert(family.clone());
-            }
-            if let Some(u) = url.as_ref().filter(|u| !u.is_empty()) {
-                any_url.entry(family.clone()).or_insert_with(|| u.clone());
-            }
-            if let Some(v) = vendor.as_ref().filter(|v| !v.is_empty()) {
-                any_vendor.entry(family.clone()).or_insert_with(|| v.clone());
-            }
-            let dist = (weight - 400).abs() + if is_slanted(&file_name, &style) { 1000 } else { 0 };
-            if best.get(&family).map_or(true, |b| dist < b.dist) {
-                best.insert(family, Best { id, path, dist, skeleton, serif: serif != 0, url, vendor });
-            }
-        }
-        let mut out: Vec<FamilySummary> = best
+        Ok(finder::load_families(&conn)?
             .into_iter()
-            .map(|(name, b)| FamilySummary {
-                style_count: styles.get(&name).map_or(1, |s| s.len() as u32),
-                is_trial: trial.contains(&name),
-                foundry_url: b.url.filter(|u| !u.is_empty()).or_else(|| any_url.remove(&name)),
-                vendor: b.vendor.filter(|v| !v.is_empty()).or_else(|| any_vendor.remove(&name)),
-                name,
-                file_path: b.path,
-                font_id: b.id,
-                skeleton: b.skeleton,
-                serif: b.serif,
+            .map(|f| FamilySummary {
+                name: f.name,
+                file_path: f.file_path,
+                font_id: f.font_id,
+                style_count: f.style_count,
+                skeleton: f.skeleton,
+                serif: f.serif,
+                is_trial: f.is_trial,
+                foundry_url: f.foundry_url,
+                vendor: f.vendor,
             })
-            .collect();
-        out.sort_by_key(|f| f.name.to_lowercase());
-        Ok(out)
+            .collect())
+    }
+
+    /// Find families: text, sources, kinds, traits, Saved, Hidden. One answer with the
+    /// families (Yours first, then by name) and the count for every chip, each computed
+    /// with the other filters applied. Hidden families (junk list plus the user's hides)
+    /// stay out unless `include_hidden` is set. See `finder.rs`.
+    pub fn find_families(&self, query: FamilyQuery) -> Result<FamilyResults, CoreError> {
+        finder::find_families(&*self.lock()?, &query).map_err(from_msg)
+    }
+
+    /// Hide a family from every list and from pairing candidates.
+    pub fn hide_family(&self, family: String) -> Result<(), CoreError> {
+        finder::hide_family(&*self.lock()?, &family).map_err(from_msg)
+    }
+
+    /// Show a hidden family again (also for families on the built-in junk list).
+    pub fn unhide_family(&self, family: String) -> Result<(), CoreError> {
+        finder::unhide_family(&*self.lock()?, &family).map_err(from_msg)
+    }
+
+    /// Star (`on`) or unstar a family. Global, not per brand.
+    pub fn set_favorite(&self, family: String, on: bool) -> Result<(), CoreError> {
+        finder::set_favorite(&*self.lock()?, &family, on).map_err(from_msg)
+    }
+
+    /// How many families the Reading rule removes from the candidates for `font_id`
+    /// ("42 not made for long text"). Counts families, not capped by the page size.
+    pub fn reading_hidden_count(&self, font_id: String, excluded_ids: Vec<String>) -> Result<u32, CoreError> {
+        let conn = self.lock()?;
+        pairing::unfit_family_count(&conn, &font_id, excluded_ids).map_err(|m| {
+            if m.ends_with("not found") { CoreError::NotFound(font_id.clone()) } else { CoreError::Db(m) }
+        })
     }
 
     /// Every font file, sorted by family then weight (flat list).

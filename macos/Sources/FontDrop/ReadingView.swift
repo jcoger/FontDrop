@@ -100,22 +100,32 @@ struct ReadingView: View {
 
     private func statusRow(shown: Int, hidden: Int) -> some View {
         HStack(spacing: 10) {
-            Label(model.includeUnfitFaces ? Lexicon.showingEvery : Lexicon.readingFixed,
-                  systemImage: "line.3.horizontal.decrease")
+            Label(longTextStatus, systemImage: "line.3.horizontal.decrease")
                 .font(.caption).foregroundStyle(.secondary)
                 .help(Lexicon.readingFixedWhy)
-            Button(model.includeUnfitFaces ? Lexicon.onlyTextFaces : Lexicon.showThem) {
-                Task { await model.setIncludeUnfit(!model.includeUnfitFaces) }
+            if model.includeUnfitFaces || model.notForLongText > 0 {
+                Button(model.includeUnfitFaces ? Lexicon.onlyTextFaces : Lexicon.showThem) {
+                    Task { await model.setIncludeUnfit(!model.includeUnfitFaces) }
+                }
+                .buttonStyle(.link).font(.caption)
             }
-            .buttonStyle(.link).font(.caption)
             Text("\(shown) shown").font(.caption).foregroundStyle(.secondary)
             if hidden > 0 {
                 Text("\u{00B7} \(hidden) hidden by your filters").font(.caption).foregroundStyle(.secondary)
                 Button(Lexicon.clearFilters) { resetLenses() }.buttonStyle(.link).font(.caption)
             }
+            if model.lenses.sort == .lessCommon {
+                Text("\u{00B7} \(Lexicon.Finder.lessCommonHelp)").font(.caption).foregroundStyle(.secondary)
+            }
             Spacer()
             GlossaryButton()
         }
+    }
+
+    /// 7.20: "42 not made for long text" with a "Show them" link beside it. Nothing removed: the plain statement.
+    private var longTextStatus: String {
+        if model.includeUnfitFaces { return Lexicon.showingEvery }
+        return model.notForLongText > 0 ? Lexicon.Finder.notForLongText(model.notForLongText) + " \u{00B7}" : Lexicon.readingFixed
     }
 
     /// Under the grid: how many the filters hide (with a way out) and a way to ask for more.
@@ -171,7 +181,10 @@ struct LensToolbar: ToolbarContent {
             }
             LensMenu(title: Lexicon.sortLabel, value: lenses.sort.rawValue) {
                 Picker(Lexicon.sortLabel, selection: $lenses.sort) {
-                    ForEach(ReadingSort.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(ReadingSort.allCases) { sort in
+                        Text(sort.rawValue).tag(sort)
+                            .help(sort == .lessCommon ? Lexicon.Finder.lessCommonHelp : "")
+                    }
                 }
             }
         }
@@ -308,6 +321,7 @@ struct ReadingInspector: View {
                       systemImage: isSaved ? "checkmark.circle.fill" : "plus.circle")
             }
             .buttonStyle(.bordered)
+            FamilyActions(name: c.family)
         }
     }
 

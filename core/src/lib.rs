@@ -13,7 +13,9 @@
 
 pub mod classifier;
 pub mod db;
+pub mod finder;
 pub mod google_fonts;
+pub mod google_list;
 pub mod metrics;
 pub mod names;
 pub mod pairing;

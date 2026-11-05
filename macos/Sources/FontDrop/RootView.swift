@@ -16,7 +16,7 @@ struct RootView: View {
                         .inspectorColumnWidth(min: 280, ideal: 330, max: 460)
                 }
         }
-        .searchable(text: $model.search, prompt: "Search families")
+        .searchable(text: $model.search, prompt: model.screen == .reading ? "Search families" : Lexicon.Finder.searchPrompt)
         .navigationTitle(model.brand?.name ?? "FontDrop")
         .navigationSubtitle(subtitle)
         .toolbar {

@@ -21,6 +21,12 @@ struct LaunchOptions {
     var demoChoose: String?      // with --no-brand: act as if "Use for Display" was pressed on this family
     var template: String?        // Reading template id: article | hero | appui | poster
     var openPlayground = false   // open every playground group
+    var showHidden = false       // finder: include hidden families
+    var savedOnly = false        // finder: only Saved
+    var sources: String?         // finder: comma list of yours,google,system
+    var sort: String?            // Reading sort: less-common
+    var demoSave: String?        // comma list of families to star (on the DB copy), for screenshots
+    var search: String?          // start with this in the search box
 
     init(arguments: [String] = CommandLine.arguments, environment: [String: String] = ProcessInfo.processInfo.environment) {
         func value(_ flag: String) -> String? {
@@ -42,6 +48,12 @@ struct LaunchOptions {
         if demoChoose != nil { noBrand = true }       // the sheet only shows when there is no brand
         template = value("--template")
         openPlayground = arguments.contains("--open-playground")
+        showHidden = arguments.contains("--show-hidden")
+        savedOnly = arguments.contains("--saved")
+        sources = value("--sources")
+        sort = value("--sort")
+        demoSave = value("--demo-save")
+        search = value("--search")
     }
 }
 
@@ -82,11 +94,6 @@ enum Screen: String, Hashable, CaseIterable, Identifiable {
     }
 }
 
-enum FamilyCategory: String, CaseIterable, Identifiable {
-    case all = "All", serif = "Serif", sans = "Sans"
-    var id: String { rawValue }
-}
-
 extension FamilySummary: @retroactive Identifiable { public var id: String { fontId } }
 extension Brand: @retroactive Identifiable {}
 
@@ -113,7 +120,7 @@ final class AppModel {
 
     // Navigation and search
     var screen: Screen = .display
-    var search = ""
+    var search = "" { didSet { if search != oldValue { scheduleFinder() } } }
     var showInspector = true
 
     // Library (read once, then filtered in memory)
@@ -134,8 +141,18 @@ final class AppModel {
     private(set) var shortlists: [String: [String]] = [:]    // job -> families
 
     // Display (and UI, Mono) grid
-    var category: FamilyCategory = .all
     var selectedFamily: String?
+
+    /// Source, kind and trait chips, Saved and Show hidden. Remembered between launches.
+    var filter: FinderFilter {
+        didSet { if filter != oldValue { persistFilter(); scheduleFinder() } }
+    }
+    /// The core's answer to the current filter and search: families plus chip counts.
+    private(set) var finderResults: FamilyResults?
+    /// Every family with its Saved, Hidden and Google flags (hidden ones included), by name.
+    private(set) var allEntries: [String: FamilyEntry] = [:]
+    private var finderGeneration = 0
+    private var finderTask: Task<Void, Never>?
 
     // Reading
     var lenses = Lenses()
@@ -151,6 +168,8 @@ final class AppModel {
     private(set) var candidatesHasMore = false
     /// Off by default: Reading only offers faces made for long text. "Show them" turns the rule off.
     private(set) var includeUnfitFaces = false
+    /// Families the long-text rule removes for the current Display face ("42 not made for long text").
+    private(set) var notForLongText = 0
 
     func setIncludeUnfit(_ on: Bool) async {
         includeUnfitFaces = on
@@ -184,6 +203,14 @@ final class AppModel {
         self.options = options
         typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: options.screenshot == nil && !options.bench)
         if let t = options.template { templateID = t }
+        // Screenshot and bench runs start from the standard filter so they repeat.
+        var f = options.screenshot == nil && !options.bench ? FinderFilter.load() : FinderFilter.standard
+        if let list = options.sources { f.sources = Set(list.split(separator: ",").compactMap { Source(key: String($0)) }) }
+        if options.showHidden { f.showHidden = true }
+        if options.savedOnly { f.savedOnly = true }
+        filter = f
+        if options.sort == "less-common" { lenses.sort = .lessCommon }
+        if let q = options.search { search = q }
     }
 
     // MARK: derived
@@ -208,18 +235,16 @@ final class AppModel {
 
     func shortlist(_ job: String) -> [String] { shortlists[job] ?? [] }
 
-    /// Families for the grid: category + search. Nothing else is hidden.
+    /// Families for the grid: the core's answer to the filter chips and the search box.
+    /// Your fonts come first. Falls back to everything until the first answer arrives.
     var visibleFamilies: [FamilySummary] {
-        var list = families
-        switch category {
-        case .all: break
-        case .serif: list = list.filter { $0.serif }
-        case .sans: list = list.filter { !$0.serif }
-        }
-        let q = search.trimmingCharacters(in: .whitespaces)
-        if !q.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(q) } }
-        return list
+        guard let results = finderResults else { return families }
+        return results.families.compactMap { familyByName[$0.name] }
     }
+
+    var savedCount: Int { allEntries.values.filter(\.saved).count }
+    func isSaved(_ name: String) -> Bool { allEntries[name]?.saved ?? false }
+    func isHidden(_ name: String) -> Bool { allEntries[name]?.hidden ?? false }
 
     var readingResult: (shown: [Candidate], hidden: Int) {
         LensEngine.apply(candidates, lenses: lenses, search: search)
@@ -266,6 +291,11 @@ final class AppModel {
             if options.refresh { timings.append(("refresh_library", ms(t1, t2))) }
             timings.append(("list_families + list_fonts + brands (\(fams.count) families)", ms(t2, t3)))
 
+            await reloadEntries()
+            await refreshFinder()
+            if let names = options.demoSave {
+                for n in names.split(separator: ",") { await setFavorite(String(n), on: true) }
+            }
             let saved = UserDefaults.standard.object(forKey: "lastBrand") as? Int64
             let wanted = options.brand.flatMap { n in brands.first { $0.name == n }?.id }
             await selectBrand(options.noBrand ? nil : (wanted ?? brands.first { $0.id == saved }?.id ?? brands.first?.id))
@@ -307,6 +337,8 @@ final class AppModel {
             familyByName = Dictionary(fams.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
             fontsByFamily = Dictionary(grouping: fonts, by: \.family)
             fontCount = fonts.count
+            await reloadEntries()
+            await refreshFinder()
             await FontLoader.shared.preload(paths: fams.map(\.filePath)) { n in
                 Task { @MainActor [weak self] in self?.fontTick = n }
             }
@@ -323,6 +355,60 @@ final class AppModel {
         if path.hasPrefix("/Library/Fonts") { return 1 }
         if path.hasPrefix("/System") { return 3 }
         return 2
+    }
+
+    // MARK: finding fonts
+
+    private func persistFilter() {
+        if options.screenshot == nil && !options.bench { filter.save() }
+    }
+
+    /// Asks the core again, soon. Typing in the search box calls this on every key; only the last answer is used.
+    private func scheduleFinder() {
+        finderTask?.cancel()
+        finderTask = Task { await refreshFinder() }
+    }
+
+    /// Waits for the answer to the latest filter or search change (tests, screenshots).
+    func finderSettled() async { await finderTask?.value }
+
+    func refreshFinder() async {
+        guard core != nil else { return }
+        finderGeneration += 1
+        let generation = finderGeneration
+        let query = filter.query(text: search.trimmingCharacters(in: .whitespaces))
+        do {
+            let results = try await background { try $0.findFamilies(query: query) }
+            if generation == finderGeneration { finderResults = results }
+        } catch { report(error) }
+    }
+
+    /// Re-reads every family's flags (Saved, Hidden, Google rank). Cheap; run after any change to them.
+    func reloadEntries() async {
+        let everything = FamilyQuery(text: "", sources: [], kinds: [], traits: [], savedOnly: false, includeHidden: true)
+        do {
+            let all = try await background { try $0.findFamilies(query: everything) }
+            allEntries = Dictionary(all.families.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+        } catch { report(error) }
+    }
+
+    func setFavorite(_ family: String, on: Bool) async {
+        do {
+            try await background { try $0.setFavorite(family: family, on: on) }
+            await reloadEntries()
+            await refreshFinder()
+        } catch { report(error) }
+    }
+
+    /// Hides or shows a family everywhere: the grid, Reading candidates and pairing.
+    func setHidden(_ family: String, hidden: Bool) async {
+        do {
+            try await background { hidden ? try $0.hideFamily(family: family) : try $0.unhideFamily(family: family) }
+            await reloadEntries()
+            await refreshFinder()
+            candidatesKey = nil
+            if screen == .reading { await loadCandidates() }
+        } catch { report(error) }
     }
 
     // MARK: brands
@@ -446,18 +532,21 @@ final class AppModel {
             let ranked = try await background {
                 try $0.fontCandidates(fontId: id, excludedIds: [], job: job, limit: limit)
             }
+            let unfit = try await background { try $0.readingHiddenCount(fontId: id, excludedIds: []) }
             var seen = Set<String>()
             var list: [Candidate] = []
             for p in ranked where !p.family.isEmpty && seen.insert(p.family).inserted {
                 // Show the family's regular upright face, not whichever file the engine matched.
                 let path = familyByName[p.family]?.filePath ?? p.filePath
                 list.append(Candidate(id: p.fontId, family: p.family, filePath: path,
-                                      pairType: p.pairType, evidence: p.evidence, order: list.count))
+                                      pairType: p.pairType, evidence: p.evidence, order: list.count,
+                                      googleRank: allEntries[p.family]?.googleRank.map(Int.init)))
             }
             let allPaths = list.flatMap { c in (fontsByFamily[c.family] ?? []).map(\.filePath) + [c.filePath] }
             await FontLoader.shared.preload(paths: allPaths)
             guard displayFamily?.fontId == id else { return }   // changed while loading
             candidates = list
+            notForLongText = Int(unfit)
             candidatesHasMore = ranked.count >= candidateLimit
             candidatesKey = key
             fontTick += 1

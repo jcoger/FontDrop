@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0767A49B10332718FAE300E6 /* FontLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 383DFDA5412103E4B0F4E62E /* FontLoader.swift */; };
 		09D9C2664F48BA423431B2F7 /* Lenses.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0868E170DE9E1D9990C8DDB /* Lenses.swift */; };
+		111EF9F312EE5025D2EA7496 /* FilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1333ACC5522C98EAAB7F599F /* FilterBar.swift */; };
 		119C0B28D1FCE012A42E1843 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */; };
 		1ECCE961F8D70A1A21B78FA9 /* FontDropApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74898072DE04330A09146301 /* FontDropApp.swift */; };
 		1F182ADA6660560FBA4B31A4 /* LensEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */; };
@@ -19,8 +20,10 @@
 		488A20D66A2AF6C28185B587 /* Bench.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A800DE57A154D964A780F27 /* Bench.swift */; };
 		4A2C61B950C635A4BFF5C8BC /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE7A979ECF90F6A4E70E4C23 /* SidebarView.swift */; };
 		5DC6F62FE17CA1E883D535E7 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 371548664C8BCD8568AEC37D /* RootView.swift */; };
+		66107F14F2028123D56CC163 /* Finder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A23618E9F79A2D3F1F2A1A1 /* Finder.swift */; };
 		737C49FB0527F9614BC9087E /* SetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0739C30EB01B17F65A09622B /* SetView.swift */; };
 		73C81E98F42FACB352C5E62C /* FaceText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5460F3400E3C5449D6C9F614 /* FaceText.swift */; };
+		858AF1009D078B080B14624C /* FinderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382020E250E4336580BD7B20 /* FinderTests.swift */; };
 		85CC14800D695A6D6CCB72C8 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F2FED0504D056B840CF694 /* AppModel.swift */; };
 		8F8F542FD8DD71BD6B8BAF07 /* PosterTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D523C8ECB26B3F1DC554339D /* PosterTemplate.swift */; };
 		94EB6B4053168E149D7E80AF /* ReadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 190B6319A33F446C461B1F70 /* ReadingView.swift */; };
@@ -47,11 +50,14 @@
 		0739C30EB01B17F65A09622B /* SetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetView.swift; sourceTree = "<group>"; };
 		0EF19A45A446759D5A06581E /* Playground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playground.swift; sourceTree = "<group>"; };
 		0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensEngineTests.swift; sourceTree = "<group>"; };
+		1333ACC5522C98EAAB7F599F /* FilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterBar.swift; sourceTree = "<group>"; };
 		190B6319A33F446C461B1F70 /* ReadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingView.swift; sourceTree = "<group>"; };
+		1A23618E9F79A2D3F1F2A1A1 /* Finder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Finder.swift; sourceTree = "<group>"; };
 		274C50217AF2739DFFFEA384 /* ArticleTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleTemplate.swift; sourceTree = "<group>"; };
 		2A800DE57A154D964A780F27 /* Bench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bench.swift; sourceTree = "<group>"; };
 		366C8EEFF62B64D9A353D0A3 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		371548664C8BCD8568AEC37D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		382020E250E4336580BD7B20 /* FinderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderTests.swift; sourceTree = "<group>"; };
 		383DFDA5412103E4B0F4E62E /* FontLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontLoader.swift; sourceTree = "<group>"; };
 		4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FontDropTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		52F2FED0504D056B840CF694 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -102,6 +108,7 @@
 		8DE61A4CEAF1A615A7BDECC5 /* FontDropTests */ = {
 			isa = PBXGroup;
 			children = (
+				382020E250E4336580BD7B20 /* FinderTests.swift */,
 				7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */,
 				0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */,
 			);
@@ -133,6 +140,8 @@
 				366C8EEFF62B64D9A353D0A3 /* Components.swift */,
 				AF45315ED86D1A62A42E9D5D /* DisplayView.swift */,
 				5460F3400E3C5449D6C9F614 /* FaceText.swift */,
+				1333ACC5522C98EAAB7F599F /* FilterBar.swift */,
+				1A23618E9F79A2D3F1F2A1A1 /* Finder.swift */,
 				74898072DE04330A09146301 /* FontDropApp.swift */,
 				383DFDA5412103E4B0F4E62E /* FontLoader.swift */,
 				E0868E170DE9E1D9990C8DDB /* Lenses.swift */,
@@ -272,6 +281,8 @@
 				BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */,
 				A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */,
 				73C81E98F42FACB352C5E62C /* FaceText.swift in Sources */,
+				111EF9F312EE5025D2EA7496 /* FilterBar.swift in Sources */,
+				66107F14F2028123D56CC163 /* Finder.swift in Sources */,
 				1ECCE961F8D70A1A21B78FA9 /* FontDropApp.swift in Sources */,
 				0767A49B10332718FAE300E6 /* FontLoader.swift in Sources */,
 				296B562B4E14FC3E54CF24AF /* HeroTemplate.swift in Sources */,
@@ -292,6 +303,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				858AF1009D078B080B14624C /* FinderTests.swift in Sources */,
 				119C0B28D1FCE012A42E1843 /* FlowTests.swift in Sources */,
 				1F182ADA6660560FBA4B31A4 /* LensEngineTests.swift in Sources */,
 			);
