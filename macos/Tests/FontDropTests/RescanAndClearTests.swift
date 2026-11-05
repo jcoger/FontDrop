@@ -16,7 +16,7 @@ final class RescanAndClearTests: XCTestCase {
 
     private func family(_ name: String, id: String) -> FamilySummary {
         FamilySummary(name: name, filePath: "/nonexistent/\(name).otf", fontId: id, styleCount: 1, skeleton: "geometric",
-                      serif: false, isTrial: false, foundryUrl: nil, vendor: nil)
+                      serif: false, isTrial: false, foundryUrl: nil, vendor: nil, foundry: nil)
     }
 
     // MARK: Reading after a rescan

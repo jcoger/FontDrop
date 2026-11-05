@@ -21,6 +21,11 @@ struct FontDropApp: App {
         .commands {
             // One window: a second one would share this model and run the open and rescan again.
             CommandGroup(replacing: .newItem) {}
+            // File > Export: the same five items as the Set bar. Disabled until both faces are picked.
+            CommandGroup(replacing: .importExport) {
+                Menu(Lexicon.Export.menu) { ExportMenuItems(shortcuts: true).environment(model) }
+                    .disabled(!model.canExport)
+            }
             // Command-1 Display, command-2 Text, command-3 Set. The menu lists them.
             CommandMenu(Lexicon.goMenu) {
                 ForEach(Screen.sidebar) { screen in

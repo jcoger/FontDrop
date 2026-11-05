@@ -324,6 +324,8 @@ pub struct FamilyAgg {
     pub is_trial: bool,
     pub foundry_url: Option<String>,
     pub vendor: Option<String>,
+    /// The foundry name read from the font files, when any file carries one.
+    pub foundry: Option<String>,
     pub entry: FamilyEntry,
     /// Lowercased family, foundry, vendor and designer text for search.
     haystack: String,
@@ -348,6 +350,7 @@ struct Acc {
     traits: HashSet<Trait>,
     any_url: Option<String>,
     any_vendor: Option<String>,
+    any_foundry: Option<String>,
     hay: HashSet<String>,
 }
 
@@ -446,6 +449,9 @@ pub fn load_families(conn: &Connection) -> Result<Vec<FamilyAgg>, rusqlite::Erro
         if let Some(v) = vendor.as_ref().filter(|v| !v.is_empty()) {
             acc.any_vendor.get_or_insert_with(|| v.clone());
         }
+        if let Some(f) = foundry.as_ref().map(|f| f.trim()).filter(|f| !f.is_empty()) {
+            acc.any_foundry.get_or_insert_with(|| f.to_string());
+        }
         for text in [foundry.as_deref(), designer.as_deref(), vendor.as_deref()].into_iter().flatten() {
             if !text.is_empty() { acc.hay.insert(text.to_lowercase()); }
         }
@@ -504,6 +510,7 @@ pub fn load_families(conn: &Connection) -> Result<Vec<FamilyAgg>, rusqlite::Erro
                 is_trial: acc.traits.contains(&Trait::Trial),
                 foundry_url: b.url.filter(|u| !u.is_empty()).or(acc.any_url),
                 vendor: b.vendor.filter(|v| !v.is_empty()).or(acc.any_vendor),
+                foundry: acc.any_foundry.take(),
                 name,
                 file_path: b.path,
                 font_id: b.id,

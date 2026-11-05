@@ -29,6 +29,7 @@ struct SetView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.stage.color)
+        .overlay(alignment: .top) { SetBar() }
         // The saved style (a heavy cut, say) may not be loaded yet. Without its file the text draws invisibly.
         .task(id: "\(model.displayFamily?.name ?? "")/\(model.readingFamily?.name ?? "")") {
             await model.preloadStyles(of: [model.displayFamily?.name, model.readingFamily?.name].compactMap { $0 })
@@ -49,7 +50,8 @@ struct SetView: View {
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 18)
                 ForEach(ScaleStep.stageOrder) { step in
-                    row(step, sizes: sizes, display: (display.name, displayFace), text: (reading.name, textFace),
+                    row(step, sizes: sizes, display: (Lexicon.SetScreen.faceAndStyle(display.name, model.styleLabel(displayFace, family: display.name)), displayFace),
+                        text: (Lexicon.SetScreen.faceAndStyle(reading.name, model.styleLabel(textFace, family: reading.name)), textFace),
                         specWidth: specWidth, stacked: stacked, tick: tick)
                 }
                 scaledNote(sizes: sizes, display: displayFace, text: textFace, specWidth: specWidth)
@@ -67,17 +69,7 @@ struct SetView: View {
 
     // MARK: Rows
 
-    private func line(for step: ScaleStep) -> String {
-        switch step {
-        case .display: Lexicon.SetScreen.displayLine
-        case .h1: Lexicon.SetScreen.h1Line
-        case .h2: Lexicon.SetScreen.h2Line
-        case .h3: Lexicon.SetScreen.h3Line
-        case .lead: Lexicon.SetScreen.leadLine
-        case .body: SampleCopy.paragraphs.joined(separator: " ")
-        case .caption: Lexicon.SetScreen.captionLine
-        }
-    }
+    private func line(for step: ScaleStep) -> String { step.sampleLine }
 
     private func row(_ step: ScaleStep, sizes: SetSizes, display: (name: String, face: FaceSpec), text: (name: String, face: FaceSpec),
                      specWidth: CGFloat, stacked: Bool, tick: Int) -> some View {
@@ -191,5 +183,43 @@ struct SetRowPlan {
         // A little under the full width: the widest line must not touch the edge.
         let f = fit(room: specWidth * 0.98, width: { lineWidth(at: $0) })
         return SetRowPlan(leading: TextRules.headingLeading(step: step.rawValue), factor: f, drawnPt: pt * f, drawnWidth: nil)
+    }
+}
+
+/// The bar over the Set stage: the Export menu, a line that says what an export did, and the inspector toggle.
+struct SetBar: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Spacer(minLength: 8)
+            if let note = model.exportNotice {
+                Text(note).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    .foregroundStyle(theme.textPrimary.color)
+                    .padding(.horizontal, 14).frame(height: 36)
+                    .glass(\.glassBar, in: Capsule(), bar: true)
+                    .transition(.opacity)
+                    .accessibilityLabel(note)
+            }
+            Menu {
+                ExportMenuItems()
+            } label: {
+                HStack(spacing: 6) {
+                    Text(Lexicon.Export.menu).font(.system(size: 13)).foregroundStyle(theme.textPrimary.color)
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+                }
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+            .padding(.horizontal, 14).frame(height: 36)
+            .glass(\.glassBar, in: Capsule(), bar: true)
+            .disabled(!model.canExport)
+            .help(model.exportReason ?? Lexicon.Export.menu)
+            .accessibilityLabel(Lexicon.Export.menu)
+            InspectorToggle()
+        }
+        .padding(.horizontal, 16).padding(.top, 16)
+        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeOut(duration: 0.15), value: model.exportNotice)
     }
 }

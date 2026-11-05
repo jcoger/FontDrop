@@ -339,6 +339,9 @@ final class AppModel {
     private(set) var choicePulse = 0
 
     var errorMessage: String?
+    /// A short line in the Set bar after an export ("CSS copied"). Clears itself.
+    var exportNotice: String?
+    var exportNoticeTask: Task<Void, Never>?
 
     /// A suite shared by every throwaway run, emptied each time it is opened, so a test or screenshot run never
     /// reads or writes the real app's preferences (last brand, remembered template, filters, variants).
