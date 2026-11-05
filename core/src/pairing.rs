@@ -93,6 +93,10 @@ pub struct FontData {
     pub wght_axis_max: i64,
     /// A variable file with an `ital` or `slnt` axis.
     pub ital_axis: bool,
+    /// Thickest over thinnest stroke of the "O", measured from the outlines (classifier.rs). None = not measured.
+    pub stroke_contrast_ratio: Option<f64>,
+    /// Mean advance of "n", "o" and "H" over the em (classifier.rs). None = not measured.
+    pub advance_ratio: Option<f64>,
 }
 
 
@@ -297,7 +301,7 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
                     optical_role, superfamily_group, superfamily_role,
                     weight_range_min, weight_range_max, spacing_personality, width_class,
                     vendor_id, file_path, style, COALESCE(is_variable, 0),
-                    COALESCE(wght_axis_max, 0), COALESCE(ital_axis, 0)
+                    COALESCE(wght_axis_max, 0), COALESCE(ital_axis, 0), stroke_contrast_ratio, advance_ratio
              FROM fonts",
         )
         .map_err(|e| e.to_string())?;
@@ -330,6 +334,8 @@ pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
             is_variable: row.get::<_, i64>(22)? != 0,
             wght_axis_max: row.get(23)?,
             ital_axis: row.get::<_, i64>(24)? != 0,
+            stroke_contrast_ratio: row.get(25)?,
+            advance_ratio: row.get(26)?,
         })
     })
         .map_err(|e| e.to_string())?
@@ -663,6 +669,8 @@ mod tests {
             is_variable: false,
             wght_axis_max: 0,
             ital_axis: false,
+            stroke_contrast_ratio: None,
+            advance_ratio: None,
         }
     }
 
@@ -839,6 +847,8 @@ mod tests {
             f.is_variable = self.is_variable;
             f.wght_axis_max = self.wght_axis_max;
             f.ital_axis = self.ital_axis;
+            f.stroke_contrast_ratio = self.stroke_contrast_ratio;
+            f.advance_ratio = self.advance_ratio;
             f.style = self.style.clone();
             f
         }
@@ -1031,7 +1041,30 @@ mod tests {
             println!("  {:<24} {}  passed: {}  | failed: {}", f.font_family, if w.is { "WORKHORSE" } else { "no       " }, w.passed.join(", "), w.failed.join(", "));
         }
         println!("  {yes} of {total} are workhorses");
+        println!("\nMeasures of the regular face (advance = mean of n, o, H over the em; contrast = thickest / thinnest stroke)");
+        println!("  {:<22} {:>7} {:>8} {:>8} {:>8}  {:<9}  {}", "family", "advance", "contrast", "x-height", "spacing", "workhorse", "failed | unknown");
+        for name in ["Timeless Sans", "Timeless Serif", "PP Museum", "PP Neue Montreal", "PP Mori", "Source Serif 4", "Times New Roman",
+                     "PP Pangaia", "Zodiak", "PP Neue Machina", "OT Jubilee Sapphire", "OT Jubilee Platinum", "OT Jubilee Diamond",
+                     "OT Jubilee Golden", "Agrandir", "Asap", "Georgia", "Test Domaine Text"] {
+            let files: Vec<&FontData> = all.iter().filter(|f| f.font_family == name).collect();
+            let Some(rep) = files.iter().filter(|f| !crate::names::is_slanted(&f.file_name, &f.style)).min_by_key(|f| (f.weight as i32 - 400).abs()) else {
+                println!("  {name:<22} not installed");
+                continue;
+            };
+            let w = &horses[name];
+            let fmt = |v: Option<f64>| v.map(|x| format!("{x:.3}")).unwrap_or("-".into());
+            println!("  {:<22} {:>7} {:>8} {:>8} {:>8}  {:<9}  {} | {}", name, fmt(rep.advance_ratio),
+                     rep.stroke_contrast_ratio.map(|c| format!("{c:.2}")).unwrap_or("-".into()), fmt(rep.x_height_ratio),
+                     rep.spacing_personality.clone().unwrap_or("-".into()), if w.is { "WORKHORSE" } else { "no" },
+                     w.failed.join(", "), w.unknown.join(", "));
+        }
         let families: HashSet<&str> = all.iter().map(|f| f.font_family.as_str()).collect();
+        let unknown_families = families.iter().filter(|f| !horses[**f].unknown.is_empty()).count();
+        println!("\n{unknown_families} of {} families have a signal that could not be read (counted as not a workhorse)", families.len());
+        for signal in ["normal width", "text x-height", "moderate contrast"] {
+            let n = families.iter().filter(|f| horses[**f].unknown.contains(&signal)).count();
+            println!("  unread {signal}: {n} families");
+        }
         let hidden = crate::finder::hidden_font_ids(&conn);
         let horse_count = families.iter().filter(|f| horses[**f].is).count();
         println!("\n{horse_count} of {} families are workhorses", families.len());
@@ -1285,7 +1318,7 @@ mod tests {
                 superfamily_role TEXT, weight_range_min INTEGER, weight_range_max INTEGER,
                 spacing_personality TEXT, width_class TEXT, vendor_id TEXT,
                 file_path TEXT, style TEXT, is_variable INTEGER,
-                wght_axis_max INTEGER, ital_axis INTEGER
+                wght_axis_max INTEGER, ital_axis INTEGER, stroke_contrast_ratio REAL, advance_ratio REAL
             );
             INSERT INTO fonts (font_id, font_family, skeleton, flesh_contrast, flesh_serif, weight, file_name, file_path, style)
             VALUES ('a','Alpha','geometric','linear',0,400,'Alpha.ttf','/x/Alpha.ttf','normal');",

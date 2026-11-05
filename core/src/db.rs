@@ -161,6 +161,9 @@ const MIGRATIONS: &[&str] = &[
     // variable rows are re-read for it.
     "ALTER TABLE fonts ADD COLUMN wght_axis_max INTEGER;",
     "ALTER TABLE fonts ADD COLUMN ital_axis INTEGER;",
+    // Mean advance of "n", "o" and "H" over the em (classifier.rs), a measured width. NULL = not measured; the
+    // classifier version bump measures every file once.
+    "ALTER TABLE fonts ADD COLUMN advance_ratio REAL;",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -417,7 +420,7 @@ fn drop_stale_twins(conn: &Connection, scanned: &[ScannedFont]) {
 
 /// Bump when the classifier's rules change: every non-override font is then
 /// reclassified once on the next launch instead of only the 'unknown' ones.
-pub const CLASSIFIER_VERSION: i64 = 8;
+pub const CLASSIFIER_VERSION: i64 = 9;      // 9: width (advance_ratio) is measured too
 
 fn meta_get(conn: &Connection, key: &str) -> Option<String> {
     conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| r.get(0)).ok()
@@ -466,7 +469,7 @@ pub fn classify_all(conn: &Connection) {
 
         conn.execute(
             "UPDATE fonts SET skeleton = ?1, flesh_contrast = ?2, flesh_serif = ?3, \
-             stroke_contrast_ratio = ?4, classification_reason = ?5, updated_at = ?6 \
+             stroke_contrast_ratio = ?4, classification_reason = ?5, updated_at = ?6, advance_ratio = ?8 \
              WHERE font_id = ?7",
             params![
                 result.skeleton,
@@ -476,6 +479,7 @@ pub fn classify_all(conn: &Connection) {
                 result.reason,
                 now,
                 font_id,
+                result.advance_ratio,
             ],
         )
         .ok();

@@ -3,15 +3,20 @@
 //!
 //! The answer is a few named signals, not a score, so it can be explained in one line:
 //!   text family   4 or more weights (or a `wght` range that spans 300 to 700) and a true italic
-//!   normal width  not condensed, compressed, extended or expanded (width class, or the name)
+//!   normal width  measured: the mean advance of "n", "o" and "H" over the em is 0.56 to 0.72 (a condensed face is
+//!                 under 0.5, an extended one over 0.75). The width class and the name can only fail it.
 //!   text cut      no Display, Poster, Headline, Deck or Banner in the name, and none of the width words
-//!   x-height      in the comfortable text range (0.44 to 0.58 of the em), where it was measured
-//!   moderate contrast   not a high-contrast face, where it was measured
-//!   normal spacing      not tight or open: faces drawn for display sizes are spaced for them, where it was measured
+//!   text x-height measured: 0.44 to 0.58 of the em
+//!   moderate contrast   measured: the thickest stroke of the "O" is at most 4.5 times the thinnest. Didone and
+//!                 other high-contrast faces are over 5.
 //!   widely used   in the top of Google Fonts' popularity rank (a lift, see below)
 //!
-//! A family is a workhorse when it has all of the signals above except "widely used". A widely used family may be a workhorse
-//! on a fuller list of weights alone: two weights and an italic are enough for a face most sites already trust.
+//! A signal is passed, failed or UNKNOWN. A file that was not measured is unknown, and unknown is never a pass:
+//! a family with an unknown core signal is not a workhorse, and says which signal it could not read.
+//!
+//! A family is a workhorse when every signal above except "widely used" passes. A widely used family may be a
+//! workhorse on a fuller list of weights alone: two weights and an italic are enough for a face most sites trust.
+//! Faces not on Google (most of a designer's library) get no lift; they stand on the measured signals.
 
 use crate::pairing::FontData;
 use rusqlite::Connection;
@@ -21,6 +26,15 @@ use std::collections::HashMap;
 pub const WIDELY_USED_RANK: u32 = 150;
 /// The x-height range of a text face, as a fraction of the em.
 pub const TEXT_X_HEIGHT: std::ops::RangeInclusive<f64> = 0.44..=0.58;
+/// The mean advance of "n", "o" and "H" over the em for a text width: from the library's lower quartile (0.56) to its 90th
+/// percentile (0.72). The median is 0.61; the 10th percentile is 0.48 (condensed). Times New Roman measures 0.57.
+pub const TEXT_ADVANCE: std::ops::RangeInclusive<f64> = 0.56..=0.72;
+/// The middle of the library's advance measure; the tie-break for a family with several widths.
+pub const LIBRARY_MEDIAN_ADVANCE: f64 = 0.61;
+/// The most contrast (thickest over thinnest stroke) a text face has. Library median 1.4, 75th percentile 2.9, 90th 5.5.
+/// The usual text serifs measure 2 to 3.5 (Source Serif 4 2.2, Timeless Serif 3.2, Times New Roman 3.2); 4 and over is a
+/// high-contrast (Didone-like) cut.
+pub const TEXT_CONTRAST_MAX: f64 = 4.0;
 
 /// Words in a family or file name that mark a cut for display sizes or a width a paragraph cannot use.
 const DISPLAY_WORDS: &[&str] = &["display", "poster", "headline", "deck", "banner"];
@@ -32,8 +46,10 @@ pub struct Workhorse {
     pub is: bool,
     /// The signals the family has, by name, in a fixed order.
     pub passed: Vec<&'static str>,
-    /// The signals it lacks.
+    /// The signals it fails.
     pub failed: Vec<&'static str>,
+    /// The signals that could not be read, because the file was never measured. Never counted as a pass.
+    pub unknown: Vec<&'static str>,
 }
 
 fn words(name: &str) -> Vec<String> {
@@ -50,14 +66,31 @@ fn has_word(text: &str, list: &[&str]) -> bool {
 pub fn assess(files: &[&FontData], popularity: Option<u32>) -> Workhorse {
     let mut passed: Vec<&'static str> = Vec::new();
     let mut failed: Vec<&'static str> = Vec::new();
-    let mut put = |ok: bool, name: &'static str| if ok { passed.push(name) } else { failed.push(name) };
+    let mut unknown: Vec<&'static str> = Vec::new();
+    // Some(true) passes, Some(false) fails, None is unknown: never a pass.
+    let mut put = |sig: Option<bool>, name: &'static str| match sig {
+        Some(true) => passed.push(name),
+        Some(false) => failed.push(name),
+        None => unknown.push(name),
+    };
     if files.is_empty() {
-        return Workhorse { is: false, passed, failed: vec!["text family"] };
+        return Workhorse { is: false, passed, failed: vec!["text family"], unknown };
     }
 
     // The regular, upright file stands for the family: nearest weight 400, not slanted.
     let upright = |f: &&&FontData| !crate::names::is_slanted(&f.file_name, &f.style);
-    let rep = files.iter().filter(upright).min_by_key(|f| (f.weight as i32 - 400).abs()).or_else(|| files.first()).copied().unwrap();
+    // A family with several widths (PP Right Grotesk: Tall, Compact, Spatial) is judged by its width nearest the
+    // library's median, since that is the style a paragraph would use.
+    let by_width = |f: &&&FontData| f.advance_ratio.map_or(f64::MAX, |a| (a - LIBRARY_MEDIAN_ADVANCE).abs());
+    let rep = files
+        .iter()
+        .filter(upright)
+        .min_by(|a, b| {
+            ((a.weight as i32 - 400).abs(), by_width(a)).partial_cmp(&((b.weight as i32 - 400).abs(), by_width(b))).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .or_else(|| files.first())
+        .copied()
+        .unwrap();
 
     // Text family: enough weights and a real italic.
     let mut weights: Vec<u16> = files.iter().map(|f| f.weight).collect();
@@ -69,29 +102,40 @@ pub fn assess(files: &[&FontData], popularity: Option<u32>) -> Workhorse {
     });
     let full_weights = weights.len() >= 4 || span;
     let italic = files.iter().any(|f| crate::names::is_slanted(&f.file_name, &f.style) || f.ital_axis);
-    let text_family = full_weights && italic;
+    // The four text styles (regular, italic, bold, bold italic) are enough too: Times New Roman and Georgia ship
+    // exactly those, and nobody doubts them for a paragraph.
+    let style = |slanted: bool, bold: bool| {
+        files.iter().any(|f| {
+            let is_slanted = crate::names::is_slanted(&f.file_name, &f.style);
+            let reaches_bold = f.is_variable && f.wght_axis_max >= 600;
+            let slant_ok = if slanted { is_slanted || (f.is_variable && f.ital_axis) } else { !is_slanted || (f.is_variable && f.ital_axis) };
+            slant_ok && if bold { f.weight >= 600 || reaches_bold } else { f.weight < 600 || reaches_bold }
+        })
+    };
+    let four_styles = style(false, false) && style(false, true) && style(true, false) && style(true, true);
+    let text_family = (full_weights && italic) || four_styles;
 
-    // Width: the measured class where there is one, and the names.
-    let width_ok = !matches!(rep.width_class.as_deref(), Some("condensed" | "compressed" | "expanded" | "extended"))
-        && !has_word(&rep.font_family, WIDTH_WORDS)
-        && !has_word(&rep.file_name, WIDTH_WORDS);
+    // Width: measured. The class and the names can fail it (a face named Condensed is not normal width whatever
+    // the outlines say), but only a measurement passes it.
+    let named_wide_or_narrow = matches!(rep.width_class.as_deref(), Some("condensed" | "compressed" | "expanded" | "extended"))
+        || has_word(&rep.font_family, WIDTH_WORDS)
+        || has_word(&rep.file_name, WIDTH_WORDS);
+    let width = if named_wide_or_narrow { Some(false) } else { rep.advance_ratio.map(|a| TEXT_ADVANCE.contains(&a)) };
     let not_display = !has_word(&rep.font_family, DISPLAY_WORDS) && !has_word(&rep.file_name, DISPLAY_WORDS);
-    let x_height_ok = rep.x_height_ratio.map_or(true, |x| TEXT_X_HEIGHT.contains(&x));
-    let contrast_ok = rep.flesh_contrast != "high";
-    let spacing_ok = rep.spacing_personality.as_deref().map_or(true, |s| s == "normal");
+    let x_height = rep.x_height_ratio.map(|x| TEXT_X_HEIGHT.contains(&x));
+    let contrast = rep.stroke_contrast_ratio.map(|c| c <= TEXT_CONTRAST_MAX);
     let widely_used = popularity.map_or(false, |r| r <= WIDELY_USED_RANK);
 
-    put(text_family, "text family");
-    put(width_ok, "normal width");
-    put(not_display, "text cut");
-    put(x_height_ok, "text x-height");
-    put(contrast_ok, "moderate contrast");
-    put(spacing_ok, "normal spacing");
-    put(widely_used, "widely used");
+    put(Some(text_family), "text family");
+    put(width, "normal width");
+    put(Some(not_display), "text cut");
+    put(x_height, "text x-height");
+    put(contrast, "moderate contrast");
+    put(Some(widely_used), "widely used");
 
-    let core = width_ok && not_display && x_height_ok && contrast_ok && spacing_ok;
+    let core = width == Some(true) && not_display && x_height == Some(true) && contrast == Some(true);
     let lifted = widely_used && weights.len() >= 2 && italic;
-    Workhorse { is: core && (text_family || lifted), passed, failed }
+    Workhorse { is: core && (text_family || lifted), passed, failed, unknown }
 }
 
 /// Google's popularity rank by normalised family name. Empty when the list was never fetched.
@@ -145,7 +189,7 @@ mod tests {
             superfamily_role: None,
             weight_range_min: None,
             weight_range_max: None,
-            spacing_personality: None,
+            spacing_personality: Some("normal".into()),
             width_class: None,
             vendor_id: None,
             file_path: format!("/x/{name}"),
@@ -153,6 +197,8 @@ mod tests {
             is_variable: false,
             wght_axis_max: 0,
             ital_axis: false,
+            stroke_contrast_ratio: Some(1.5),
+            advance_ratio: Some(0.62),
         }
     }
 
@@ -209,22 +255,56 @@ mod tests {
         for f in &mut tiny { f.x_height_ratio = Some(0.36); }
         assert!(!assess_owned(&tiny, None).is);
         let mut didone = text_family("Acme Didone");
-        for f in &mut didone { f.flesh_contrast = "high".into(); }
+        for f in &mut didone { f.stroke_contrast_ratio = Some(6.0); }
         assert!(!assess_owned(&didone, None).is);
     }
 
+    /// Missing data is unknown, and unknown is never a pass: a family whose file was never measured is not a workhorse.
     #[test]
-    fn tight_or_open_spacing_marks_a_display_face() {
-        for spacing in ["tight", "open"] {
-            let mut fam = text_family("Acme Spaced");
-            for f in &mut fam { f.spacing_personality = Some(spacing.into()); }
-            let w = assess_owned(&fam, None);
-            assert!(!w.is, "{spacing}");
-            assert!(w.failed.contains(&"normal spacing"));
+    fn an_unmeasured_signal_is_unknown_and_never_a_pass() {
+        let measures: [(&str, fn(&mut FontData)); 3] = [
+            ("moderate contrast", |f| f.stroke_contrast_ratio = None),
+            ("normal width", |f| f.advance_ratio = None),
+            ("text x-height", |f| f.x_height_ratio = None),
+        ];
+        for (signal, clear) in measures {
+            let mut fam = text_family("Acme Unread");
+            for f in &mut fam { clear(f); }
+            let w = assess_owned(&fam, Some(1));
+            assert!(!w.is, "{signal}: unknown must not pass, even for a popular family");
+            assert!(w.unknown.contains(&signal), "{signal}");
+            assert!(!w.passed.contains(&signal) && !w.failed.contains(&signal), "{signal}");
         }
-        let mut normal = text_family("Acme Normal");
-        for f in &mut normal { f.spacing_personality = Some("normal".into()); }
-        assert!(assess_owned(&normal, None).is);
+        assert!(assess_owned(&text_family("Acme Read"), None).unknown.is_empty());
+    }
+
+    #[test]
+    fn width_and_contrast_thresholds_come_from_the_measures() {
+        let at = |advance: f64, contrast: f64| {
+            let mut fam = text_family("Acme Measured");
+            for f in &mut fam { f.advance_ratio = Some(advance); f.stroke_contrast_ratio = Some(contrast); }
+            assess_owned(&fam, None)
+        };
+        assert!(at(0.62, 1.2).is && at(0.62, 3.2).is, "a Times-like contrast of 3.2 is moderate");
+        assert!(at(0.62, 4.0).is, "the limit is included");
+        assert!(!at(0.62, 4.36).is && !at(0.62, 8.3).is, "4.4 and 8.3 are high-contrast cuts");
+        assert!(!at(0.357, 1.2).is, "a compressed face (0.36) is not normal width");
+        assert!(!at(0.80, 1.2).is, "an extended face (0.80) is not");
+        assert!(!at(0.54, 1.2).is, "0.54 is narrower than a quarter of the library");
+        assert!(at(0.56, 1.2).is && at(0.72, 1.2).is, "the band includes its ends");
+    }
+
+    #[test]
+    fn the_four_text_styles_make_a_text_family() {
+        // Regular, italic, bold, bold italic: two weights, as Times New Roman ships.
+        let fam = vec![
+            file("Acme Classic", "Classic-Regular.otf", 400, "normal"),
+            file("Acme Classic", "Classic-Italic.otf", 400, "italic"),
+            file("Acme Classic", "Classic-Bold.otf", 700, "normal"),
+            file("Acme Classic", "Classic-BoldItalic.otf", 700, "italic"),
+        ];
+        assert!(assess_owned(&fam, None).is);
+        assert!(!assess_owned(&fam[..3], None).is, "no bold italic, and not enough weights");
     }
 
     #[test]

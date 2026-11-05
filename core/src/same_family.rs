@@ -347,6 +347,8 @@ mod tests {
             is_variable: false,
             wght_axis_max: 0,
             ital_axis: false,
+            stroke_contrast_ratio: None,
+            advance_ratio: None,
         }
     }
 
