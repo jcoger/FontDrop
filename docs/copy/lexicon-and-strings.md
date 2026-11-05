@@ -77,7 +77,7 @@ Source citations shown to designers use author names, not codes: "Latin, Typewol
 | 4.3 | insp.row.strength | Guideline / Shortcut | **Common advice / Rule of thumb** (2nd line, quiet) |
 | 4.4 | insp.row.source | LAT ch.5; TWC 69-70; BON p.145; MAY | **Latin, Typewolf, Bonneville, Mayer** |
 | 4.5 | insp.row.notscored | Your call | **Not scored. Your choice.** |
-| 4.6 | insp.shortlist.title | Shortlist · Reading | **Shortlist** (role is already in the sidebar) |
+| 4.6 | insp.shortlist.title | Shortlist · Reading | ~~Shortlist~~ cut from the Text inspector (11.x). The shortlist itself stays on the stage bar. Done in R1 |
 | 4.7 | insp.shortlist.add | Add to shortlist | **Add to shortlist** |
 | 4.8 | insp.shortlist.remove | (icon only) | Label for VoiceOver: **Remove [Family] from shortlist** |
 | 4.9 | insp.shortlist.empty | — | **Nothing here yet. Add faces you want to compare.** |
@@ -90,8 +90,8 @@ Source citations shown to designers use author names, not codes: "Latin, Typewol
 |---|---|---|---|---|
 | 5.1 | default | choose.display | **Use for Display** | Passes WYLTIWLT |
 | 5.2 | default | choose.reading | **Use for Reading** | |
-| 5.3 | success | choose.done.display | **Display face set** | Inspector, replaces the button. One delight beat: a check, no confetti |
-| 5.4 | success | choose.done.reading | **Reading face set** | |
+| 5.3 | success | choose.done.display | **Display face picked** | Inspector, replaces the button. One delight beat: a check, no confetti |
+| 5.4 | success | choose.done.reading | **Text face picked** | "set" was a verb. Set is now only the destination (17.9). Display reads **Display face picked** |
 | 5.5 | action | choose.undo | **Undo** | |
 | 5.6 | next | choose.next.display | **Find a Reading face** | Arrow icon carries direction; text stays plain |
 | 5.7 | next | choose.next.reading | **Set the type** | |
@@ -151,7 +151,7 @@ A fresh reader (working brand designer, no plan) read the rendered strings. Find
 | 7.15 | Sources as surnames: "Latin, Typewolf, Bonneville, Mayer" | Short titles: **Better Web Typography · Typewolf checklist · Smashing (Bonneville) · Smashing (Mayer)** · **Universal Principles of Typography** · **Flexible Typesetting** · **Typekit** | "Latin" read as the script; "Stocks" as finance. Full citations live in the README credits |
 | 7.16 | Strength words with no ranking | Help line under each: **Firm**: "Most sources agree." **Common advice**: "Several sources recommend it." **Rule of thumb**: "Helps, no guarantee." **Use with care**: "Sources disagree." | Reader couldn't rank Common advice vs Rule of thumb |
 | 7.17 | Licence **No trial marks** / **Trial** | **Not marked as trial** / **Trial version · License before you ship** | "Trial marks" read as watermarks. Still accurate: we only detect trial words |
-| 7.18 | Next step **Set the type** | **Next: sizes and spacing** | Says where it goes |
+| 7.18 | Next step **Set the type** | **Next: Set** | Names the destination (17.10). Was "Next: sizes and spacing" |
 | 7.19 | **3 hidden by your filters · Show all** | **3 hidden by your filters · Clear filters** | Two hidden counts; "Show all" was unclear about the 42 |
 | 7.20 | **42 hidden · Why?** | **42 not made for long text · Show them** (popover unchanged) | Separate control for the role rule |
 | 7.21 | **No matches with these filters. Show all** | **No matches with these filters. Clear filters** | Same as 7.19 |
@@ -260,7 +260,7 @@ Strings for the layout menu, the Colors button and popover, the color field and 
 | 10.10 | contrast.fine | **Fine for body text** | 4.5 or above. Check mark icon |
 | 10.11 | contrast.large | **Large text only** | 3 to 4.5. Exclamation icon |
 | 10.12 | contrast.low | **Too low to read** | Below 3. Stop icon. Each band has its own icon: meaning never rests on color alone |
-| 10.13 | saved | **Saved to Acme** | The brand's name. With no brand yet: **Saved to your brand** (the same fallback the Reading header uses) |
+| 10.13 | saved | ~~Saved to Acme~~ cut in R1 (17.8). Was **Saved to Acme** | The brand's name. With no brand yet: **Saved to your brand** (the same fallback the Reading header uses) |
 | 10.14 | brand.use | **Use brand colors** | Hidden. Appears only for a brand that has colors of its own. None do yet |
 
 ### 10.3 Color field
@@ -321,7 +321,7 @@ Reading is a list of faces beside a stage. Default surfaces carry the type and a
 | 11.17 | decide.hint | **↑ ↓ flips candidates in place** | |
 | 11.18 | decide.shortlist | **Add to shortlist · On shortlist** | |
 | 11.19 | decide.compare | **Compare shortlist (2)** | Shows with two or more on the shortlist |
-| 11.20 | decide.use | **Use for Reading** | Unchanged. After it: **Reading face set** · **Undo** · **Next: sizes and spacing** |
+| 11.20 | decide.use | **Use for Reading** | Unchanged. After it: **Text face picked** · **Undo** · **Next: Set**. The button reads **Use for Text** (17.1) |
 | 11.21 | compare.title | **Comparing 2 on your shortlist** | |
 | 11.22 | compare.use | **Use** | Above each board, next to the family name |
 | 11.23 | compare.back | **Back to one** | |
@@ -400,7 +400,7 @@ Template type is sized from the font by default ("Fit"). A brand can lock one bo
 | 14.7 | scale.readout.headline | **Headline 64 pt · 4.3× body** | Quiet caption under the controls, for the template on stage |
 | 14.8 | scale.readout.body | **Body 15 pt** | Same caption, second line |
 | 14.9 | scale.controlsOff | **Lock sizes to set the body size and ratio** | Help on the two controls while unlocked |
-| 14.10 | trim.group | **Scale and spacing** | Heading of the numbers group in a face's playground. Was "Size and spacing" |
+| 14.10 | trim.group | **Spacing and features** (17.4) | Heading of the numbers group in a face's playground. Was "Size and spacing" |
 | 14.11 | trim.label | **Trim** | Slider, 75% to 135%. Readout: **+8%**, **0%**, **-12%** |
 | 14.12 | trim.help | **Nudges every size this face gets in the templates** | Help on 14.11 |
 
@@ -456,6 +456,17 @@ The second job is **Text**, not Reading. On a poster the second face sets the cr
 | 17.6 | Hand off | **Export** | "Handoff" is also a macOS feature. The plans keep "Hand-off" as a round name only |
 | 17.7 | Display / Text (variable-font optical size switch) | **Optical size: Auto** | So Display and Text name only jobs. It already follows the point size |
 | 17.8 | Saved to Acme | cut | Collides with Saved (the star). A Mac app autosaves |
+| 17.9 | "set" as a verb: Reading face set, Set the colors the templates use, Lock sizes to set the body size | **picked**, **Choose**, **change** | Set is only the destination noun. Strings: "Text face picked", "Choose the colors the templates use", "Lock sizes to change the body size and ratio" |
+| 17.10 | Next: sizes and spacing (the door on the Text stage) | **Next: Set** | |
+| 17.11 | Sidebar: Brands, Type (Display, Reading, UI, Mono), Library (Saved), Set, Colors Parked | **Brands, then Display, Text, Set** | UI and Mono are gated off, not deleted. Saved stays a chip on the Display filter bar. Colors stays the Colors button on the Text stage |
+| 17.12 | Set row: no second line | **15 pt · 1.333**, or **Auto** while the scale is unlocked | Like Display and Text show their face |
+| 17.13 | Scale note "Sizes fit each font" | **Auto: sizes fit each font** | Scale mode Auto (17.3). The Fit to window zoom keeps "Fit" |
+| 17.14 | Display card badge Chosen | **Current** | 17.5 |
+| 17.15 | Export button, disabled, "Export arrives in a later wave" | hidden | Returns in R6 when it exports something. No roadmap text anywhere: Coming next, Nothing to inspect yet, Colors are parked are cut |
+| 17.16 | Set screen "Coming next. This is a plain specimen" | cut | Empty states say what to do, not what is planned |
+| 17.17 | Command menu | **Go**: Display (command-1), Text (command-2), Set (command-3) | |
+
+Status at R1: 17.1 to 17.17 are built. In code, the optical size slider (17.7) reads **Optical size** with **Auto** until the designer moves it. The Display/Text switch the lexicon mentions does not exist in the app yet; it lands with the Set screen (R5).
 
 Plain words. No em dashes.
 

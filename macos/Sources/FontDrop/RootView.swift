@@ -11,7 +11,8 @@ struct RootView: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 235, max: 300)
         } detail: {
             ContentRouter()
-                .inspector(isPresented: $model.showInspector) {
+                .inspector(isPresented: Binding(get: { model.showInspector && model.screen != .set },
+                                                set: { model.showInspector = $0 })) {
                     InspectorRouter()
                         .inspectorColumnWidth(min: 280, ideal: 330, max: 460)
                 }
@@ -21,13 +22,13 @@ struct RootView: View {
         .navigationSubtitle(subtitle)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button {} label: { Label("Export", systemImage: "square.and.arrow.up") }
-                    .disabled(true)
-                    .help("Export arrives in a later wave")
-                Button { model.inspectorTouched = true; model.showInspector.toggle() } label: {
-                    Label("Inspector", systemImage: "sidebar.trailing")
+                // Export returns in round R6, when it has something to export. No dead button until then.
+                if model.screen != .set {
+                    Button { model.inspectorTouched = true; model.showInspector.toggle() } label: {
+                        Label("Inspector", systemImage: "sidebar.trailing")
+                    }
+                    .help("Show or hide the inspector")
                 }
-                .help("Show or hide the inspector")
             }
         }
         .background(GeometryReader { geo in
@@ -54,8 +55,8 @@ struct RootView: View {
         switch model.screen {
         case .display, .ui, .mono: "\(model.screen.title) \u{00B7} \(model.visibleFamilies.count) families"
         case .reading: Lexicon.Reading.subtitle(model.shortlist("reading").count)
-        case .set: "Set"
-        case .colors: "Colors"
+        case .set: Lexicon.Scale.sidebarLine(model.scale)
+        case .colors: ""
         }
     }
 
@@ -83,7 +84,7 @@ struct ContentRouter: View {
         case .display, .ui, .mono: FamilyPickerView(screen: model.screen)
         case .reading: ReadingView()
         case .set: SetView()
-        case .colors: ContentUnavailableView("Colors are parked", systemImage: "circle.lefthalf.filled")
+        case .colors: EmptyView()
         }
     }
 }
@@ -97,8 +98,7 @@ struct InspectorRouter: View {
         case .display, .ui, .mono: FamilyInspector(screen: model.screen)
         case .reading: ReadingInspector()
         case .set, .colors:
-            ContentUnavailableView("Nothing to inspect yet", systemImage: "sidebar.trailing",
-                                   description: Text("The Set inspector arrives with the Set tool."))
+            EmptyView()
         }
     }
 }

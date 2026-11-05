@@ -65,7 +65,6 @@ struct ColorsPopover: View {
                 }
             }
             contrast(p)
-            footer
         }
         .padding(14)
         .frame(width: 300)
@@ -142,7 +141,7 @@ struct ColorsPopover: View {
         .accessibilityValue(open ? "expanded" : "collapsed")
     }
 
-    // MARK: Contrast and footer
+    // MARK: Contrast
 
     private func contrast(_ p: TemplatePalette) -> some View {
         let band = p.contrastBand
@@ -158,13 +157,6 @@ struct ColorsPopover: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// "Use brand colors" appears only for a brand that has colors of its own. None do yet, so it is hidden.
-    private var footer: some View {
-        HStack {
-            Spacer()
-            Text(Lexicon.Colors.savedTo(model.brand?.name ?? "your brand")).font(.caption).foregroundStyle(.secondary)
-        }
-    }
 }
 
 /// A popover window can open with the system appearance while the app is set to the other one

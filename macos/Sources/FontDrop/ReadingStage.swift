@@ -309,7 +309,7 @@ struct DecideBar: View {
         return HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill").font(.title3).foregroundStyle(Color.accentColor)
                 .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : model.choicePulse)
-            Text(justChosen ? Lexicon.setDone("reading") : Lexicon.current("reading")).font(.callout.weight(.semibold)).lineLimit(1)
+            Text(justChosen ? Lexicon.picked("reading") : Lexicon.current("reading")).font(.callout.weight(.semibold)).lineLimit(1)
             if justChosen { Button(Lexicon.undo) { Task { await model.undo("reading") } }.buttonStyle(.link) }
             Button(Lexicon.clearFace("reading")) { Task { await model.clear("reading") } }
                 .buttonStyle(.link).foregroundStyle(.secondary).font(.caption).lineLimit(1)

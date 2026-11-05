@@ -1,8 +1,8 @@
 import FontDropCore
 import SwiftUI
 
-/// The Reading inspector, in the order the audit set: why it pairs, the Reading playground (open),
-/// the Display playground (collapsed), the shortlist. Shortlist and "Use for Reading" live on the stage.
+/// The Text inspector, in the order the audit set: why it pairs, the Text playground (open),
+/// the Display playground (collapsed). The shortlist and "Use for Text" live on the stage.
 struct ReadingInspector: View {
     @Environment(AppModel.self) private var model
 
@@ -18,7 +18,6 @@ struct ReadingInspector: View {
                 } else {
                     Text(Lexicon.Reading.pickOne).font(.callout).foregroundStyle(.secondary)
                 }
-                shortlist()
             }
             .padding(16)
         }
@@ -82,46 +81,16 @@ struct ReadingInspector: View {
         e.effect > 0 ? .accentColor : e.effect < 0 ? .orange : .secondary
     }
 
-    /// The candidate's Reading playground (open) first, then the Display playground (collapsed unless asked for).
+    /// The candidate's Text playground (open) first, then the Display playground (collapsed unless asked for).
     @ViewBuilder
     private func playgrounds(_ c: Candidate) -> some View {
         if let family = model.familyByName[c.family] {
-            PlaygroundGroup(job: "reading", family: family, title: "Reading \u{00B7} \(family.name)",
+            PlaygroundGroup(job: "reading", family: family, title: "Text \u{00B7} \(family.name)",
                             preview: SampleCopy.paragraphs[0], startOpen: true)
         }
         if let display = model.displayFamily {
             PlaygroundGroup(job: "display", family: display, title: "Display \u{00B7} \(display.name)",
                             preview: SampleCopy.displayHeadline, startOpen: model.options.openPlayground)
-        }
-    }
-
-    private func shortlist() -> some View {
-        let list = model.shortlist("reading")
-        return InspectorSection(title: Lexicon.shortlistTitle, trailing: "\(list.count)") {
-            if list.isEmpty {
-                Text(Lexicon.shortlistEmpty).font(.callout).foregroundStyle(.secondary)
-            }
-            ForEach(Array(list.enumerated()), id: \.element) { i, name in
-                if i > 0 { Divider().padding(.vertical, 5) }
-                HStack {
-                    Button(name) {
-                        if let c = model.candidates.first(where: { $0.family == name }) ?? model.currentReadingCandidate.flatMap({ $0.family == name ? $0 : nil }) {
-                            model.selectedCandidate = c.id
-                        }
-                    }
-                    .buttonStyle(.plain).lineLimit(1)
-                    Spacer()
-                    if model.chosen(.reading) == name {
-                        Text(Lexicon.Reading.current).font(.caption).foregroundStyle(Color.accentColor)
-                    }
-                    Button { Task { await model.setShortlist("reading", family: name, on: false) } } label: {
-                        Image(systemName: "minus.circle")
-                    }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary)
-                    .help(Lexicon.Reading.removeFromShortlist)
-                    .accessibilityLabel("Remove \(name) from shortlist")
-                }
-            }
         }
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Placeholder for the Set screen. Real scale, measure and optical-style work is a later wave.
+/// The Set screen: today a plain specimen of the pair. Scale, measure and optical-size work is round R5.
 struct SetView: View {
     @Environment(AppModel.self) private var model
 
@@ -8,12 +8,9 @@ struct SetView: View {
         let tick = model.fontTick
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Label("Coming next. This is a plain specimen, not the Set tool yet.", systemImage: "hammer")
-                    .font(.callout).foregroundStyle(.secondary)
-
                 HStack(spacing: 24) {
                     pairing("Display", model.displayFamily?.name)
-                    pairing("Reading", model.readingFamily?.name)
+                    pairing("Text", model.readingFamily?.name)
                 }
 
                 if let display = model.displayFamily {
@@ -30,7 +27,7 @@ struct SetView: View {
                     }
                     .frame(maxWidth: 560, alignment: .leading)
                 } else {
-                    Text("Choose a Reading face to see it here.").foregroundStyle(.secondary)
+                    Text("Choose a Text face to see it here.").foregroundStyle(.secondary)
                 }
             }
             .padding(24)
@@ -44,7 +41,7 @@ struct SetView: View {
     private func pairing(_ job: String, _ family: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(job).font(.caption).foregroundStyle(.secondary)
-            Text(family ?? "Not chosen").font(.title3.weight(.semibold))
+            Text(family ?? "None yet").font(.title3.weight(.semibold))
         }
     }
 }
