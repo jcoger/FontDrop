@@ -340,6 +340,79 @@ final class AppModel {
         return results.families.compactMap { familyByName[$0.name] }
     }
 
+    // MARK: Either way in (Display ranked against the Text face)
+
+    /// How the Display grid is ordered. `.library` is the finder's order (your fonts first). `.pairsWith` ranks every
+    /// family as a headline for the chosen Text face, with the same pairing engine run the other way.
+    enum DisplaySort: String, Equatable { case library, pairsWith }
+
+    /// One family's place in the Display list for the chosen Text face.
+    struct DisplayPair: Equatable {
+        let rank: Int
+        let pairType: String
+    }
+
+    /// What the designer picked in the Sort menu. Nil: automatic, see `displaySort`.
+    var displaySortChoice: DisplaySort?
+    private(set) var displayPairs: [String: DisplayPair] = [:]
+    private var displayPairsKey: String?
+    private var displayPairsGeneration = 0
+
+    /// The sort the Display grid really uses. With no Text face there is nothing to pair against, so the library order.
+    /// With a Text face and no Display face yet, Pairs with is the default (the Text face came first). Once a Display
+    /// face is chosen the grid keeps the library order unless the designer asks for Pairs with.
+    var displaySort: DisplaySort {
+        guard readingFamily != nil else { return .library }
+        return displaySortChoice ?? (displayFamily == nil ? .pairsWith : .library)
+    }
+
+    /// The Display grid's families in order. Families the engine gave no rank (the Text face's own family) follow the ranked ones.
+    var displayGridFamilies: [FamilySummary] {
+        let base = visibleFamilies
+        guard displaySort == .pairsWith, displayPairsAreCurrent, !displayPairs.isEmpty else { return base }
+        return base.enumerated()
+            .sorted { (displayPairs[$0.element.name]?.rank ?? Int.max, $0.offset) < (displayPairs[$1.element.name]?.rank ?? Int.max, $1.offset) }
+            .map(\.element)
+    }
+
+    /// The one line under a Display card's name while Pairs with is on: the pair's kind, in the Text face's name.
+    func displayReason(for family: String) -> String? {
+        guard displaySort == .pairsWith, displayPairsAreCurrent, let text = readingFamily?.name, let pair = displayPairs[family] else { return nil }
+        return Lexicon.Pairs.reason(pairType: pair.pairType, text: text)
+    }
+
+    /// The ranks held are for the Text face chosen now (not a face chosen a moment ago).
+    var displayPairsAreCurrent: Bool { readingFamily.map { displayPairsKey == displayKey($0) } ?? false }
+
+    private func displayKey(_ text: FamilySummary) -> String { "\(brandID ?? 0)/\(text.fontId)/\(libraryRevision)" }
+
+    /// True while Pairs with is the sort and its ranks are not here yet.
+    var displayPairsLoading: Bool { displaySort == .pairsWith && !displayPairsAreCurrent }
+
+    /// Asks the core for every family's rank as a Display partner of the chosen Text face. The Text-only rules do not
+    /// apply, so every family is ranked. The grid shows the result only while Pairs with is the sort.
+    func loadDisplayPairs() async {
+        guard let text = readingFamily else {
+            displayPairs = [:]; displayPairsKey = nil; displayPairsGeneration += 1
+            return
+        }
+        let key = displayKey(text)
+        if key == displayPairsKey { return }
+        displayPairsGeneration += 1
+        let generation = displayPairsGeneration
+        let id = text.fontId
+        do {
+            let ranked = try await background { try $0.displayCandidates(fontId: id, excludedIds: [], excludedFamilies: [], limit: 100_000) }
+            guard generation == displayPairsGeneration else { return }       // the Text face changed while this ran
+            var map: [String: DisplayPair] = [:]
+            for (i, p) in ranked.enumerated() where !p.family.isEmpty && map[p.family] == nil {
+                map[p.family] = DisplayPair(rank: i, pairType: p.pairType)
+            }
+            displayPairs = map
+            displayPairsKey = key
+        } catch { report(error) }
+    }
+
     var savedCount: Int { allEntries.values.filter(\.saved).count }
     func isSaved(_ name: String) -> Bool { allEntries[name]?.saved ?? false }
     func isHidden(_ name: String) -> Bool { allEntries[name]?.hidden ?? false }

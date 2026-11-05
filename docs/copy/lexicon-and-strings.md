@@ -473,3 +473,28 @@ Plain words. No em dashes.
 ### Gates for section 17
 
 A pass · B pass · C pass (no em dashes) · F pass after 17.7 · R pass
+
+## 18. Either way in, and plain text faces (R3, 2026-11-05)
+
+A Text face can come first. Once one is chosen the Display grid can rank headline faces against it, using the same pairing engine run the other way. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 18.1 | display.sort.pairsWith | **Pairs with Timeless Sans** (menu item) · **Sort · Pairs with Timeless Sans** (menu label) | Names the Text face. The default on Display while a Text face is chosen and no Display face is. Rows that exist only after a Text face is chosen |
+| 18.2 | display.sort.library | **Your fonts first** (menu item) · **Sort · Your fonts first** (menu label) | The order Display always had: your fonts, then the rest. The menu hides when there is no Text face |
+| 18.3 | display.sort.help | **Sort the grid. Pairs with puts the best headline partners for your Text face first.** | Hover on the Sort menu |
+| 18.4 | display.subtitle.pairsWith | **Acme set in each of 505 families. The best partners for Timeless Sans come first.** | Subtitle of the Display grid under Pairs with. With the library sort the old subtitle stays |
+| 18.5 | display.reason.contrast | **Clear contrast with Timeless Sans** | Card line, replaces the style count while Pairs with is on. Role-worded: the card is the headline, the named face is the Text face |
+| 18.6 | display.reason.plain | **Character over plain Timeless Sans** | A sans headline with character over a dependable sans (18.10) |
+| 18.7 | display.reason.uniform | **Harmony with Timeless Sans** | Same form and structure (the Harmony term, section 1) |
+| 18.8 | display.reason.superfamily | **Drawn as a set with Timeless Sans** | |
+| 18.9 | display.reason.middle | **Too close to Timeless Sans** · **Structure unknown** | The warning and the no-reading case. Same family and no engine result: no line, the style count stays |
+| 18.10 | evidence.plain | Chip **Plain text face** · Why row **Clear difference**, detail **A plain, dependable text face under a headline with character.** | On a Text candidate whose Display face is a sans with character. Counts as Clear difference (Difference: Distinct passes it) |
+
+A plain pair is not Strong: same form is not the far end. Structure: Mixed keeps a plain pair that shares no skeleton.
+
+Open for the owner: the engine reads "a sans with character" as "not a basic" (widely used or named for text by the type guides). The workhorse signals alone pass Agrandir and PP Museum. See docs/pairing-score.md, Roles.
+
+### Gates for section 18
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · R pass

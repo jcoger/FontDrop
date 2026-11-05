@@ -53,12 +53,14 @@
 		A852010CD99968F953D52A1D /* TemplatePalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A70A5AEF9AB9A8B3AD2F94 /* TemplatePalette.swift */; };
 		AB5434D3B830C6E2B1CAF0FE /* LaunchPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */; };
 		ADB5583D1B3AAAC566EAE8C4 /* ReadingSafeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A90A99F5624F81E5DA41C20 /* ReadingSafeTests.swift */; };
+		B1E74AC6DD431E1FA7E45EC3 /* DisplaySortMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F9E53CD974A61BC39BBE4D1 /* DisplaySortMenu.swift */; };
 		B2EC8EFC5EF12BC52FCD9004 /* ColorMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1392F04AD1B9B11E2372CB55 /* ColorMath.swift */; };
 		BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 366C8EEFF62B64D9A353D0A3 /* Components.swift */; };
 		C39BD445A03AC2AC55850378 /* AppUITemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1EF282224F001EA5646D3C /* AppUITemplate.swift */; };
 		C5735C77CBB583EEAC75BF3B /* TypeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB0EA488E17E1380FBAA940 /* TypeScale.swift */; };
 		CA87540FA673258AE190470B /* PosterFit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643595791572FA0A0CB216C3 /* PosterFit.swift */; };
 		D41755DADF3D8C791BD7D830 /* FaceVariants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A60A733017317A0A472D23 /* FaceVariants.swift */; };
+		D6C2F0C21958E0F2CA9D577E /* EitherWayInTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D64A8F316D5D188A36B826A /* EitherWayInTests.swift */; };
 		D838D95AF20557F5EC65E074 /* AppDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E75E30C33A8E68581A0CAA /* AppDetail.swift */; };
 		DB5A8E1944294858E657D5CA /* ReadingStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6046E775A350959D59C8B1AC /* ReadingStageTests.swift */; };
 		E2C1E584F0AE9772E5C098B2 /* ArticleEssay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A79E2313EB9FCB289A2ED9C /* ArticleEssay.swift */; };
@@ -102,6 +104,7 @@
 		371548664C8BCD8568AEC37D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		382020E250E4336580BD7B20 /* FinderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderTests.swift; sourceTree = "<group>"; };
 		383DFDA5412103E4B0F4E62E /* FontLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontLoader.swift; sourceTree = "<group>"; };
+		3D64A8F316D5D188A36B826A /* EitherWayInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EitherWayInTests.swift; sourceTree = "<group>"; };
 		402C3808858D795319E8CBDF /* TemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateTests.swift; sourceTree = "<group>"; };
 		473506B3CBD640CAEF115FBE /* ArticleFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleFeature.swift; sourceTree = "<group>"; };
 		4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FontDropTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -123,6 +126,7 @@
 		833E80B4FB518DF123A1E244 /* FontDropCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = FontDropCore; path = FontDropCore; sourceTree = SOURCE_ROOT; };
 		87B370D95E47FCF4D5DE05C8 /* ColorMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorMathTests.swift; sourceTree = "<group>"; };
 		8AF1FCD3E65A483F85532FD1 /* NamesAndStructureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NamesAndStructureTests.swift; sourceTree = "<group>"; };
+		8F9E53CD974A61BC39BBE4D1 /* DisplaySortMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySortMenu.swift; sourceTree = "<group>"; };
 		9189F5D45E4ED82B35C68B35 /* HeroTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroTemplate.swift; sourceTree = "<group>"; };
 		94A986121FCC102B0FA12D9B /* RescanAndClearTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RescanAndClearTests.swift; sourceTree = "<group>"; };
 		9F1EF282224F001EA5646D3C /* AppUITemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUITemplate.swift; sourceTree = "<group>"; };
@@ -183,6 +187,7 @@
 			isa = PBXGroup;
 			children = (
 				87B370D95E47FCF4D5DE05C8 /* ColorMathTests.swift */,
+				3D64A8F316D5D188A36B826A /* EitherWayInTests.swift */,
 				382020E250E4336580BD7B20 /* FinderTests.swift */,
 				7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */,
 				B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */,
@@ -226,6 +231,7 @@
 				1392F04AD1B9B11E2372CB55 /* ColorMath.swift */,
 				72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */,
 				366C8EEFF62B64D9A353D0A3 /* Components.swift */,
+				8F9E53CD974A61BC39BBE4D1 /* DisplaySortMenu.swift */,
 				AF45315ED86D1A62A42E9D5D /* DisplayView.swift */,
 				5460F3400E3C5449D6C9F614 /* FaceText.swift */,
 				76A60A733017317A0A472D23 /* FaceVariants.swift */,
@@ -400,6 +406,7 @@
 				A3DBFA936E8FE6AD78B4969A /* ColorsPopover.swift in Sources */,
 				BAF1013C56CF1200ADA1EDD5 /* Components.swift in Sources */,
 				54EC61E22A75D210DD5A5F40 /* Copy.swift in Sources */,
+				B1E74AC6DD431E1FA7E45EC3 /* DisplaySortMenu.swift in Sources */,
 				A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */,
 				73C81E98F42FACB352C5E62C /* FaceText.swift in Sources */,
 				D41755DADF3D8C791BD7D830 /* FaceVariants.swift in Sources */,
@@ -442,6 +449,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				902B4624A75B8BACE7E8005E /* ColorMathTests.swift in Sources */,
+				D6C2F0C21958E0F2CA9D577E /* EitherWayInTests.swift in Sources */,
 				858AF1009D078B080B14624C /* FinderTests.swift in Sources */,
 				119C0B28D1FCE012A42E1843 /* FlowTests.swift in Sources */,
 				AB5434D3B830C6E2B1CAF0FE /* LaunchPathTests.swift in Sources */,

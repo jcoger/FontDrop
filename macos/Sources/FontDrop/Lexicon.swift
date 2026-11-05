@@ -34,7 +34,7 @@ enum Lexicon {
         case "Skeleton": .structure
         case "Same hand": .sameStructure
         case "Texture": .strokeContrast
-        case "Clear contrast": .difference
+        case "Clear contrast", "Plain text face": .difference
         case "Uniform": .harmony
         case "Designed together": .superfamily
         case "Same family": .sameFamily
@@ -46,7 +46,7 @@ enum Lexicon {
     /// Pair type (engine) to the group word.
     static func pairGroup(_ pairType: String) -> String {
         switch pairType {
-        case "contrast": "Clear difference"
+        case "contrast", "plain": "Clear difference"
         case "uniform": "Harmony"
         case "superfamily": "Superfamily"
         case "same_family": sameFamilyGroup
@@ -129,6 +129,7 @@ enum Lexicon {
         case "Clear contrast": return e.detail.replacingOccurrences(of: " + ", with: " with ").capitalizedFirst
         case "Uniform": return sentence(replacingStructureIn: e.detail)
         case "Designed together": return "Superfamily"
+        case "Plain text face": return Pairs.plainChip
         case "The middle": return "Too close"
         case "Unclassified": return "Structure unknown"
         case "Skeleton": return sentence(replacingStructureIn: e.detail)
@@ -163,7 +164,7 @@ enum Lexicon {
     static func whyTitle(_ e: Evidence) -> String {
         switch e.lens {
         case "Skeleton", "Same hand": "Structure"
-        case "Clear contrast": "Clear difference"
+        case "Clear contrast", "Plain text face": "Clear difference"
         case "Uniform": "Harmony"
         case "Designed together": "Superfamily"
         case "The middle", "Near-duplicate": "Too close"
@@ -180,6 +181,7 @@ enum Lexicon {
     static func whyDetail(_ e: Evidence) -> String {
         switch e.lens {
         case "Foundry", "Designer", "Same family": e.detail
+        case "Plain text face": Pairs.plainWhy
         case "Long text": e.detail + "."
         default: chip(e)
         }
@@ -300,6 +302,32 @@ enum Lexicon {
         static let lessCommonHelp = "Faces fewer sites use. Families not on Google Fonts come first."
         /// "Your fonts \u{00B7} Google Fonts", for the inspector.
         static func sources(_ list: [Source]) -> String { list.map(sourceLabel).joined(separator: " \u{00B7} ") }
+    }
+
+    // MARK: Either way in (18.x)
+
+    /// The Display grid ranked against a chosen Text face. Source: docs/copy/lexicon-and-strings.md section 18.
+    enum Pairs {
+        static let sortLibrary = "Your fonts first"
+        static func sortPairsWith(_ text: String) -> String { "Pairs with \(text)" }
+        static let sortHelp = "Sort the grid. Pairs with puts the best headline partners for your Text face first."
+        /// The Display card's one line under the name, in the Text face's name. Nil when the engine had nothing to say.
+        static func reason(pairType: String, text: String) -> String? {
+            switch pairType {
+            case "contrast": "Clear contrast with \(text)"
+            case "plain": "Character over plain \(text)"
+            case "uniform": "Harmony with \(text)"
+            case "superfamily": "Drawn as a set with \(text)"
+            case "middle": "Too close to \(text)"
+            case "uncertain": "Structure unknown"
+            default: nil
+            }
+        }
+        static func subtitle(brand: String, count: Int, text: String) -> String {
+            "\(brand) set in each of \(count) families. The best partners for \(text) come first."
+        }
+        static let plainChip = "Plain text face"
+        static let plainWhy = "A plain, dependable text face under a headline with character."
     }
 
     // MARK: Inspector (4.x)
