@@ -73,20 +73,15 @@ struct ScaleSection: View {
     @ViewBuilder
     private func readout(scale: TypeScale, sizes: (headline: Double, body: Double, headlineStep: Int)?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            if !scale.locked { Text(Lexicon.Scale.fitNote) }
+            if !scale.locked { Text(Lexicon.Scale.autoNote) }
             if let sizes, sizes.body > 0 {
                 Text(Lexicon.Scale.headlineReadout(sizes.headline, times: sizes.headline / sizes.body))
                 Text(Lexicon.Scale.bodyLine(sizes.body))
             }
         }
         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-        .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.fitHelp)
+        .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.autoHelp)
     }
 
-    /// 1.2, 1.25, 1.333, 1.5, 1.618: as many digits as the number has.
-    private static func label(_ ratio: Double) -> String {
-        let s = String(format: "%.3f", ratio)
-        return s.replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
-    }
+    private static func label(_ ratio: Double) -> String { TypeScale.ratioLabel(ratio) }
 }

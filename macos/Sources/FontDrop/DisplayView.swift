@@ -83,7 +83,7 @@ struct FamilyPickerView: View {
 
     private func subtitle(count: Int) -> String {
         let brand = model.brand?.name ?? "Your brand name"
-        let tail = screen == .display ? "The face you pick here sets the tone for Reading." : "Pick one for this job."
+        let tail = screen == .display ? "The face you pick here sets the tone for Text." : "Pick one for this job."
         return "\(brand) set in each of \(count) families. Your fonts come first. \(tail)"
     }
 }
@@ -127,7 +127,7 @@ struct FamilyCard: View {
                 }
                 Spacer(minLength: 8)
                 if isChosen {
-                    Text("Chosen").font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
+                    Text(Lexicon.Reading.current).font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
                 } else if isHidden {
                     TagPill(text: Lexicon.Finder.hidden)
                 } else if family.isTrial {
@@ -252,7 +252,7 @@ struct FamilyInspector: View {
         if let job = screen.job {
             if model.choices[job] == family.name {
                 ChosenPanel(job: job,
-                            nextTitle: job == "display" ? Lexicon.findReading : nil,
+                            nextTitle: job == "display" ? Lexicon.findText : nil,
                             next: job == "display" ? { model.screen = .reading } : nil)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else {

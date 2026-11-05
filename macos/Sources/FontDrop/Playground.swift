@@ -136,11 +136,14 @@ struct PlaygroundGroup: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Variable axes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             ForEach(axes) { axis in
-                slider("\(axis.name) \u{00B7} \(axis.tag.trimmingCharacters(in: .whitespaces))",
+                // Optical size follows the size drawn until the designer moves it, so it reads Auto (17.7).
+                let isOptical = axis.tag == "opsz"
+                slider(isOptical ? Lexicon.opticalSize : "\(axis.name) \u{00B7} \(axis.tag.trimmingCharacters(in: .whitespaces))",
                        value: Binding(
                         get: { s.axes[axis.tag] ?? axis.defaultValue },
                         set: { v in store.update(key, job: job) { $0.axes[axis.tag] = v } }),
-                       range: axis.min...axis.max, readout: fmt(s.axes[axis.tag] ?? axis.defaultValue))
+                       range: axis.min...axis.max,
+                       readout: isOptical && s.axes[axis.tag] == nil ? Lexicon.auto : fmt(s.axes[axis.tag] ?? axis.defaultValue))
             }
         }
     }

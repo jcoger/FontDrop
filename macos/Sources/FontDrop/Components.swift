@@ -204,7 +204,7 @@ struct ChosenPanel: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3).foregroundStyle(Color.accentColor)
                     .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : model.choicePulse)
-                Text(justChosen ? Lexicon.setDone(job) : Lexicon.current(job))
+                Text(justChosen ? Lexicon.picked(job) : Lexicon.current(job))
                     .font(.callout.weight(.semibold))
                 Spacer()
                 if justChosen {

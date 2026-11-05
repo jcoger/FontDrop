@@ -25,21 +25,11 @@ struct SidebarView: View {
                 }
             }
 
-            Section("Type") {
-                ForEach([Screen.display, .reading, .ui, .mono]) { screen in typeRow(screen).tag(screen) }
-            }
-
-            Section("Library") { savedRow }
-
+            // Display, Text, Set. UI and Mono are off the sidebar; Saved is a filter on Display; Colors is on the Text stage.
             Section {
-                Label("Set", systemImage: Screen.set.symbol).tag(Screen.set)
-                HStack {
-                    Label("Colors", systemImage: Screen.colors.symbol)
-                    Spacer()
-                    Text("Parked").font(.caption)
+                ForEach(Screen.sidebar) { screen in
+                    row(screen).tag(screen)
                 }
-                .foregroundStyle(.tertiary)
-                .selectionDisabled()
             }
         }
         .listStyle(.sidebar)
@@ -105,25 +95,19 @@ struct SidebarView: View {
         }
     }
 
-    /// Saved: the starred families. A shortcut for the Saved chip on the Display grid.
-    private var savedRow: some View {
-        let on = model.filter.savedOnly
-        return Button {
-            model.filter.savedOnly.toggle()
-            if ![Screen.display, .ui, .mono].contains(model.screen) { model.screen = .display }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: on ? "star.fill" : "star").foregroundStyle(on ? Color.accentColor : Color.secondary)
-                Text(Lexicon.Finder.saved)
-                Spacer()
-                Text("\(model.savedCount)").font(.caption).foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 2)
-            .contentShape(Rectangle())
+    @ViewBuilder
+    private func row(_ screen: Screen) -> some View {
+        if screen == .set { setRow } else { typeRow(screen) }
+    }
+
+    /// Set: the brand's scale on a second line, like Display and Text show their face.
+    private var setRow: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Label(Screen.set.title, systemImage: Screen.set.symbol)
+            Text(Lexicon.Scale.sidebarLine(model.scale))
+                .font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
+                .padding(.leading, 24)
         }
-        .buttonStyle(.plain)
-        .help(Lexicon.Finder.savedSidebarHelp)
-        .listRowBackground(on ? RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)).padding(.horizontal, 6) : nil)
     }
 
     private func typeRow(_ screen: Screen) -> some View {
@@ -149,7 +133,9 @@ struct SidebarView: View {
                 }
             }
             Spacer()
-            trailing(screen, chosen: chosen)
+            if chosen != nil {
+                Image(systemName: "checkmark").font(.caption).foregroundStyle(.secondary)
+            }
         }
         .contextMenu {
             if let job = screen.job {
@@ -159,15 +145,6 @@ struct SidebarView: View {
                     Button(Lexicon.undo) { Task { await model.undo(job) } }
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func trailing(_ screen: Screen, chosen: String?) -> some View {
-        if chosen != nil {
-            Image(systemName: "checkmark").font(.caption).foregroundStyle(.secondary)
-        } else if screen == .ui || screen == .mono {
-            Image(systemName: "plus").font(.caption).foregroundStyle(.tertiary)
         }
     }
 }

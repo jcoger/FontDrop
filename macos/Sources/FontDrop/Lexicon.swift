@@ -201,16 +201,26 @@ enum Lexicon {
 
     // MARK: Choose flow (5.x)
 
-    static func useFor(_ job: String) -> String { "Use for \(job.capitalized)" }
-    static func setDone(_ job: String) -> String { "\(job.capitalized) face set" }
-    static func current(_ job: String) -> String { "Current \(job.capitalized) face" }
+    /// The designer's name for a job. The core's `reading` job is called Text on screen (docs/copy section 17).
+    static func jobName(_ job: String) -> String { job == "reading" ? "Text" : job.capitalized }
+    static func useFor(_ job: String) -> String { "Use for \(jobName(job))" }
+    static func picked(_ job: String) -> String { "\(jobName(job)) face picked" }
+    static func current(_ job: String) -> String { "Current \(jobName(job)) face" }
     static let undo = "Undo"
     /// "Clear Display face". Takes the face off the job. Undo puts it back.
-    static func clearFace(_ job: String) -> String { "Clear \(job.capitalized) face" }
-    static func cleared(_ job: String) -> String { "\(job.capitalized) face cleared" }
+    static func clearFace(_ job: String) -> String { "Clear \(jobName(job)) face" }
+    static func cleared(_ job: String) -> String { "\(jobName(job)) face cleared" }
     static let typeMenu = "Type"
-    static let findReading = "Find a Reading face"
-    static let setTheType = "Next: sizes and spacing"
+    static let findText = "Find a Text face"
+    static let setTheType = "Next: Set"
+
+    // MARK: Navigation (17.x)
+
+    /// The menu that holds the three screens and their command-1 to command-3 shortcuts.
+    static let goMenu = "Go"
+    /// 17.7: the variable font's optical size axis. Auto follows the size drawn.
+    static let opticalSize = "Optical size"
+    static let auto = "Auto"
 
     // MARK: Brand sheet and empty states (6.x)
 
@@ -224,7 +234,7 @@ enum Lexicon {
     }
     static let brandsEmpty = "No brands yet"
     static let needsDisplayTitle = "Pick a Display face first"
-    static let needsDisplayBody = "Reading suggestions start from it."
+    static let needsDisplayBody = "Text suggestions start from it."
     static let needsDisplayCTA = "Choose a Display face"
     static let readingFixed = "Showing faces made for long text"
     static let readingFixedWhy = "Hidden: display cuts, condensed and mono faces, and families without italic or bold."
@@ -244,7 +254,7 @@ enum Lexicon {
         static let failed = "Couldn\u{2019}t update the library"
         static let retry = "Retry"
         static let retryHelp = "Scan your font folders again"
-        /// Display and Reading while the library is empty and a scan is working on it.
+        /// Display and Text while the library is empty and a scan is working on it.
         static let scanningFonts = "Scanning your fonts\u{2026}"
     }
 
@@ -277,7 +287,6 @@ enum Lexicon {
         static let removeSaved = "Remove from Saved"
         /// 9.5: the chip counts what the filters show; the sidebar counts every saved family.
         static let savedChipHelp = "Saved fonts in this view"
-        static let savedSidebarHelp = "All your saved fonts"
         static let savedEmpty = "Nothing saved yet. Star a family to keep it here."
         static let searchPrompt = "Search name, foundry or designer"
         static let noMatches = "No families match these filters."
@@ -285,7 +294,7 @@ enum Lexicon {
         /// 7.20: the long-text rule's count, with its own control.
         static func notForLongText(_ n: Int) -> String { "\(n) not made for long text" }
         static let lessCommon = "Less common first"
-        /// 15.1: Sort option that flips Reading's two groups: personality first, the dependable text faces after.
+        /// 15.1: Sort option that flips Text's two groups: personality first, the dependable text faces after.
         static let moreCharacter = "More character first"
         static let moreCharacterHelp = "Faces with more personality come first. The dependable text faces follow."
         static let lessCommonHelp = "Faces fewer sites use. Families not on Google Fonts come first."
@@ -297,18 +306,16 @@ enum Lexicon {
 
     static let whyItPairs = "Why it pairs"
     static let notScored = "Not scored. Your choice."
-    static let shortlistTitle = "Shortlist"
-    static let shortlistEmpty = "Nothing here yet. Add faces you want to compare."
     static let licenseOK = "Not marked as trial"
     static let licenseTrial = "Trial version \u{00B7} License before you ship"
     static let getLicense = "Get the license"
 
-    // MARK: Reading list and stage (11.x)
+    // MARK: Text list and stage (11.x)
 
     enum Reading {
-        static func title(_ display: String) -> String { "Reading for \(display)" }
+        static func title(_ display: String) -> String { "Text for \(display)" }
         static func onShortlist(_ n: Int) -> String { "\(n) on shortlist" }
-        static func subtitle(_ n: Int) -> String { "Reading \u{00B7} \(onShortlist(n))" }
+        static func subtitle(_ n: Int) -> String { "Text \u{00B7} \(onShortlist(n))" }
         static let current = "Current"
         static let onShortlistTag = "On shortlist"
         static let trialTag = "Trial"
@@ -325,14 +332,14 @@ enum Lexicon {
         static let backToOne = "Back to one"
         static let use = "Use"
         static func comparing(_ n: Int) -> String { "Comparing \(n) on your shortlist" }
-        static let candidateTitle = "Reading candidate"
-        static let currentTitle = "Current Reading face"
+        static let candidateTitle = "Text candidate"
+        static let currentTitle = "Current Text face"
         static let sourceLabel = "Source"
         static let sourceYours = "Your fonts", sourceGoogle = "+ Google Fonts", sourceAll = "All", sourceMixed = "Custom"
         static let foot = "Not made for long text"
         static func footCount(_ n: Int) -> String { "\(n) not made for long text" }
-        static let findingNone = "No Reading partners found."
-        static let findingFaces = "Finding Reading faces"
+        static let findingNone = "No Text partners found."
+        static let findingFaces = "Finding Text faces"
         static func finding(_ display: String) -> String { "Finding partners for \(display)" }
         static func onItsOwn(_ family: String) -> String { "\(family) on its own" }
         static let pickHeadline = "Pick a headline face to see pairs"
@@ -349,32 +356,36 @@ enum Lexicon {
     enum Readout {
         static let display = "Display"
         static let displayItalic = "Display italic"
-        static let reading = "Reading"
+        static let reading = "Text"
         static func weight(_ w: Int) -> String { "Weight \(w)" }
-        static func readingWeight(_ w: Int) -> String { "Reading \u{00B7} \(w)" }
+        static func readingWeight(_ w: Int) -> String { "Text \u{00B7} \(w)" }
         static func italic(_ on: Bool) -> String { on ? "Italic on" : "Italic off" }
         static func tracking(_ em: Double) -> String { abs(em) < 0.0005 ? "Tracking 0" : String(format: "Tracking %+.3f em", em) }
         static func size(_ pt: Int) -> String { "\(pt) pt" }
     }
 
-    /// The Scale section of the Reading inspector, and the Trim slider in each face's playground (docs/copy section 14).
+    /// The Scale section of the Text inspector, and the Trim slider in each face's playground (docs/copy section 14).
     enum Scale {
         static let title = "Scale"
         static let lock = "Lock"
         static let lockHelp = "Lock sizes to the ratio"
         static let body = "Body"
         static let ratio = "Ratio"
-        static let fitNote = "Sizes fit each font"
-        static let fitHelp = "Each face is sized to match the board's letter height, and headlines fill their column. Lock to set the sizes by hand."
+        static let autoNote = "Auto: sizes fit each font"
+        static let autoHelp = "Auto sizes each face to match the board's letter height, and headlines fill their column. Lock to choose the sizes by hand."
         static let lockedHelp = "Every size is the body size times the ratio, once for each step up. Headlines still wrap and never split a word."
-        static let controlsOffHelp = "Lock sizes to set the body size and ratio"
+        static let controlsOffHelp = "Lock sizes to change the body size and ratio"
         static func bodyReadout(_ pt: Double) -> String { "\(Int(pt.rounded())) pt" }
         static func headlineReadout(_ pt: Double, times: Double) -> String {
             "Headline \(Int(pt.rounded())) pt \u{00B7} " + String(format: "%.1f", times) + "\u{00D7} body"
         }
         static func bodyLine(_ pt: Double) -> String { "Body \(Int(pt.rounded())) pt" }
+        /// The sidebar's second line under Set: "15 pt \u{00B7} 1.333", or Auto while the scale is not locked.
+        static func sidebarLine(_ scale: TypeScale) -> String {
+            scale.locked ? "\(Int(scale.body.rounded())) pt \u{00B7} \(TypeScale.ratioLabel(scale.ratio))" : Lexicon.auto
+        }
 
-        static let sectionFace = "Scale and spacing"
+        static let sectionFace = "Spacing and features"
         static let trim = "Trim"
         static let trimHelp = "Nudges every size this face gets in the templates"
         /// "+8%", "0%", "-12%".
@@ -386,7 +397,7 @@ enum Lexicon {
 
     enum Colors {
         static let button = "Colors"
-        static let buttonHelp = "Set the colors the templates use"
+        static let buttonHelp = "Choose the colors the templates use"
         static let layoutLabel = "Layout"
         static let layoutHelp = "Show the template in a different layout"
         static let presets = "Presets"
@@ -394,8 +405,6 @@ enum Lexicon {
         static let text = "Text"
         static let accent = "Accent"
         static let useBrand = "Use brand colors"
-        static func savedTo(_ brand: String) -> String { "Saved to \(brand)" }
-        static let savedToBrand = "Saved to this brand"
         static func contrast(_ ratio: String) -> String { "Text contrast \(ratio):1" }
         static func band(_ band: ContrastBand) -> String {
             switch band {

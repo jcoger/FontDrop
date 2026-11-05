@@ -1,4 +1,5 @@
 import FontDropCore
+import SwiftUI
 import Foundation
 import Observation
 
@@ -91,11 +92,25 @@ enum Screen: String, Hashable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .display: "Display"
-        case .reading: "Reading"
+        case .reading: "Text"
         case .ui: "UI"
         case .mono: "Mono"
         case .set: "Set"
         case .colors: "Colors"
+        }
+    }
+
+    /// The rows the sidebar shows, in order. UI and Mono stay in the code, off the screen (ship plan R1).
+    /// Saved is a filter on Display, and Colors lives in the Text stage's Colors button.
+    static let sidebar: [Screen] = [.display, .reading, .set]
+
+    /// The key that opens this screen with command: 1 Display, 2 Text, 3 Set.
+    var shortcutKey: KeyEquivalent? {
+        switch self {
+        case .display: "1"
+        case .reading: "2"
+        case .set: "3"
+        case .ui, .mono, .colors: nil
         }
     }
 

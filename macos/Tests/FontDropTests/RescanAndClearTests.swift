@@ -172,7 +172,7 @@ final class RescanAndClearTests: XCTestCase {
 
     func testLexiconClearStrings() {
         XCTAssertEqual(Lexicon.clearFace("display"), "Clear Display face")
-        XCTAssertEqual(Lexicon.clearFace("reading"), "Clear Reading face")
+        XCTAssertEqual(Lexicon.clearFace("reading"), "Clear Text face")
         XCTAssertFalse(Lexicon.clearFace("display").contains("\u{2014}"))
     }
 }

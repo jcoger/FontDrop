@@ -14,7 +14,7 @@ struct TypeScale: Codable, Hashable, Sendable {
     var body: Double = 15
     /// How much each step up multiplies the size.
     var ratio: Double = 1.333
-    /// Off: Fit decides every size. On: `body x ratio^step`.
+    /// Off: Auto decides every size. On: `body x ratio^step`.
     var locked = false
 
     static let ratios: [Double] = [1.2, 1.25, 1.333, 1.5, 1.618]
@@ -24,6 +24,13 @@ struct TypeScale: Codable, Hashable, Sendable {
 
     /// The size of a role `step` steps from body (label -1, body 0, deck +1, headline about +5).
     func size(step: Int) -> Double { body * pow(ratio, Double(step)) }
+
+    /// 1.2, 1.25, 1.333, 1.5, 1.618: as many digits as the number has.
+    static func ratioLabel(_ ratio: Double) -> String {
+        let s = String(format: "%.3f", ratio)
+        return s.replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
+    }
 
     /// The standard ratio closest to `value`.
     static func nearestRatio(_ value: Double) -> Double {
