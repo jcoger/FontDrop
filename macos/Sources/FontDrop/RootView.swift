@@ -44,6 +44,9 @@ struct RootView: View {
         .onChange(of: model.screen) { _, _ in model.applyInspectorRule() }
         .onChange(of: model.windowWidth) { _, _ in model.applyInspectorRule() }
         .overlay { phaseOverlay }
+        .overlay { if let state = model.preview { FacePreview(state: state) } }
+        .onChange(of: model.screen) { _, _ in model.closePreview() }
+        .onChange(of: model.brandID) { _, _ in model.closePreview() }
         .sheet(isPresented: Binding(get: { model.pending != nil }, set: { if !$0 { model.pending = nil } })) {
             NameBrandSheet().environment(model)
         }
@@ -63,9 +66,7 @@ struct RootView: View {
         case .loading:
             ProgressView("Opening library").padding(24).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         case .failed(let message):
-            ContentUnavailableView("Could not open the library", systemImage: "exclamationmark.triangle",
-                                   description: Text(message))
-                .background(.background)
+            LibraryProblemView(problem: LibraryOpenProblem.classify(error: message, dbPath: model.dbPath))
         case .ready:
             EmptyView()
         }
@@ -172,6 +173,7 @@ struct DisplayTopRow: View {
 struct SearchField: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
+    @FocusState private var focused: Bool
     let prompt: String
 
     var body: some View {
@@ -180,6 +182,12 @@ struct SearchField: View {
             Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             TextField(prompt, text: $model.search)
                 .textFieldStyle(.plain).font(.system(size: 12))
+                .focused($focused)
+                .onChange(of: model.focusSearchTick) { _, _ in focused = true }       // command-F
+                .onExitCommand {                                                         // Escape: clear what is typed, then give the keys back to the list
+                    if model.search.isEmpty { focused = false; model.requestListFocus() } else { model.search = "" }
+                }
+                .onSubmit { focused = false; model.requestListFocus() }              // Return: look at the results
             if !model.search.isEmpty {
                 Button { model.search = "" } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 12)) }
                     .buttonStyle(.plain).foregroundStyle(theme.textSecondary.color)
@@ -188,6 +196,7 @@ struct SearchField: View {
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
         .pill()
+        .overlay { if focused { Capsule().strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2) } }
     }
 }
 

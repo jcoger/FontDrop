@@ -191,6 +191,10 @@ pub(crate) fn migrations_before_brands_rebuild() -> &'static [&'static str] {
     &MIGRATIONS[..MIGRATIONS.len() - 4]
 }
 
+/// The marker in the error text when the library was written by a newer build ("newer-library:<its version>:<ours>").
+/// The Mac app looks for it to show a plain message instead of the raw database error.
+pub const NEWER_LIBRARY: &str = "newer-library";
+
 /// Apply any migrations with index >= the DB's current user_version, then
 /// stamp user_version to MIGRATIONS.len(). Tolerates "duplicate column"
 /// (existing DBs already have these columns) but surfaces any other error.
@@ -204,6 +208,12 @@ pub fn try_run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
     // A failed read is an error, not "version 0": treating it as 0 would re-run
     // every migration and then stamp the version down.
     let current: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0))?;
+
+    // A library written by a newer build is not ours to touch: this build does not know its schema, and an older
+    // build writing to it could damage what the newer one stored. Refuse it with a message the app can name.
+    if current > MIGRATIONS.len() as i64 {
+        return Err(rusqlite::Error::InvalidParameterName(format!("{NEWER_LIBRARY}:{current}:{}", MIGRATIONS.len())));
+    }
 
     for (i, stmt) in MIGRATIONS.iter().enumerate() {
         if (i as i64) < current {
@@ -1106,6 +1116,41 @@ mod tests {
         assert_eq!(crate::userdata::list_brands(&conn).unwrap(), vec![b]);
         drop(conn);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A library stamped by a newer build is refused untouched: its version stays, and nothing is written.
+    #[test]
+    fn newer_library_is_refused_and_its_version_is_kept() {
+        let dir = std::env::temp_dir().join(format!("fontdrop-core-newer-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("new.db");
+        let _ = std::fs::remove_file(&path);
+        let newer = MIGRATIONS.len() + 3;
+        {
+            let c = Connection::open(&path).unwrap();
+            c.execute_batch(CREATE_TABLE).unwrap();
+            c.execute_batch(&format!("PRAGMA user_version = {newer};")).unwrap();
+        }
+        let err = try_open_db_at(&path).expect_err("a newer library must not open");
+        assert!(err.to_string().contains(NEWER_LIBRARY), "{err}");
+        let c = Connection::open(&path).unwrap();
+        let v: i64 = c.query_row("PRAGMA user_version;", [], |r| r.get(0)).unwrap();
+        assert_eq!(v as usize, newer, "an older build never lowers the version");
+        drop(c);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Opening twice never lowers user_version, and an install behind us is raised to the current one.
+    #[test]
+    fn version_only_moves_up() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(CREATE_TABLE).unwrap();
+        run_migrations(&conn);
+        let v1: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0)).unwrap();
+        run_migrations(&conn);
+        let v2: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0)).unwrap();
+        assert_eq!(v1, v2);
+        assert_eq!(v2 as usize, MIGRATIONS.len());
     }
 
     /// An install that already stamped is_trial = 0 with the old check (family names and licence

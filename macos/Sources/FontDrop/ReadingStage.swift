@@ -195,7 +195,7 @@ struct LayoutMenu: View {
     }
 }
 
-/// Minus, Fit, plus. Command-minus, command-0 and command-plus.
+/// Minus, Fit, plus. The View menu holds the shortcuts (command-minus, command-0, command-plus); command-equals also zooms in.
 struct ZoomControls: View {
     @Environment(AppModel.self) private var model
     @Environment(\.theme) private var theme
@@ -204,12 +204,10 @@ struct ZoomControls: View {
         let zoom = model.stageZoom
         HStack(spacing: 0) {
             Button { model.stageZoom.zoomOut() } label: { Image(systemName: "minus").frame(width: 18) }
-                .keyboardShortcut("-", modifiers: .command)
                 .disabled(!zoom.canZoomOut)
                 .help(Lexicon.Reading.zoomOut)
                 .accessibilityLabel(Lexicon.Reading.zoomOut)
             Button { model.stageZoom.fit() } label: { Text(zoom.label).frame(minWidth: 34) }
-                .keyboardShortcut("0", modifiers: .command)
                 .help(Lexicon.Reading.zoomFit)
                 .accessibilityLabel(Lexicon.Reading.zoomFit)
             Button { model.stageZoom.zoomIn() } label: { Image(systemName: "plus").frame(width: 18) }
@@ -217,9 +215,6 @@ struct ZoomControls: View {
                 .disabled(!zoom.canZoomIn)
                 .help(Lexicon.Reading.zoomIn)
                 .accessibilityLabel(Lexicon.Reading.zoomIn)
-            Button("") { model.stageZoom.zoomIn() }              // command-plus on layouts where plus is its own key
-                .keyboardShortcut("+", modifiers: .command)
-                .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
         }
         .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(theme.textPrimary.color)
         .fixedSize()

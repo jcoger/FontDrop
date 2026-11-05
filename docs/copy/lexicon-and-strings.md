@@ -610,3 +610,31 @@ Export lives in File > Export, in a bar over the Set stage and in the Set inspec
 ### Gates for section 23
 
 C pass (no em dashes) · R pass
+
+## 24. Keyboard, number fields, About and launch problems (R7, 2026-11-05)
+
+Every command lives in a menu with its shortcut. The lists also take the bare keys. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 24.1 | edit.undo | **Undo Display face** · **Undo Text face** · **Undo clear Display face** · **Undo clear Text face** · **Undo** | Edit menu, Command-Z. The item names what it takes back. The bare word when nothing is waiting. In a text box it undoes typing |
+| 24.2 | edit.redo | **Redo Display face** · **Redo clear Text face** · **Redo** | Shift-Command-Z |
+| 24.3 | edit.find | **Find a Font** | Command-F. Puts the keyboard in the search box of Display or Text. Off on Set |
+| 24.4 | type.use | **Use for Display** · **Use for Text** | Type menu, Command-Return. Return does the same in the Display grid and the Text list |
+| 24.5 | type.clear | **Clear Display face** · **Clear Text face** | Type menu, unchanged |
+| 24.6 | view.preview | **Preview Face** · **Close Preview** | View menu, Command-Y. Space does the same in the list |
+| 24.7 | view.zoom | **Zoom In** · **Zoom Out** · **Fit** | View menu, Command-Plus, Command-Minus, Command-0. Only on the Text stage |
+| 24.8 | preview.hint | **Space or Escape closes. Return uses it.** | Top right of the large preview |
+| 24.9 | preview.sample | **Good type fits the job.** · the alphabet and digits · a two-line paragraph (Text only) | Display previews your brand sample line instead of the headline |
+| 24.10 | number.step | **Increase Body** · **Decrease Line height** | VoiceOver names of the plus and minus on a number field |
+| 24.11 | number.auto | **Auto** | What the optical size field shows until you type a value |
+| 24.12 | about.credits | **Doto and Geist Mono are bundled under the SIL Open Font License 1.1. The licence texts are in the app's Resources folder.** · **Recommended for text uses published advice from Typewolf and Butterick's Practical Typography.** | About window. Name, version, build and copyright come from the app bundle |
+| 24.13 | library.newer | **This library is from a newer FontDrop** · **A newer version of FontDrop saved it. This version left it alone so nothing is lost. Update FontDrop, then open it again.** | Shown instead of the window. Buttons: Quit FontDrop |
+| 24.14 | library.readOnly | **FontDrop can't save its library here** · **This folder is read-only: <folder>. Make it writable, then open FontDrop again.** | Buttons: Show in Finder, Quit FontDrop |
+| 24.15 | library.other | **FontDrop couldn't open its library** · **Quit and open FontDrop again. If it keeps happening, move this file to the Desktop and FontDrop will make a new library: <file>** | The error text sits under it in small type |
+| 24.16 | library.empty | **No fonts found** (existing) | Also what a missing font folder shows. Never an error |
+
+### Gates for section 24
+
+C pass (no em dashes) · R pass
+

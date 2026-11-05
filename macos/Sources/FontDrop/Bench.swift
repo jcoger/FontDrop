@@ -119,7 +119,7 @@ func captureSize() -> NSSize {
 ///   --trim-reading <x>         the same for the selected Reading candidate
 ///   --body-size <pt>           the brand scale's body size, 9 to 24, in memory only
 ///   --ratio <r>                the brand scale's ratio (1.2, 1.25, 1.333, 1.5, 1.618)
-///   FD_LOCK=1 (environment)    lock the scale: every size is body x ratio^step instead of fitted to the font. Not an argument: `--lock` stalls the app at launch
+///   --lock or FD_LOCK=1        lock the scale: every size is body x ratio^step instead of fitted to the font
 ///   --pick-reading <family>    choose this family for Reading (in the DB copy)
 ///   --clear <job>              clear the Display or Reading face (in the DB copy)
 /// --body-size, --ratio and FD_LOCK for the brand's scale. `family` is the Text face the lock starts from
@@ -133,8 +133,8 @@ func applyScaleFlags(_ model: AppModel, family: (name: String, path: String)?) {
     }
     let body = value("--body-size").flatMap(Double.init)
     let ratio = value("--ratio").flatMap(Double.init)
-    // Environment only: an argument spelled --lock stalls the app at launch (before any of our code runs).
-    let lock = ProcessInfo.processInfo.environment["FD_LOCK"] != nil
+    // --lock works as an argument now (ArgvFix.swift fixed the launch hang); FD_LOCK=1 still works too.
+    let lock = ProcessInfo.processInfo.environment["FD_LOCK"] != nil || args.contains("--lock")
     guard body != nil || ratio != nil || lock else { return }
     if lock, body == nil, ratio == nil, let family {
         model.lockScale(reading: family.name, fallbackPath: family.path)      // starts from what Fit gives, as the switch does

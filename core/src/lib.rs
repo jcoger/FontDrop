@@ -10,8 +10,7 @@
 //! - `google_fonts`: catalogue enrichment
 //! - `ffi` (feature `uniffi`): the Swift surface
 //!
-//! Nothing here depends on Tauri. The Tauri shell calls these functions from
-//! its command wrappers; the SwiftUI app calls `ffi::Library`.
+//! The SwiftUI app calls `ffi::Library`. (The old Tauri shell that called these functions directly was removed in R7.)
 
 pub mod brand_settings;
 pub mod classifier;

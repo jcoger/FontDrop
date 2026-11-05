@@ -6,7 +6,11 @@ import SwiftUI
 struct FamilyPickerView: View {
     @Environment(AppModel.self) private var model
     let screen: Screen
+    @FocusState private var focused: Bool
+    @State private var keyboardNav = false       // the focus ring shows once a key is used, not after a click
+    @State private var gridWidth: CGFloat = 800
 
+    private static let cellMin: CGFloat = 220, cellSpacing: CGFloat = 14
     private let columns = [GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 14)]
 
     var body: some View {
@@ -35,6 +39,7 @@ struct FamilyPickerView: View {
                             FamilyCard(family: family, sample: sample, tick: tick,
                                        isSelected: model.selectedFamily == family.name,
                                        isChosen: chosen == family.name,
+                                       showFocus: keyboardNav && focused && model.selectedFamily == family.name,
                                        isSaved: model.isSaved(family.name),
                                        isHidden: model.isHidden(family.name),
                                        reason: screen == .display ? model.displayReason(for: family.name) : nil,
@@ -42,12 +47,40 @@ struct FamilyPickerView: View {
                                        toggleSaved: { Task { await model.setFavorite(family.name, on: !model.isSaved(family.name)) } },
                                        toggleHidden: { Task { await model.setHidden(family.name, hidden: !model.isHidden(family.name)) } })
                                 .id(family.name)
-                                .onTapGesture { model.selectedFamily = family.name }
+                                .onTapGesture { keyboardNav = false; model.selectedFamily = family.name; focused = true }
                         }
                     }
                 }
             }
             .padding(20)
+            .background(GeometryReader { geo in Color.clear.onChange(of: geo.size.width, initial: true) { _, w in gridWidth = w - 40 } })
+        }
+        .focusable()
+        .focused($focused)
+        .focusEffectDisabled()          // the ring is drawn on the card, distinct from the selection ring
+        .onAppear { focused = true }
+        .onChange(of: model.focusListTick) { _, _ in focused = true }
+        .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, .space]) { press in
+            guard press.modifiers.isEmpty else { return .ignored }
+            switch press.key {
+            case .return:
+                guard model.canUseSelected else { return .ignored }
+                Task { await model.useSelected() }
+            case .space:
+                guard model.selectedFaceName != nil else { return .ignored }
+                model.togglePreview()
+            default:
+                let dir: GridNav.Direction = press.key == .leftArrow ? .left : press.key == .rightArrow ? .right : press.key == .upArrow ? .up : .down
+                keyboardNav = true
+                let cols = GridNav.columns(width: gridWidth, minimum: Self.cellMin, spacing: Self.cellSpacing)
+                let index = families.firstIndex { $0.name == model.selectedFamily }
+                if let next = GridNav.move(count: families.count, from: index, dir, columns: cols) {
+                    model.selectedFamily = families[next].name
+                    withAnimationIfAllowed { proxy.scrollTo(families[next].name) }
+                    announce(families[next].name)
+                }
+            }
+            return .handled
         }
         // Open on the chosen face, so the grid starts where you left off.
         .task(id: "\(model.brandID ?? 0)/\(screen.rawValue)/\(model.fontsReady)") {
@@ -79,6 +112,11 @@ struct FamilyPickerView: View {
 
     /// The designer changed this family's settings. The grid still draws its default style (an equal comparison),
     /// and the card says so with a small "Tuned" mark (UX audit U2).
+    private func announce(_ name: String) {
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: Lexicon.Keyboard.selectedAnnouncement(name), .priority: NSAccessibilityPriorityLevel.low.rawValue])
+    }
+
     private func isTuned(_ family: FamilySummary) -> Bool {
         guard let job = screen.job else { return false }
         return model.typeSettings.isModified(model.settingsKey(job, family.name), job: job)
@@ -102,6 +140,7 @@ struct FamilyCard: View {
     let tick: Int
     let isSelected: Bool
     let isChosen: Bool
+    var showFocus = false            // keyboard focus is on this card (arrow keys), drawn as the system focus ring
     let isSaved: Bool
     let isHidden: Bool
     var reason: String?              // Pairs with: why this face pairs with the Text face, in place of the style count
@@ -149,6 +188,10 @@ struct FamilyCard: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(theme.controlGround.color))
         .overlay { if isSelected {      // board 16 option B: a 1.5 pt ring, grids only
             RoundedRectangle(cornerRadius: 12).strokeBorder(theme.textPrimary.color, lineWidth: 1.5)
+        } }
+        .overlay { if showFocus {
+            RoundedRectangle(cornerRadius: 14, style: .continuous).inset(by: -3)
+                .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
         } }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)

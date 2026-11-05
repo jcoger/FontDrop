@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-@main
+/// Started from main.swift, after ArgvFix.
 struct FontDropApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel(options: LaunchOptions())
@@ -36,12 +36,19 @@ struct FontDropApp: App {
                 }
             }
             CommandGroup(replacing: .appInfo) {
-                Button("About FontDrop") {
-                    NSApp.orderFrontStandardAboutPanel(options: [
-                        .credits: NSAttributedString(string: Lexicon.aboutCredits,
-                                                     attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]),
-                    ])
-                }
+                Button("About FontDrop") { AboutPanel.show() }
+            }
+            // Edit > Undo and Redo take back and redo a face choice or clear. In a text box they undo the typing.
+            CommandGroup(replacing: .undoRedo) {
+                Button(model.undoLastLabel ?? Lexicon.undo) { Self.undo(model) }
+                    .keyboardShortcut("z", modifiers: .command)
+                Button(model.redoLastLabel ?? Lexicon.Keyboard.redo) { Self.redo(model) }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+            }
+            CommandGroup(after: .textEditing) {
+                Button(Lexicon.Keyboard.find) { model.requestSearchFocus() }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .disabled(!model.canFind)
             }
             CommandGroup(after: .sidebar) {
                 Button(model.showSidebar ? Lexicon.hideSidebar : Lexicon.showSidebar) { model.showSidebar.toggle() }
@@ -50,18 +57,51 @@ struct FontDropApp: App {
                     model.inspectorTouched = true; model.showInspector.toggle()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+                Divider()
+                Button(model.preview == nil ? Lexicon.Keyboard.previewFace : Lexicon.Keyboard.closePreview) { model.togglePreview() }
+                    .keyboardShortcut("y", modifiers: .command)
+                    .disabled(model.preview == nil && model.selectedFaceName == nil)
+                Button(Lexicon.Reading.zoomIn) { model.stageZoom.zoomIn() }
+                    .keyboardShortcut("+", modifiers: .command)
+                    .disabled(!model.canZoomStage || !model.stageZoom.canZoomIn)
+                Button(Lexicon.Reading.zoomOut) { model.stageZoom.zoomOut() }
+                    .keyboardShortcut("-", modifiers: .command)
+                    .disabled(!model.canZoomStage || !model.stageZoom.canZoomOut)
+                Button(Lexicon.Reading.zoomFit) { model.stageZoom.fit() }
+                    .keyboardShortcut("0", modifiers: .command)
+                    .disabled(!model.canZoomStage)
             }
             CommandMenu(Lexicon.typeMenu) {
+                // Return does the same in the Display grid and the Text list. The menu carries a modified shortcut so
+                // that typing in a text box is never taken.
+                Button(Lexicon.useFor(model.keyJob ?? "display")) { Task { await model.useSelected() } }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!model.canUseSelected)
+                Divider()
                 ForEach(["display", "reading"], id: \.self) { job in
                     Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }
                         .disabled(!model.canClear(job))
                 }
-                Divider()
-                Button(Lexicon.undo) {
-                    Task { for job in ["display", "reading"] where model.canUndo(job) { await model.undo(job); break } }
-                }
-                .disabled(!(model.canUndo("display") || model.canUndo("reading")))
             }
+        }
+    }
+
+    /// Command-Z. A text box that is being edited gets it first, so typing can be undone as usual.
+    @MainActor
+    static func undo(_ model: AppModel) {
+        if let text = NSApp.keyWindow?.firstResponder as? NSTextView, text.undoManager?.canUndo == true {
+            text.undoManager?.undo()
+        } else {
+            Task { await model.undoLast() }
+        }
+    }
+
+    @MainActor
+    static func redo(_ model: AppModel) {
+        if let text = NSApp.keyWindow?.firstResponder as? NSTextView, text.undoManager?.canRedo == true {
+            text.undoManager?.redo()
+        } else {
+            Task { await model.redoLast() }
         }
     }
 }

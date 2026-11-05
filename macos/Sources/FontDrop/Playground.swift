@@ -209,7 +209,9 @@ struct PlaygroundGroup: View {
                         get: { s.axes[axis.tag] ?? axis.defaultValue },
                         set: { v in store.update(key, job: job) { $0.axes[axis.tag] = v } }),
                        range: axis.min...axis.max,
-                       readout: isOptical && s.axes[axis.tag] == nil ? Lexicon.auto : fmt(s.axes[axis.tag] ?? axis.defaultValue))
+                       readout: isOptical && s.axes[axis.tag] == nil ? Lexicon.auto : fmt(s.axes[axis.tag] ?? axis.defaultValue),
+                       step: axis.max - axis.min <= 10 ? 0.1 : 1, decimals: axis.max - axis.min <= 10 ? 1 : 0,
+                       autoText: isOptical && s.axes[axis.tag] == nil ? Lexicon.auto : nil)
             }
         }
     }
@@ -218,12 +220,12 @@ struct PlaygroundGroup: View {
         VStack(alignment: .leading, spacing: 8) {
             if titled { Text(Lexicon.Scale.sectionFace).font(.caption.weight(.semibold)).foregroundStyle(.secondary) }
             slider(Lexicon.Scale.trim, value: Binding(get: { s.trim }, set: { v in store.update(key, job: job) { $0.trim = v } }),
-                   range: TypeSettings.trimRange, readout: Lexicon.Scale.trimReadout(s.trim))
+                   range: TypeSettings.trimRange, readout: Lexicon.Scale.trimReadout(s.trim), step: 0.01, decimals: 2, unit: "\u{00D7}")
                 .help(Lexicon.Scale.trimHelp)
             slider("Tracking", value: Binding(get: { s.tracking }, set: { v in store.update(key, job: job) { $0.tracking = v } }),
-                   range: -0.08...0.3, readout: String(format: "%+.3f em", s.tracking))
+                   range: -0.08...0.3, readout: String(format: "%+.3f em", s.tracking), step: 0.005, decimals: 3, unit: "em")
             slider("Line height", value: Binding(get: { s.lineHeight }, set: { v in store.update(key, job: job) { $0.lineHeight = v } }),
-                   range: 0.8...2.2, readout: String(format: "%.2f", s.lineHeight))
+                   range: 0.8...2.2, readout: String(format: "%.2f", s.lineHeight), step: 0.05, decimals: 2)
         }
     }
 
@@ -269,12 +271,14 @@ struct PlaygroundGroup: View {
         }
     }
 
-    private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, readout: String) -> some View {
+    private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, readout: String,
+                        step: Double = 1, decimals: Int = 0, unit: String? = nil, autoText: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(label).font(.callout)
                 Spacer()
-                Text(readout).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                NumberField(label: label, value: value.wrappedValue, range: range, step: step, decimals: decimals, unit: unit,
+                            autoText: autoText, onChange: { value.wrappedValue = $0 })
             }
             Slider(value: value, in: range).controlSize(.small)
                 .accessibilityLabel(label)

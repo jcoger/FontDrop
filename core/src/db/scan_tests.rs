@@ -173,7 +173,9 @@ fn user_version_never_goes_down() {
     conn.execute_batch(CREATE_TABLE).unwrap();
     let above = MIGRATIONS.len() + 5;
     conn.execute_batch(&format!("PRAGMA user_version = {above};")).unwrap();
-    try_run_migrations(&conn).unwrap();
+    // R7: a newer library is refused outright (the app shows a plain message), and the stamp stays where it was.
+    let err = try_run_migrations(&conn).expect_err("a library from a newer build is refused");
+    assert!(err.to_string().contains(NEWER_LIBRARY), "{err}");
     let v: i64 = conn.query_row("PRAGMA user_version;", [], |r| r.get(0)).unwrap();
     assert_eq!(v as usize, above, "an older build must not lower the stamp");
 }

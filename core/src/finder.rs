@@ -1050,4 +1050,18 @@ mod tests {
         hide_family(&conn, "Acme").unwrap();
         assert!(font_candidates(&conn, "d0", vec![], vec![], None, 10).unwrap().iter().all(|c| c.pair_type != "same_family"));
     }
+    /// On a rescanned COPY of a real library: PP Neue Machina is a sans, so the exported CSS stack ends in sans-serif
+    /// (ExportSpec uses `serif` to pick the generic family). Run on demand:
+    ///   FONTDROP_DB=<copy> cargo test --lib machina_is_sans_on_copy -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn machina_is_sans_on_copy() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB to a rescanned copy");
+        assert!(!path.contains("Application Support"), "point FONTDROP_DB at a copy, not the live DB");
+        let conn = Connection::open(&path).unwrap();
+        let fams = load_families(&conn).unwrap();
+        let machina = fams.iter().find(|f| f.name == "PP Neue Machina").expect("PP Neue Machina is in the copy");
+        println!("PP Neue Machina: serif={} skeleton={:?}", machina.serif, machina.skeleton);
+        assert!(!machina.serif, "a text face with no foot on the stems reads as sans");
+    }
 }

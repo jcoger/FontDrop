@@ -35,7 +35,7 @@ struct TextModule: View {
                     held: scale.measure != nil, help: Lexicon.SetScreen.measureHelp) { model.updateScale { $0.measure = nil } }
             control(label: Lexicon.SetScreen.lineHeight,
                     slider: BodySlider(value: lineHeight, range: TextRules.lineHeightRange, enabled: true, step: 0.05,
-                                       label: Lexicon.SetScreen.lineHeight, valueText: { String(format: "%.2f", $0) }) { v in
+                                       label: Lexicon.SetScreen.lineHeight, valueText: { String(format: "%.2f", $0) }, decimals: 2) { v in
                         model.updateScale { $0.lineHeight = v } },
                     held: scale.lineHeight != nil, help: Lexicon.SetScreen.lineHeightHelp,
                     idle: Lexicon.SetScreen.lineHeightFollows) { model.updateScale { $0.lineHeight = nil } }
@@ -161,7 +161,7 @@ private struct FaceAxes: View {
                 }
             }
             BodySlider(value: value, range: axis.min...axis.max, enabled: true, step: 1, label: label,
-                       valueText: { "\(Int($0.rounded()))" }, onChange: onChange)
+                       valueText: { "\(Int($0.rounded()))" }, autoText: axis.tag == "opsz" && !held ? Lexicon.auto : nil, onChange: onChange)
         }
         .help(help)
     }
