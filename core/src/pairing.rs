@@ -10,8 +10,6 @@ use rusqlite::Connection;
 use std::collections::HashSet;
 use serde::Serialize;
 
-use crate::db::DbState;
-
 /// Placeholder foundry assigned by Google Fonts enrichment when no specific
 /// foundry/designer is known (see google_fonts.rs). It marks a font as
 /// "enriched" but carries no real shared-origin signal, so the pairing scorer
@@ -56,27 +54,27 @@ pub struct PairBucket {
 // ── Internal row for scoring ──────────────────────────────────────────────────
 
 #[allow(dead_code)] // loaded whole from the DB; not every column scores today
-struct FontData {
-    font_id: String,
-    font_family: String,
-    skeleton: String,
-    flesh_contrast: String,
-    flesh_serif: i32,
-    weight: u16,
-    x_height_ratio: Option<f64>,
-    cap_height_ratio: Option<f64>,
-    ascender_descender_ratio: Option<f64>,
-    foundry: Option<String>,
-    designer: Option<String>,
-    file_name: String,
-    optical_role: Option<String>,
-    superfamily_group: Option<String>,
-    superfamily_role: Option<String>,
-    weight_range_min: Option<i32>,
-    weight_range_max: Option<i32>,
-    spacing_personality: Option<String>,
-    width_class: Option<String>,
-    vendor_id: Option<String>,
+pub struct FontData {
+    pub font_id: String,
+    pub font_family: String,
+    pub skeleton: String,
+    pub flesh_contrast: String,
+    pub flesh_serif: i32,
+    pub weight: u16,
+    pub x_height_ratio: Option<f64>,
+    pub cap_height_ratio: Option<f64>,
+    pub ascender_descender_ratio: Option<f64>,
+    pub foundry: Option<String>,
+    pub designer: Option<String>,
+    pub file_name: String,
+    pub optical_role: Option<String>,
+    pub superfamily_group: Option<String>,
+    pub superfamily_role: Option<String>,
+    pub weight_range_min: Option<i32>,
+    pub weight_range_max: Option<i32>,
+    pub spacing_personality: Option<String>,
+    pub width_class: Option<String>,
+    pub vendor_id: Option<String>,
 }
 
 
@@ -271,7 +269,7 @@ fn score_pair(primary: &FontData, candidate: &FontData) -> Option<PairScore> {
 
 // ── Query + score ─────────────────────────────────────────────────────────────
 
-fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
+pub fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT font_id, font_family, skeleton, flesh_contrast, flesh_serif,
@@ -316,29 +314,26 @@ fn load_all_fonts(conn: &Connection) -> Result<Vec<FontData>, String> {
     Ok(rows)
 }
 
-// ── Tauri command ─────────────────────────────────────────────────────────────
+// ── Entry point ───────────────────────────────────────────────────────────────
 
 /// `excluded_ids`: fonts the user has hidden. They never take a match slot.
 /// Browse filters (search, category, Starred) are deliberately NOT applied here:
 /// matches come from the whole visible library, not the left panel's current view.
-#[tauri::command]
-pub fn get_font_pairs(
-    state: tauri::State<'_, DbState>,
-    font_id: String,
-    excluded_ids: Option<Vec<String>>,
-    job: Option<String>,
+pub fn font_pairs(
+    conn: &Connection,
+    font_id: &str,
+    excluded_ids: Vec<String>,
+    job: Option<&str>,
 ) -> Result<Vec<PairBucket>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    let all = load_all_fonts(&conn)?;
+    let all = load_all_fonts(conn)?;
 
     let primary = all
         .iter()
         .find(|f| f.font_id == font_id)
         .ok_or_else(|| format!("Font {} not found", font_id))?;
 
-    let mut excluded: HashSet<String> = excluded_ids.unwrap_or_default().into_iter().collect();
-    if job.as_deref() == Some("reading") {
+    let mut excluded: HashSet<String> = excluded_ids.into_iter().collect();
+    if job == Some("reading") {
         excluded.extend(unfit_for_reading(&all));
     }
     Ok(bucket_pairs(primary, &all, &excluded))
@@ -349,7 +344,7 @@ pub fn get_font_pairs(
 /// never a display cut in a text role (Typewolf 21, Reynolds); condensed and
 /// mono faces fail for long text (Typewolf 22/81, Refactoring UI).
 /// Italic here is "has an italic file", a proxy until true-italic is checked.
-fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
+pub fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
     #[derive(Default)]
     struct Cover { regular: bool, italic: bool, bold: bool, bold_italic: bool }
     let mut cover: std::collections::HashMap<&str, Cover> = Default::default();
@@ -380,7 +375,7 @@ fn unfit_for_reading(all: &[FontData]) -> HashSet<String> {
 }
 
 /// Score every non-hidden candidate against `primary` and fill the three buckets.
-fn bucket_pairs(
+pub fn bucket_pairs(
     primary: &FontData,
     all: &[FontData],
     excluded: &HashSet<String>,
@@ -484,7 +479,8 @@ mod tests {
     //
     // Pairings Jarrett actually shipped, scored both directions against the
     // live font database. Not a pass/fail gate: it prints a hit-rate table.
-    //   FONTDROP_DB=~/Library/Application\ Support/co.dynolabs.fontdrop/fontdrop.db \
+    //   (use a COPY: sqlite3 <live db> ".backup /tmp/fd-copy.db")
+    //   cd core && FONTDROP_DB=/tmp/fd-copy.db \
     //     cargo test --lib eval_ground_truth -- --ignored --nocapture
 
     /// (key a, key b, tokens that disqualify a family from matching key a / key b)
@@ -557,7 +553,7 @@ mod tests {
     }
 
     // ── Broad benchmark (Google Fonts pairs mined from real sites + books) ──
-    //   BENCH_DB=<bench.db> BENCH_PAIRS=docs/research/benchmarks/web-pairs.csv \
+    //   cd core && BENCH_DB=<bench.db> BENCH_PAIRS=../docs/research/benchmarks/web-pairs.csv \
     //     cargo test --lib eval_benchmark -- --ignored --nocapture
     // AUC = chance a real pair outscores a fake one (0.5 = coin flip).
     // Negatives are popularity-matched, so popularity alone scores ~0.5.
@@ -586,7 +582,7 @@ mod tests {
                 .min_by_key(|f| (f.weight as i32 - 400).abs());
             exact.or_else(|| {
                 all.iter()
-                    .filter(|f| crate::strip_instance_words(&f.font_family).to_lowercase() == fam)
+                    .filter(|f| crate::names::strip_instance_words(&f.font_family).to_lowercase() == fam)
                     .filter(upright)
                     .min_by_key(|f| (f.weight as i32 - 400).abs())
             })
