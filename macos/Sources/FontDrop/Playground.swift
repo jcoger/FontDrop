@@ -90,23 +90,44 @@ struct PlaygroundGroup: View {
     }
 
     private func stylePicker(_ s: TypeSettings) -> some View {
-        let list = styles
+        // Files, and under each variable file its named instances ("Light", "Black").
+        let choices = StyleChoices.build(files: styles, family: family.name, instances: FontInstances.of)
         // The saved or suggested file may not be in the list (the list keeps one file per style), so pick the nearest listed one.
         let wanted = s.stylePath ?? family.filePath
-        let current = StyleNames.nearest(to: wanted, in: list, family: family.name,
-                                         weight: StyleTraits.of(path: wanted)?.weight)?.filePath ?? wanted
+        let defaults = Dictionary((FontLoader.shared.info(wanted)?.axes ?? []).map { ($0.tag, $0.defaultValue) }, uniquingKeysWith: { a, _ in a })
+        let hit = StyleChoices.current(in: choices, path: wanted, set: s.axes, defaults: defaults)
+        let fallbackFile = StyleNames.nearest(to: wanted, in: styles, family: family.name,
+                                              weight: StyleTraits.of(path: wanted)?.weight)?.filePath
+        // A slider moved off every instance: say "Custom" rather than show a wrong name.
+        let custom = hit == nil && choices.contains { $0.path == wanted && $0.isInstance }
+        let current = hit?.id ?? (custom ? StyleChoice.customID : (fallbackFile ?? wanted))
+        let plain = choices.filter { !$0.isInstance }
+        let groups = Dictionary(grouping: choices.filter(\.isInstance), by: { $0.path })
+        let groupOrder = choices.filter(\.isInstance).map(\.path).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         return HStack {
             Text("Style").font(.callout)
             Spacer()
-            if list.count > 1 {
+            if choices.count > 1 {
                 Picker("Style", selection: Binding(
                     get: { current },
-                    set: { new in store.update(key, job: job) { $0.stylePath = (new == family.filePath ? nil : new) } })) {
-                    ForEach(list, id: \.filePath) { Text(StyleNames.label($0, family: family.name)).tag($0.filePath) }
+                    set: { new in
+                        guard let pick = choices.first(where: { $0.id == new }) else { return }   // "Custom" is a status, not a choice
+                        store.update(key, job: job) {
+                            $0.stylePath = (pick.path == family.filePath ? nil : pick.path)
+                            $0.axes = pick.axes      // an instance sets its axes; a plain file clears them
+                        }
+                    })) {
+                    ForEach(plain) { Text($0.label).tag($0.id) }
+                    ForEach(groupOrder, id: \.self) { path in
+                        Section(groups[path]?.first?.group ?? "Variable") {
+                            ForEach(groups[path] ?? []) { Text($0.label).tag($0.id) }
+                        }
+                    }
+                    if custom { Text("Custom").tag(StyleChoice.customID) }
                 }
                 .labelsHidden().frame(maxWidth: 190)
             } else {
-                Text(list.first.map { StyleNames.label($0, family: family.name) } ?? "Regular").font(.callout).foregroundStyle(.secondary)
+                Text(choices.first?.label ?? "Regular").font(.callout).foregroundStyle(.secondary)
             }
         }
     }

@@ -181,13 +181,19 @@ extension TypeSettings {
     func font(from loaded: FontLoader.Loaded, axisInfo: [FontLoader.Axis], ratio: CGFloat = 1) -> CTFont {
         var attrs: [CFString: Any] = [:]
         var variation: [NSNumber: Double] = [:]
+        let size = CGFloat(self.size) * ratio
         for axis in axisInfo {
-            if let v = axes[axis.tag] { variation[NSNumber(value: axis.identifier)] = min(max(v, axis.min), axis.max) }
+            if let v = axes[axis.tag] {
+                variation[NSNumber(value: axis.identifier)] = min(max(v, axis.min), axis.max)
+            } else if axis.tag == "opsz" {
+                // Optical size follows the size drawn, unless the designer moved the slider. Core Text does this itself
+                // for Apple's fonts, but a third-party font can stay at its default (12 for one, 96 for another).
+                variation[NSNumber(value: axis.identifier)] = min(max(Double(size), axis.min), axis.max)
+            }
         }
         if !variation.isEmpty { attrs[kCTFontVariationAttribute] = variation }
         let feats = featureAttribute
         if !feats.isEmpty { attrs[kCTFontFeatureSettingsAttribute] = feats }
-        let size = CGFloat(self.size) * ratio
         guard !attrs.isEmpty else { return CTFontCreateWithFontDescriptor(loaded.descriptor, size, nil) }
         let descriptor = CTFontDescriptorCreateCopyWithAttributes(loaded.descriptor, attrs as CFDictionary)
         return CTFontCreateWithFontDescriptor(descriptor, size, nil)

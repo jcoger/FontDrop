@@ -128,6 +128,29 @@ pub struct HouseStyle {
     pub statements: Vec<String>,
 }
 
+/// One axis value of a named instance.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct AxisSetting {
+    pub tag: String,
+    pub value: f64,
+}
+
+/// A named instance of a variable font ("Light", "Black") and the axis values it sets.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct FontInstance {
+    pub name: String,
+    pub axes: Vec<AxisSetting>,
+}
+
+/// The named instances in a variable font file's `fvar` table, in the font's own order. Empty for a static font.
+#[uniffi::export]
+pub fn font_instances(path: String) -> Vec<FontInstance> {
+    crate::names::named_instances(std::path::Path::new(&path))
+        .into_iter()
+        .map(|i| FontInstance { name: i.name, axes: i.axes.into_iter().map(|(tag, value)| AxisSetting { tag, value }).collect() })
+        .collect()
+}
+
 /// The four jobs a face can be chosen for: display, reading, ui, mono.
 #[uniffi::export]
 pub fn jobs() -> Vec<String> {

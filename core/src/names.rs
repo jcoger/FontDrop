@@ -448,3 +448,60 @@ pub fn parse_font_meta(path: &std::path::Path, family_name: &str) -> FontMeta {
         weight,
     }
 }
+
+/// One named instance of a variable font, from its `fvar` table: "Light", "Black", with the axis values it sets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamedInstance {
+    pub name: String,
+    /// (axis tag, user-space value), in the font's axis order.
+    pub axes: Vec<(String, f64)>,
+}
+
+/// The named instances of a variable font, in the font's own order. Empty for a static font or an unreadable file.
+/// Instances with no readable name are left out, and so is a repeat of the same name and values.
+pub fn named_instances(path: &std::path::Path) -> Vec<NamedInstance> {
+    use skrifa::{FontRef, MetadataProvider};
+    let Ok(data) = std::fs::read(path) else { return Vec::new() };
+    let Ok(font) = FontRef::from_index(&data, 0) else { return Vec::new() };
+    let tags: Vec<String> = font.axes().iter().map(|a| a.tag().to_string()).collect();
+    let mut out: Vec<NamedInstance> = Vec::new();
+    for inst in font.named_instances().iter() {
+        let Some(name) = font.localized_strings(inst.subfamily_name_id()).english_or_first().map(|s| s.to_string().trim().to_string()).filter(|s| !s.is_empty()) else { continue };
+        let axes: Vec<(String, f64)> = tags.iter().cloned().zip(inst.user_coords().map(|v| v as f64)).collect();
+        let item = NamedInstance { name, axes };
+        if !out.contains(&item) { out.push(item); }
+    }
+    out
+}
+
+#[cfg(test)]
+mod instance_tests {
+    use super::named_instances;
+
+    #[test]
+    fn a_variable_font_lists_its_named_instances_with_axis_values() {
+        let path = std::path::Path::new("/System/Library/Fonts/NewYork.ttf");
+        if !path.exists() { return; } // macOS only
+        let list = named_instances(path);
+        let heavy = list.iter().find(|i| i.name == "Heavy").expect("New York has a Heavy");
+        let wght = heavy.axes.iter().find(|(t, _)| t == "wght").map(|(_, v)| *v).unwrap();
+        assert!((wght - 810.0).abs() < 1.0, "{wght}");
+        assert!(list.len() >= 6);
+    }
+
+    /// Prints the instances of the font files in FONT_FILES (comma separated): `FONT_FILES=a.ttf,b.ttf cargo test --lib print_instances -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn print_instances() {
+        for p in std::env::var("FONT_FILES").expect("set FONT_FILES").split(',') {
+            let list = named_instances(std::path::Path::new(p));
+            println!("{p}: {}", list.iter().map(|i| format!("{} {:?}", i.name, i.axes.iter().map(|(t, v)| format!("{t}={v}")).collect::<Vec<_>>())).collect::<Vec<_>>().join(" | "));
+        }
+    }
+
+    #[test]
+    fn a_static_or_missing_font_has_none() {
+        assert!(named_instances(std::path::Path::new("/System/Library/Fonts/Supplemental/Arial.ttf")).is_empty());
+        assert!(named_instances(std::path::Path::new("/nonexistent.ttf")).is_empty());
+    }
+}
