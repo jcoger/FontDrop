@@ -441,3 +441,24 @@ The two sources named today are **Typewolf** and **Butterick's Practical Typogra
 ### Gates for section 16
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass
+
+## 17. Display and Text, and the Nov 5 renames (2026-11-05)
+
+The second job is **Text**, not Reading. On a poster the second face sets the credit line, which nobody reads at length. Display and text face is the trade's own pair, and variable fonts use the same two words for optical sizes. Primary and Secondary were rejected: they are ranks, and the Oct 21 rethink gave fonts jobs, not ranks. Headline and Body were rejected: "Body" is already the size on the dial. The code's `reading` identifier stays; only what people see changes. Source: `team`, needs a first-click test (ship plan R1).
+
+| ID | Was | Now | Note |
+|---|---|---|---|
+| 17.1 | Reading (job, sidebar row, screen title) | **Text** | 17 UI strings at 567688a, e.g. "Text for Agrandir", "Use for Text", "Current Text face", "Find a Text face" |
+| 17.2 | Reading candidate | **Text candidate** | Inspector subtitle |
+| 17.3 | Fit (scale mode, "Press for Fit") | **Auto** ("Press for Auto") | "Fit" now means stage zoom only (11.16 stays) |
+| 17.4 | Letters and spacing / Scale and spacing | **Spacing and features** | "Letters" names only the glyph tile strip |
+| 17.5 | Chosen | **Current** | One word for the face you picked |
+| 17.6 | Hand off | **Export** | "Handoff" is also a macOS feature. The plans keep "Hand-off" as a round name only |
+| 17.7 | Display / Text (variable-font optical size switch) | **Optical size: Auto** | So Display and Text name only jobs. It already follows the point size |
+| 17.8 | Saved to Acme | cut | Collides with Saved (the star). A Mac app autosaves |
+
+Plain words. No em dashes.
+
+### Gates for section 17
+
+A pass · B pass · C pass (no em dashes) · F pass after 17.7 · R pass

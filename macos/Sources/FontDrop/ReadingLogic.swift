@@ -233,6 +233,88 @@ enum StyleNames {
     }
 }
 
+// MARK: - Style choices (files and named instances)
+
+/// One row of the Style picker: a font file, or a named instance of a variable file.
+/// Picking an instance keeps the file and sets its axis values; it never changes the file.
+struct StyleChoice: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let path: String
+    /// Axis values the choice sets. Empty for a plain file.
+    let axes: [String: Double]
+    /// Nil for a plain file; the group title ("Variable", "Variable Italic") for an instance.
+    let group: String?
+    let weight: Double
+    let italic: Bool
+
+    var isInstance: Bool { group != nil }
+    static let customID = "custom"
+}
+
+enum StyleChoices {
+    /// Plain files first, in the order `StyleNames.sorted` gives. Then, for each variable file that names instances, a group
+    /// with its instances by weight (upright before italic at the same weight, then by name).
+    static func build(files: [FontFile], family: String, instances: (String) -> [FontInstance]) -> [StyleChoice] {
+        var plain: [StyleChoice] = []
+        var groups: [StyleChoice] = []
+        for file in StyleNames.sorted(files, family: family) {
+            let named = instances(file.filePath)
+            let fileItalic = StyleNames.isItalic(file, family: family) || file.filePath.lowercased().contains("italic")
+            if named.isEmpty {
+                plain.append(StyleChoice(id: file.filePath, label: StyleNames.label(file, family: family), path: file.filePath,
+                                         axes: [:], group: nil, weight: Double(file.weight), italic: fileItalic))
+                continue
+            }
+            let title = fileItalic ? "Variable Italic" : "Variable"
+            var items: [StyleChoice] = []
+            for inst in named {
+                let axes = Dictionary(inst.axes.map { ($0.tag, $0.value) }, uniquingKeysWith: { a, _ in a })
+                let italic = fileItalic || (axes["ital"] ?? 0) > 0.5 || (axes["slnt"] ?? 0) < -0.5
+                    || inst.name.lowercased().contains("italic") || inst.name.lowercased().contains("oblique")
+                let needsWord = italic && !inst.name.lowercased().contains("italic") && !inst.name.lowercased().contains("oblique")
+                items.append(StyleChoice(id: "\(file.filePath)#\(inst.name)", label: needsWord ? "\(inst.name) Italic" : inst.name,
+                                         path: file.filePath, axes: axes, group: title,
+                                         weight: axes["wght"] ?? Double(file.weight), italic: italic))
+            }
+            items.sort { a, b in
+                let ka = (a.weight, a.italic ? 1 : 0), kb = (b.weight, b.italic ? 1 : 0)
+                if ka != kb { return ka < kb }
+                return a.label.localizedStandardCompare(b.label) == .orderedAscending
+            }
+            groups += items
+        }
+        return plain + groups
+    }
+
+    /// The choice the picker shows for the face now drawn: `path` with the axis values in `set`, over the file's `defaults`.
+    /// An instance matches when every axis it names sits within half a unit of the value drawn. Nil when none does
+    /// (a slider was moved, or the file is not in the list).
+    static func current(in choices: [StyleChoice], path: String, set: [String: Double], defaults: [String: Double]) -> StyleChoice? {
+        let ofFile = choices.filter { $0.path == path }
+        guard !ofFile.isEmpty else { return nil }
+        if let plain = ofFile.first(where: { !$0.isInstance }) { return plain }
+        return ofFile.first { c in
+            c.axes.allSatisfy { tag, value in abs((set[tag] ?? defaults[tag] ?? value) - value) < 0.5 }
+        }
+    }
+}
+
+/// The named instances of each variable file, read once from the file's `fvar` table.
+enum FontInstances {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var memo: [String: [FontInstance]] = [:]
+
+    static func of(_ path: String) -> [FontInstance] {
+        lock.lock()
+        if let hit = memo[path] { lock.unlock(); return hit }
+        lock.unlock()
+        let list = fontInstances(path: path)
+        lock.lock(); memo[path] = list; lock.unlock()
+        return list
+    }
+}
+
 /// Which candidate is selected after the list is rebuilt. Font ids can change when the library is rescanned. The
 /// family name does not, so the selection follows the family.
 enum CandidateSelection {

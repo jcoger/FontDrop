@@ -162,6 +162,98 @@ final class ReadingStageTests: XCTestCase {
         XCTAssertNil(StyleNames.nearest(to: "/z/Other.otf", in: [], family: "Fam", weight: nil))
     }
 
+    // MARK: Variable fonts: named instances in the Style picker, optical size
+
+    private static func inst(_ name: String, _ wght: Double) -> FontInstance {
+        FontInstance(name: name, axes: [AxisSetting(tag: "wght", value: wght)])
+    }
+
+    private static let shapeInstances: [String: [FontInstance]] = [
+        "/x/Shape-Variable.ttf": [inst("Black", 900), inst("Light", 300), inst("Regular", 400), inst("Medium", 500), inst("Bold", 700)],
+        "/x/Shape-VariableItalic.ttf": [inst("Regular", 400), inst("Light", 300)],
+    ]
+
+    func testNamedInstancesListUnderTheirVariableFileByWeight() {
+        let files = [file("/x/Shape-Regular.otf", weight: 400, style: "Regular"), file("/x/Shape-Variable.ttf", weight: 900, style: "Black"),
+                     file("/x/Shape-VariableItalic.ttf", weight: 900, style: "Black Italic"), file("/x/Shape-Bold.otf", weight: 700, style: "Bold")]
+        let list = StyleChoices.build(files: files, family: "Shape", instances: { Self.shapeInstances[$0] ?? [] })
+        XCTAssertEqual(list.filter { !$0.isInstance }.map(\.label), ["Regular", "Bold"], "plain files keep the StyleNames order")
+        let upright = list.filter { $0.group == "Variable" }
+        XCTAssertEqual(upright.map(\.label), ["Light", "Regular", "Medium", "Bold", "Black"], "light to heavy")
+        XCTAssertTrue(upright.allSatisfy { $0.path == "/x/Shape-Variable.ttf" }, "an instance never changes the file")
+        let italic = list.filter { $0.group == "Variable Italic" }
+        XCTAssertEqual(italic.map(\.label), ["Light Italic", "Regular Italic"], "the italic file's instances say so")
+        XCTAssertEqual(Set(list.map(\.id)).count, list.count, "ids are unique")
+    }
+
+    func testTheDrawnFaceMatchesItsInstanceOrNone() {
+        let files = [file("/x/Shape-Variable.ttf", weight: 900)]
+        let list = StyleChoices.build(files: files, family: "Shape", instances: { Self.shapeInstances[$0] ?? [] })
+        let path = "/x/Shape-Variable.ttf"
+        XCTAssertEqual(StyleChoices.current(in: list, path: path, set: [:], defaults: ["wght": 900])?.label, "Black", "the file's default")
+        XCTAssertEqual(StyleChoices.current(in: list, path: path, set: ["wght": 300], defaults: ["wght": 900])?.label, "Light")
+        XCTAssertNil(StyleChoices.current(in: list, path: path, set: ["wght": 350], defaults: ["wght": 900]), "between instances: Custom")
+        XCTAssertNil(StyleChoices.current(in: list, path: "/x/Other.ttf", set: [:], defaults: [:]))
+    }
+
+    func testAStaticFamilyHasNoGroups() {
+        let files = [file("/x/A-Regular.otf", weight: 400, style: "Regular"), file("/x/A-Bold.otf", weight: 700, style: "Bold")]
+        let list = StyleChoices.build(files: files, family: "A", instances: { _ in [] })
+        XCTAssertEqual(list.map(\.label), ["Regular", "Bold"])
+        XCTAssertTrue(list.allSatisfy { !$0.isInstance })
+    }
+
+    /// The real fvar of a system variable font lists its named instances through the core.
+    func testTheCoreReadsNamedInstancesFromARealFont() throws {
+        let path = "/System/Library/Fonts/NewYork.ttf"
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: path))
+        let names = fontInstances(path: path).map(\.name)
+        XCTAssertTrue(names.contains("Heavy") && names.contains("Bold"), "\(names)")
+    }
+
+    /// Rendered optical size: the effective `opsz` of a font drawn at 12 and at 72 points.
+    private func opsz(_ settings: TypeSettings, path: String, ratio: CGFloat = 1) throws -> Double? {
+        guard case .success(let loaded) = FontLoader.shared.load(path: path) else { throw XCTSkip("font not loadable") }
+        let axes = FaceInspector.read(loaded).axes
+        let font = settings.font(from: loaded, axisInfo: axes, ratio: ratio)
+        let variation = CTFontCopyVariation(font) as? [NSNumber: Double]
+        let id = axes.first { $0.tag == "opsz" }?.identifier
+        return id.flatMap { variation?[NSNumber(value: $0)] }
+    }
+
+    func testOpticalSizeFollowsThePointSize() throws {
+        let path = "/System/Library/Fonts/NewYork.ttf"        // opsz 12...256
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: path))
+        var s = TypeSettings(size: 12, lineHeight: 1.3)
+        XCTAssertEqual(try opsz(s, path: path) ?? 0, 12, accuracy: 0.01)
+        s.size = 72
+        XCTAssertEqual(try opsz(s, path: path) ?? 0, 72, accuracy: 0.01)
+        s.size = 40
+        XCTAssertEqual(try opsz(s, path: path, ratio: 0.5) ?? 0, 20, accuracy: 0.01, "the role's size, not the base size")
+        s.axes["opsz"] = 30                                      // the designer moved the slider: it wins at any size
+        XCTAssertEqual(try opsz(s, path: path) ?? 0, 30, accuracy: 0.01)
+    }
+
+    /// Core Text sizes Apple's fonts by itself; some third-party fonts stay at one value whatever the size.
+    /// Finds such a font in the user's own folder (skips when there is none) and checks it now follows.
+    func testOpticalSizeFollowsEvenWhenCoreTextLeavesTheFontAtItsDefault() throws {
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Fonts")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        for name in files where name.lowercased().hasSuffix(".ttf") || name.lowercased().hasSuffix(".otf") {
+            let path = dir.appendingPathComponent(name).path
+            guard case .success(let loaded) = FontLoader.shared.load(path: path),
+                  let axis = FaceInspector.read(loaded).axes.first(where: { $0.tag == "opsz" }), axis.max - axis.min > 20 else { continue }
+            // What Core Text does alone, at 72 pt: build the font with no variation set.
+            let bare = CTFontCreateWithFontDescriptor(loaded.descriptor, 72, nil)
+            let alone = (CTFontCopyVariation(bare) as? [NSNumber: Double])?[NSNumber(value: axis.identifier)]
+            guard alone != min(max(72, axis.min), axis.max) else { continue }      // follows by itself: not the case we want
+            let s = TypeSettings(size: 72, lineHeight: 1.1)
+            XCTAssertEqual(try opsz(s, path: path) ?? 0, min(max(72, axis.min), axis.max), accuracy: 0.01, name)
+            return
+        }
+        throw XCTSkip("no third-party variable font with a stuck optical size in the user's fonts folder")
+    }
+
     /// A label in semibold must come from the same width as the text around it (PP Right Serif ships Compact, Wide, Tall...).
     func testWeightedStaysInTheFacesWidth() {
         let fam = "PP Right Serif"

@@ -344,6 +344,48 @@ mod tests {
         assert!(!assess_owned(&fam[..3], None).is, "no bold italic, and not enough weights");
     }
 
+    /// A family shipped only as two variable files, the way Google ships Inter: one upright, one italic, each with a
+    /// `wght` axis. It has one weight per file, so the weight count cannot make it a text family; the axis does.
+    #[test]
+    fn a_family_of_two_variable_files_is_a_text_family() {
+        let vf = |name: &str, style: &str| {
+            let mut f = file("Acme Inter", name, 400, style);
+            f.is_variable = true;
+            f.wght_axis_max = 900;
+            f.weight_range_min = Some(100);
+            f.weight_range_max = Some(900);
+            f.advance_ratio = Some(0.63);
+            f.x_height_ratio = Some(0.55);
+            f
+        };
+        let fam = vec![vf("AcmeInter[opsz,wght].ttf", "normal"), vf("AcmeInter-Italic[opsz,wght].ttf", "italic")];
+        let w = assess_owned(&fam, Some(2));
+        assert!(w.is, "{w:?}");
+        assert!(w.passed.contains(&"text family") && !w.failed.contains(&"normal width"), "{w:?}");
+        // The upright file alone has no italic, and the same rule keeps it out.
+        assert!(!assess_owned(&fam[..1], None).is, "no italic file and no ital axis");
+        // With the guides' word it is a workhorse even when the files were never measured.
+        let mut unread = vec![vf("AcmeInter[opsz,wght].ttf", "normal"), vf("AcmeInter-Italic[opsz,wght].ttf", "italic")];
+        for f in &mut unread { f.advance_ratio = None; f.stroke_contrast_ratio = None; }
+        assert!(assess_recommended(&unread).is);
+    }
+
+    /// Statics beside variable files, as Fontshare ships Satoshi. A variable file's OS/2 weight is its default instance
+    /// (900 for Satoshi Variable); it must not pull the family's regular face away from the static Regular.
+    #[test]
+    fn statics_beside_variable_files_still_judge_by_the_regular() {
+        let mut fam = text_family("Acme Shape");
+        for w in [200, 900] {
+            let mut f = file("Acme Shape", &format!("AcmeShape-Variable{w}.ttf"), w, "normal");
+            f.is_variable = true;
+            f.wght_axis_max = 900;
+            f.advance_ratio = Some(0.9); // would fail the width if it were taken for the regular face
+            fam.push(f);
+        }
+        let w = assess_owned(&fam, None);
+        assert!(w.is, "{w:?}");
+    }
+
     #[test]
     fn a_variable_family_with_a_weight_range_counts() {
         let mut vf = file("Acme Var", "AcmeVar[wght].ttf", 400, "normal");

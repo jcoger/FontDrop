@@ -807,6 +807,50 @@ mod tests {
         assert!(unfit_for_reading(&all).is_empty());
     }
 
+    /// The basics: an Inter-like family (two variable files, as Google ships it) and a Satoshi-like one (statics plus two
+    /// variable files whose OS/2 weight is 900) are fit for Reading, count as workhorses, and are offered under a serif
+    /// Display. No family name is special-cased.
+    #[test]
+    fn inter_like_and_satoshi_like_families_reach_reading() {
+        let measured = |mut f: FontData| {
+            f.x_height_ratio = Some(0.52);
+            f.cap_height_ratio = Some(0.7);
+            f.advance_ratio = Some(0.62);
+            f.stroke_contrast_ratio = Some(1.2);
+            f.skeleton = "rational".into();
+            f
+        };
+        let mut all = Vec::new();
+        for (id, name, style) in [("i1", "Basic[opsz,wght].ttf", "normal"), ("i2", "Basic-Italic[opsz,wght].ttf", "italic")] {
+            let mut f = measured(styled(id, "Basic Sans", name, 400));
+            f.style = style.into();
+            f.is_variable = true;
+            f.wght_axis_max = 900;
+            all.push(f);
+        }
+        for (id, name, w) in [("s1", "Shape-Regular.otf", 400), ("s2", "Shape-Italic.otf", 400), ("s3", "Shape-Bold.otf", 700),
+                              ("s4", "Shape-BoldItalic.otf", 700), ("s5", "Shape-Light.otf", 300)] {
+            all.push(measured(styled(id, "Shape Sans", name, w)));
+        }
+        for (id, name) in [("s6", "Shape-Variable.ttf"), ("s7", "Shape-VariableItalic.ttf")] {
+            let mut f = measured(styled(id, "Shape Sans", name, 900));
+            f.is_variable = true;
+            f.wght_axis_max = 900;
+            all.push(f);
+        }
+        assert!(unfit_for_reading(&all).is_empty());
+        let horses = crate::workhorse::assess_all(&all, &std::collections::HashMap::new());
+        assert!(horses["Basic Sans"].is && horses["Shape Sans"].is, "{horses:?}");
+        let mut display = measured(styled("d1", "Acme Serif", "Serif-Regular.otf", 400));
+        display.flesh_serif = 1;
+        display.skeleton = "dynamic".into();
+        all.push(display.clone_for_test());
+        let ranked = ranked_candidates(&display, &all, &unfit_for_reading(&all), 10);
+        let families: HashSet<&str> = ranked.iter().filter_map(|s| all.iter().find(|f| f.font_id == s.font_id)).map(|f| f.font_family.as_str()).collect();
+        assert!(families.contains("Basic Sans") && families.contains("Shape Sans"), "{families:?}");
+        assert!(ranked.iter().all(|s| s.pair_type == "contrast"), "serif with sans");
+    }
+
     #[test]
     fn a_variable_file_that_reaches_bold_and_italic_is_fit_for_reading() {
         let mut vf = styled("v1", "Vari", "Vari[wght].ttf", 400);
@@ -1113,6 +1157,56 @@ mod tests {
             v
         };
         println!("\n{} of {} library families match a recommendation: {}", recommended.len(), families.len(), recommended.join(", "));
+    }
+
+    // The basics (Inter-like, Satoshi-like families), on a DB copy:
+    //   FONTDROP_DB=<copy> BASICS="General Sans,Satoshi" cargo test --lib eval_basics -- --ignored --nocapture
+    // Prints each file's measures, each signal, whether the family is a workhorse, and its place in Reading for three
+    // Display faces: under Difference Distinct, under Any, and whether it is inside the first page of 40.
+    #[test]
+    #[ignore]
+    fn eval_basics() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB");
+        let names: Vec<String> = std::env::var("BASICS")
+            .unwrap_or("General Sans,Satoshi,Timeless Sans,Timeless Serif".into())
+            .split(',').map(|s| s.trim().to_string()).collect();
+        let conn = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let all = load_all_fonts(&conn).unwrap();
+        let pop = crate::workhorse::popularity(&conn);
+        let horses = crate::workhorse::assess_all(&all, &pop);
+        let unfit = unfit_for_reading(&all);
+        let fmt = |v: Option<f64>| v.map(|x| format!("{x:.3}")).unwrap_or("-".into());
+        for name in &names {
+            let files: Vec<&FontData> = all.iter().filter(|f| &f.font_family == name).collect();
+            println!("\n== {name}: {} files, {} variable", files.len(), files.iter().filter(|f| f.is_variable).count());
+            for f in &files {
+                println!("   {:<44} w{:<4} var:{} wght<={:<4} ital:{} slant:{} width:{:<9} x:{} adv:{} con:{} unfit:{}",
+                    f.file_name, f.weight, f.is_variable as u8, f.wght_axis_max, f.ital_axis as u8,
+                    crate::names::is_slanted(&f.file_name, &f.style) as u8, f.width_class.clone().unwrap_or("-".into()),
+                    fmt(f.x_height_ratio), fmt(f.advance_ratio), fmt(f.stroke_contrast_ratio), unfit.contains(&f.font_id) as u8);
+            }
+            let Some(w) = horses.get(name) else { println!("   not installed"); continue };
+            let rank = pop.get(&crate::google_list::normalize_family(name));
+            println!("   WORKHORSE: {}  google rank: {:?}  recommended: {}", w.is, rank, crate::recommendations::for_family(name).is_some());
+            println!("   passed: {} | failed: {} | unknown: {}", w.passed.join(", "), w.failed.join(", "), w.unknown.join(", "));
+        }
+        for key in ["agrandir", "ppmuseum", "timelessserif"] {
+            let Some(primary) = pick_primary(&all, key, &[]) else { println!("{key}: not installed"); continue };
+            let (page, _) = reading_candidates(&conn, &primary.font_id, vec![], vec![], false, 10_000).unwrap();
+            let fam = |id: &str| all.iter().find(|f| f.font_id == id).map(|f| f.font_family.clone()).unwrap_or_default();
+            let distinct: Vec<&PairScore> = page.iter().filter(|s| s.pair_type == "contrast" || s.pair_type == "same_family").collect();
+            println!("\nDisplay = {}: {} families in Reading under Any, {} under Distinct (workhorses {} / {})", primary.font_family,
+                page.len(), distinct.len(),
+                page.iter().filter(|s| horses[&fam(&s.font_id)].is).count(),
+                distinct.iter().filter(|s| horses[&fam(&s.font_id)].is).count());
+            for name in &names {
+                let pos_any = page.iter().position(|s| fam(&s.font_id) == *name);
+                let pos_dist = distinct.iter().position(|s| fam(&s.font_id) == *name);
+                let kind = pos_any.map(|i| page[i].pair_type.clone()).unwrap_or("none".into());
+                let show = |p: Option<usize>| p.map(|i| format!("#{}{}", i + 1, if i < 40 { "" } else { " (past the 40 cut)" })).unwrap_or("not listed".into());
+                println!("   {:<16} Any {:<22} Distinct {:<22} type: {}", name, show(pos_any), show(pos_dist), kind);
+            }
+        }
     }
 
     // ── Broad benchmark (Google Fonts pairs mined from real sites + books) ──
