@@ -27,10 +27,12 @@ enum FoundryLens: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Best match is the engine's order. "Less common first" uses Google's popularity rank
+/// Best match is the engine's order, with the dependable text faces (workhorses, from the core) first and the faces with
+/// more personality after them. "More character first" flips those two groups. "Less common first" uses Google's popularity rank
 /// (the only popularity data there is) and puts families Google does not list first.
 enum ReadingSort: String, CaseIterable, Identifiable {
     case bestMatch = "Best match", xHeight = "Same x-height first", name = "Name", lessCommon = "Less common first"
+    case characterFirst = "More character first"
     var id: String { rawValue }
     /// What the Sort menu offers before a Display face exists: nothing to rank against, so no "Best match".
     static let withoutDisplay: [ReadingSort] = [.name, .lessCommon]
@@ -57,19 +59,23 @@ struct Candidate: Identifiable, Hashable {
     let googleRank: Int?
     /// For a Same family pair: which style of the family to use for body text.
     let bodyStyle: BodyStyle?
+    /// A dependable text face, by the core's own signals. Not shown as a badge: it only sets the order.
+    let workhorse: Bool
 
     init(_ m: PairCandidate, order: Int, googleRank: Int? = nil) {
         id = m.fontId; family = m.family; filePath = m.filePath
         pairType = m.pairType; evidence = m.evidence; self.order = order; self.googleRank = googleRank
         bodyStyle = m.suggestedBodyStyle
+        workhorse = m.workhorse
     }
 
     /// For tests and previews.
     init(id: String, family: String, filePath: String = "", pairType: String, evidence: [Evidence], order: Int,
-         googleRank: Int? = nil, bodyStyle: BodyStyle? = nil) {
+         googleRank: Int? = nil, bodyStyle: BodyStyle? = nil, workhorse: Bool = false) {
         self.id = id; self.family = family; self.filePath = filePath
         self.pairType = pairType; self.evidence = evidence; self.order = order; self.googleRank = googleRank
         self.bodyStyle = bodyStyle
+        self.workhorse = workhorse
     }
 
     /// The Display family offered as its own partner.
@@ -104,8 +110,10 @@ enum LensEngine {
         let q = search.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty { shown = shown.filter { $0.family.localizedCaseInsensitiveContains(q) } }
         switch lenses.sort {
-        case .bestMatch:
-            shown.sort { $0.order < $1.order }   // Same family is order 0: the engine puts it first
+        case .bestMatch, .characterFirst:
+            // The core ordered the groups (workhorses first, or last for "More character first") and the engine's
+            // best match within each. Same family is order 0: the engine puts it first.
+            shown.sort { $0.order < $1.order }
         case .xHeight:
             shown.sort { ($0.xHeightGap ?? 99, $0.order) < ($1.xHeightGap ?? 99, $1.order) }
         case .name:

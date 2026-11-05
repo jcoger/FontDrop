@@ -72,6 +72,12 @@ extension PairContext {
 
     /// Height of `item` on the board at the current playground size, shrunk by `s`, with its wrapped line count.
     private func height(of item: FitItem, at s: CGFloat) -> CGFloat {
+        // A fill word is as tall as its ink (see `posterWord`), or its line height when that is more.
+        if item.fill != nil, !scale.locked {
+            let size = item.px * drawFactor(item) * s
+            let ink = inkBox(item.text, display, size: size, track: item.tracking)
+            return max(size * CGFloat(item.lh), ink.above + ink.below)
+        }
         var lines = 1
         if let width = item.width, let font = FontLoader.shared.styledFont(display, ratio: item.px * s * drawFactor(item) / CGFloat(display.settings.size)) {
             lines = TightLines.lines(item.text, font: font,
@@ -96,7 +102,7 @@ extension PairContext {
             let other = items.filter { $0.fill == nil }.reduce(0) { $0 + height(of: $1, at: 1) }
             let filled = fillItems.reduce(0) { $0 + height(of: $1, at: 1) }
             let room = boardHeight - fixed - other
-            c.fillFit = filled > 0 ? min(1, max(0.35, room / filled * PosterFit.margin)) : 1
+            c.fillFit = filled > 0 ? min(1, max(0.05, room / filled * PosterFit.margin)) : 1
         }
         // Line counts change as the type shrinks, so settle on the factor over a few passes.
         var s: CGFloat = 1

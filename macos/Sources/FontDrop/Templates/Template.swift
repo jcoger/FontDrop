@@ -145,20 +145,32 @@ struct PairContext {
         let size = scale.locked
             ? roleSize(spec, px: px, isDisplay: true, step: nil).size * CGFloat(spec.settings.trim) * fit
             : fillSize(fill, px: px, track: track, italic: italic) * fillFit * fit
-        let _ = recordFill(text, spec, px: px, size: size, track: track, fill: fill)
+        // The word's box is its ink: the top of the tallest letter at the box's top, the bottom of the deepest descender at
+        // its bottom (or the line height, when that is more). So a descender never reaches the line under it, and the
+        // top never reaches the bars above it, whatever line box SwiftUI gives the text.
+        let ink = inkBox(text, spec, size: size, track: track)
+        let frameHeight = max(size * CGFloat(lh), ink.above + ink.below)
+        let _ = recordFill(text, spec, px: px, size: size, track: track, fill: fill, ink: ink, frameHeight: frameHeight)
         display(text, px, track: track, italic: italic, color: color, exactSize: size)
             .lineLimit(1).fixedSize()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: size * CGFloat(lh), alignment: .leading)
+            .alignmentGuide(.top) { d in d[.firstTextBaseline] - ink.above }
+            .frame(maxWidth: .infinity, minHeight: frameHeight, maxHeight: frameHeight, alignment: .topLeading)
     }
 
-    private func recordFill(_ text: String, _ face: FaceSpec, px: CGFloat, size: CGFloat, track: Double, fill: FillSpec) {
+    /// How far the word's ink reaches above and below its baseline, in points.
+    func inkBox(_ text: String, _ face: FaceSpec, size: CGFloat, track: Double) -> (above: CGFloat, below: CGFloat) {
+        guard let font = FontLoader.shared.styledFont(face, ratio: size / CGFloat(face.settings.size)) else { return (size * 0.75, size * 0.25) }
+        return TypeFit.ink(text, font: font, tracking: CGFloat(face.settings.tracking + track) * size)
+    }
+
+    private func recordFill(_ text: String, _ face: FaceSpec, px: CGFloat, size: CGFloat, track: Double, fill: FillSpec,
+                            ink: (above: CGFloat, below: CGFloat), frameHeight: CGFloat) {
         guard let recorder, let font = FontLoader.shared.styledFont(face, ratio: size / CGFloat(face.settings.size)) else { return }
         let w = TypeFit.lineWidth(text, font: font, tracking: CGFloat(face.settings.tracking + track) * size)
         recorder.add(FitRecord(kind: .display, text: text, px: px, size: size, clamped: false, width: fill.width, lines: [text],
                                lineWidths: [w], fill: w / fill.width, heightLimited: fillFit < 0.999, capped: false,
                                xTarget: nil, xActual: nil, tracking: face.settings.tracking + track, pitch: nil, need: nil,
-                               charsPerLine: nil, fillWord: true))
+                               charsPerLine: nil, fillWord: true, inkHeight: ink.above + ink.below, frameHeight: frameHeight))
     }
 
     // MARK: Solving

@@ -409,3 +409,20 @@ Plain words. No em dashes. "pt" is the unit, and the sizes are the board's point
 ### Gates for section 14
 
 A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass
+
+## 15. Dependable faces first in Reading (2026-11-04)
+
+Reading puts the dependable text faces (the core's "workhorses") ahead of the faces with more personality. Best match still orders each group. There is no badge: the vibe stays first and the order does the work.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 15.1 | sort.moreCharacter | **More character first** | Sort option, after **Less common first**. Flips the two groups: personality first, dependable text faces after |
+| 15.2 | sort.moreCharacter.help | **Faces with more personality come first. The dependable text faces follow.** | Help text on 15.1 |
+
+**Best match** keeps its name. Its help (7.x) is unchanged; the order inside it is now workhorses first. Compressed, condensed and narrow faces ("Compressed", "Condensed", "Schmal" in the name) leave the Reading list and count in **N not made for long text** (7.20).
+
+Plain words. No em dashes.
+
+### Gates for section 15
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass
