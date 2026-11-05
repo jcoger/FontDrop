@@ -43,7 +43,9 @@ final class FontLoader: @unchecked Sendable {
                 else { return nil }
                 let name = d[kCTFontVariationAxisNameKey as String] as? String ?? "Axis"
                 let id = (d[kCTFontVariationAxisIdentifierKey as String] as? NSNumber)?.uint32Value ?? 0
-                return Axis(tag: Self.tag(id), name: name, min: min, max: max, defaultValue: def)
+                let hidden = (d[kCTFontVariationAxisHiddenKey as String] as? NSNumber)?.boolValue ?? false
+                return Axis(tag: Self.tag(id), identifier: id, name: name, min: min, max: max,
+                            defaultValue: def, hidden: hidden)
             }
         }
 
@@ -55,10 +57,12 @@ final class FontLoader: @unchecked Sendable {
 
     struct Axis: Sendable, Identifiable {
         let tag: String
+        let identifier: UInt32     // the number Core Text wants when you set a value
         let name: String
         let min: Double
         let max: Double
         let defaultValue: Double
+        var hidden = false         // the font asks apps not to show it (e.g. GRAD in SF)
         var id: String { tag }
     }
 

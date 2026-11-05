@@ -31,7 +31,8 @@ struct FamilyPickerView: View {
                         ForEach(families) { family in
                             FamilyCard(family: family, sample: sample, tick: tick,
                                        isSelected: model.selectedFamily == family.name,
-                                       isChosen: chosen == family.name)
+                                       isChosen: chosen == family.name,
+                                       playground: model.selectedFamily == family.name ? playgroundFace(family) : nil)
                                 .id(family.name)
                                 .onTapGesture { model.selectedFamily = family.name }
                         }
@@ -55,6 +56,14 @@ struct FamilyPickerView: View {
         }
     }
 
+    /// The selected card shows the playground's style, axes, features and tracking (its size stays the card's).
+    private func playgroundFace(_ family: FamilySummary) -> FaceSpec? {
+        guard let job = screen.job, model.typeSettings.isModified(model.settingsKey(job, family.name), job: job) else { return nil }
+        var face = model.face(job, family)
+        face.settings.size = 54
+        return face
+    }
+
     private func subtitle(count: Int) -> String {
         let brand = model.brand?.name ?? "Your brand name"
         let tail = screen == .display ? "The face you pick here sets the tone for Reading." : "Pick one for this job."
@@ -69,11 +78,17 @@ struct FamilyCard: View {
     let tick: Int
     let isSelected: Bool
     let isChosen: Bool
+    var playground: FaceSpec?        // set on the selected card once the designer changed something
 
     var body: some View {
         VStack(spacing: 0) {
-            FontText(path: family.filePath, text: sample, size: 54,
-                     fallbacks: [family.name], tick: tick)
+            Group {
+                if let playground {
+                    FaceText(face: playground, text: sample, tick: tick, useLineHeight: false)
+                } else {
+                    FontText(path: family.filePath, text: sample, size: 54, fallbacks: [family.name], tick: tick)
+                }
+            }
                 .lineLimit(1)
                 .minimumScaleFactor(0.3)
                 .padding(.horizontal, 16)
@@ -110,18 +125,23 @@ struct FamilyInspector: View {
     @Environment(AppModel.self) private var model
     let screen: Screen
     @State private var detail: FamilyDetail?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if let name = model.selectedFamily, let family = model.familyByName[name] {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header(family)
-                    specimen(family)
+                    if let job = screen.job {
+                        PlaygroundGroup(job: job, family: family, title: "Playground \u{00B7} \(family.name)",
+                                        preview: model.sampleText, startOpen: true)
+                    }
                     if let detail, detail.family == name { facts(family, detail) }
                 }
                 .padding(16)
             }
             .safeAreaInset(edge: .bottom) { action(family) }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.choices[screen.job ?? ""] == family.name)
             .task(id: name) { detail = await model.detail(for: name) }
         } else {
             ContentUnavailableView("No family selected", systemImage: "textformat",
@@ -135,15 +155,6 @@ struct FamilyInspector: View {
             Text("\(screen.title) candidate" + (detail.map { $0.axes.isEmpty ? "" : " \u{00B7} Variable" } ?? ""))
                 .font(.caption).foregroundStyle(.secondary)
         }
-    }
-
-    private func specimen(_ family: FamilySummary) -> some View {
-        FontText(path: family.filePath, text: "Aa Gg Rr", size: 56, tick: model.fontTick)
-            .lineLimit(1).minimumScaleFactor(0.4)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 100)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.background.secondary))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
     }
 
     @ViewBuilder
@@ -166,32 +177,12 @@ struct FamilyInspector: View {
                 Text("\(d.styles.count - 10) more").font(.caption).foregroundStyle(.secondary).padding(.top, 6)
             }
         }
-        if !d.axes.isEmpty {
-            InspectorSection(title: "Axes", trailing: "\(d.axes.count)") {
-                ForEach(Array(d.axes.enumerated()), id: \.element.id) { i, axis in
-                    if i > 0 { Divider().padding(.vertical, 5) }
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("\(axis.tag.trimmingCharacters(in: .whitespaces)) \u{00B7} \(axis.name)").font(.callout)
-                            Spacer()
-                            Text("\(fmt(axis.min))\u{2013}\(fmt(axis.max))").font(.caption).foregroundStyle(.secondary)
-                        }
-                        if axis.max > axis.min {
-                            Gauge(value: axis.defaultValue, in: axis.min...axis.max) { EmptyView() }
-                                .gaugeStyle(.linearCapacity)
-                                .controlSize(.small)
-                        }
-                        Text("Default \(fmt(axis.defaultValue))").font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
         InspectorSection(title: "Facts") {
             fact("x-height", d.xHeight.map { String(format: "%.3f", $0) } ?? "Unavailable")
             Divider().padding(.vertical, 5)
-            fact("Skeleton", family.skeleton.isEmpty ? "Unknown" : family.skeleton.capitalized)
+            fact("Structure", family.skeleton.isEmpty ? "Unknown" : Lexicon.structure(family.skeleton))
             Divider().padding(.vertical, 5)
-            fact("Licence", family.isTrial ? "Trial build" : "Not marked as trial")
+            fact("License", family.isTrial ? Lexicon.licenseTrial : Lexicon.licenseOK)
             if let vendor = family.vendor {
                 Divider().padding(.vertical, 5)
                 fact("Vendor", vendor)
@@ -201,7 +192,7 @@ struct FamilyInspector: View {
                 HStack {
                     Text("Foundry").font(.callout)
                     Spacer()
-                    Link(url.host() ?? "Foundry page", destination: url).font(.callout).lineLimit(1)
+                    Link(family.isTrial ? Lexicon.getLicense : (url.host() ?? "Foundry page"), destination: url).font(.callout).lineLimit(1)
                 }
             }
         }
@@ -225,10 +216,15 @@ struct FamilyInspector: View {
     @ViewBuilder
     private func action(_ family: FamilySummary) -> some View {
         if let job = screen.job {
-            let isChosen = model.choices[job] == family.name
-            DecisionButton(title: isChosen ? "Chosen for \(screen.title)" : "Use for \(screen.title)",
-                           disabled: isChosen) {
-                Task { await model.choose(job, family: family.name) }
+            if model.choices[job] == family.name {
+                ChosenPanel(job: job,
+                            nextTitle: job == "display" ? Lexicon.findReading : nil,
+                            next: job == "display" ? { model.screen = .reading } : nil)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else {
+                DecisionButton(title: Lexicon.useFor(job)) {
+                    Task { await model.choose(job, family: family.name) }
+                }
             }
         }
     }

@@ -114,6 +114,14 @@ pub fn choose(conn: &Connection, brand: i64, job: &str, family: &str) -> Result<
     Ok(())
 }
 
+/// Remove the choice for this job (the "Undo" after a first choice).
+pub fn clear_choice(conn: &Connection, brand: i64, job: &str) -> Result<(), String> {
+    check_job(job)?;
+    conn.execute("DELETE FROM choices WHERE brand_id = ?1 AND job = ?2", params![brand, job])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn choices(conn: &Connection, brand: i64) -> Result<Vec<Choice>, String> {
     let mut st = conn
         .prepare("SELECT job, font_family FROM choices WHERE brand_id = ?1 ORDER BY job")
@@ -250,6 +258,17 @@ mod tests {
         choose(&c, b, "reading", "Satoshi").unwrap();
         choose(&c, b, "reading", "Timeless Sans").unwrap();
         assert_eq!(choices(&c, b).unwrap(), vec![Choice { job: "reading".into(), font_family: "Timeless Sans".into() }]);
+    }
+
+    #[test]
+    fn clearing_a_choice_removes_only_that_job() {
+        let c = db();
+        let b = create_brand(&c, "A").unwrap().id;
+        choose(&c, b, "display", "Serif One").unwrap();
+        choose(&c, b, "reading", "Satoshi").unwrap();
+        clear_choice(&c, b, "reading").unwrap();
+        assert_eq!(choices(&c, b).unwrap(), vec![Choice { job: "display".into(), font_family: "Serif One".into() }]);
+        assert!(clear_choice(&c, b, "nope").is_err());
     }
 
     #[test]

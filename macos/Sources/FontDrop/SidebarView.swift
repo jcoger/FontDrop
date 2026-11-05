@@ -14,7 +14,7 @@ struct SidebarView: View {
             Section {
                 ForEach(model.brands) { brand in brandRow(brand) }
                 if model.brands.isEmpty {
-                    Text("No brands yet").font(.callout).foregroundStyle(.secondary)
+                    Text(Lexicon.brandsEmpty).font(.callout).foregroundStyle(.secondary)
                 }
             } header: {
                 HStack {

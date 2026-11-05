@@ -46,26 +46,72 @@ struct TagPill: View {
     }
 }
 
-/// One piece of evidence from the core, as a chip. Effect +1 helps, -1 counts against,
-/// 0 is "your call": drawn neutral with a dashed outline.
+/// One short reason as a chip. Effect +1 helps, -1 counts against, 0 is "not scored":
+/// drawn neutral with a dashed outline. Meaning never rests on colour alone: "against"
+/// carries a minus sign and "not scored" a dashed edge.
 struct EvidenceChip: View {
-    let evidence: Evidence
+    let text: String
+    let effect: Int8
+    var help: String = ""
+    var warning = false      // "too close": an icon plus secondary colour, so it never reads as a plus
+
+    private var label: Text {
+        let words = Text((effect < 0 ? "\u{2212} " : "") + text)
+        return warning ? Text(Image(systemName: "exclamationmark.triangle")) + Text(" ") + words : words
+    }
 
     var body: some View {
-        Text(label)
+        label
             .font(.caption)
             .lineLimit(1)
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Capsule().fill(.quaternary.opacity(evidence.effect == 0 ? 0 : 0.6)))
+            .background(Capsule().fill(.quaternary.opacity(effect == 0 ? 0 : 0.6)))
             .overlay(Capsule().strokeBorder(.secondary.opacity(0.4),
-                                            style: StrokeStyle(lineWidth: 1, dash: evidence.effect == 0 ? [3, 2] : [])))
-            .foregroundStyle(evidence.effect == 0 ? .secondary : .primary)
-            .help(evidence.source.isEmpty ? evidence.lens : "\(evidence.lens). Source: \(evidence.source)")
+                                            style: StrokeStyle(lineWidth: 1, dash: effect == 0 ? [3, 2] : [])))
+            .foregroundStyle(effect == 0 || warning ? Color.secondary : Color.primary)
+            .help(help)
     }
+}
 
-    private var label: String {
-        let prefix = evidence.effect > 0 ? "+ " : evidence.effect < 0 ? "\u{2212} " : ""
-        return prefix + (evidence.detail.isEmpty ? evidence.lens : "\(evidence.lens): \(evidence.detail)")
+/// A small "?" that opens a one-line explanation of a term. Book words live here, not in labels.
+struct HelpButton: View {
+    let term: Lexicon.Term
+    @State private var shown = false
+
+    var body: some View {
+        Button { shown.toggle() } label: {
+            Image(systemName: "questionmark.circle").font(.caption)
+        }
+        .buttonStyle(.borderless).foregroundStyle(.secondary)
+        .accessibilityLabel("What is \(term.rawValue)?")
+        .popover(isPresented: $shown, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(term.rawValue).font(.callout.weight(.semibold))
+                Text(term.help).font(.callout).foregroundStyle(.secondary)
+            }
+            .padding(12).frame(width: 240, alignment: .leading)
+        }
+    }
+}
+
+/// "What do these mean?": every term and its one line, in one popover.
+struct GlossaryButton: View {
+    @State private var shown = false
+
+    var body: some View {
+        Button("What do these mean?") { shown.toggle() }
+            .buttonStyle(.link).font(.caption)
+            .popover(isPresented: $shown, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Lexicon.Term.allCases) { term in
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(term.rawValue).font(.callout.weight(.semibold))
+                            Text(term.help).font(.callout).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(14).frame(width: 280, alignment: .leading)
+            }
     }
 }
 
@@ -137,5 +183,86 @@ struct DecisionButton: View {
         .disabled(disabled)
         .padding(14)
         .background(.bar)
+    }
+}
+
+/// The bottom of the inspector once a face is chosen: confirmation, Undo, and the next step.
+/// Replaces "Use for ..." so the click visibly lands. The check bounces once (not with Reduce Motion).
+///
+/// React: a conditional footer driven by store state, with a CSS keyframe keyed on a counter.
+struct ChosenPanel: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let job: String
+    var nextTitle: String?
+    var next: (() -> Void)?
+
+    var body: some View {
+        let justChosen = model.canUndo(job)
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3).foregroundStyle(Color.accentColor)
+                    .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : model.choicePulse)
+                Text(justChosen ? Lexicon.setDone(job) : Lexicon.current(job))
+                    .font(.callout.weight(.semibold))
+                Spacer()
+                if justChosen {
+                    Button(Lexicon.undo) { Task { await model.undo(job) } }
+                        .buttonStyle(.link)
+                }
+            }
+            if let nextTitle, let next {
+                Button(action: next) {
+                    HStack(spacing: 6) {
+                        Text(nextTitle)
+                        Image(systemName: "arrow.right")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+        }
+        .padding(14)
+        .background(.bar)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Shown while a choice waits for a brand. One field, prefilled, so naming takes a keystroke.
+struct NameBrandSheet: View {
+    @Environment(AppModel.self) private var model
+    @State private var name = Lexicon.BrandSheet.suggestion
+    @FocusState private var focused: Bool
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(Lexicon.BrandSheet.title).font(.title3.weight(.semibold))
+            TextField(Lexicon.BrandSheet.field, text: $name)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .onSubmit(create)
+            Text(Lexicon.BrandSheet.help).font(.callout).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button(Lexicon.BrandSheet.cancel, role: .cancel) { model.pending = nil }
+                    .keyboardShortcut(.cancelAction)
+                Button(Lexicon.BrandSheet.ok, action: create)
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(trimmed.isEmpty)
+            }
+        }
+        .padding(22)
+        .frame(width: 360)
+        .onAppear { focused = true }
+    }
+
+    private func create() {
+        guard !trimmed.isEmpty else { return }
+        Task { await model.createBrandAndApplyPending(trimmed) }
     }
 }

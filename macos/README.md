@@ -2,12 +2,33 @@
 
 The SwiftUI app. The Rust engine in `core/` does the work (library DB, classifier, pairing, brands, shortlists). SwiftUI draws it. Fonts are drawn by Core Text.
 
-Wave 2: app shell, Display, Reading, a placeholder Set. See `LEARN.md` for SwiftUI notes mapped to React.
+Wave 2: app shell, Display, Reading, a placeholder Set. Wave 3: choosing that lands, the pair shown together, a live type playground, presentation templates, designer-word copy. See `LEARN.md` for SwiftUI notes mapped to React.
 
 | Light | Dark |
 |---|---|
 | ![Display, light](docs/wave2-display-light.png) | ![Display, dark](docs/wave2-display-dark.png) |
 | ![Reading, light](docs/wave2-reading-light.png) | ![Reading, dark](docs/wave2-reading-dark.png) |
+
+## Wave 3
+
+| Display, playground open (variable font) | Reading, Article template |
+|---|---|
+| ![Display with playground](docs/wave3-display-playground.png) | ![Reading, Article](docs/wave3-reading-article.png) |
+
+| Reading, App UI template | No brand yet: Name this brand |
+|---|---|
+| ![Reading, App UI](docs/wave3-reading-appui.png) | ![Name this brand sheet](docs/wave3-name-brand-sheet.png) |
+
+- **Choosing never errors.** With no brand, "Use for ..." opens a "Name this brand" sheet (prefilled), creates the brand, selects it, then applies the choice.
+- **Choosing lands.** The inspector footer becomes "Display face set" with Undo (puts back the previous face, or clears) and a next step: "Find a Reading face" or "Next: sizes and spacing". The check bounces once, not with Reduce Motion on.
+- **More candidates.** Reading asks the core for a flat ranked list (`Library.font_candidates`, one per family, 40 at a time, "Show more" adds 40). Filters still run in the app. A footer says how many the filters hide and offers "Clear filters". "Show them" lifts the long-text rule (display cuts, condensed, mono, families without italic or bold).
+- **The pair, not separate fonts.** Every Reading card draws the Display face (with its playground settings) for headlines and the candidate for body and interface text. No Display face chosen: Reading says so and links to Display.
+- **Playground** (inspector, Display and Reading): style picker, variable axes read with `CTFontCopyVariationAxes` (names, min, max, default, hidden axes skipped), size, tracking (em), line height, and OpenType features read with `CTFontCopyFeatures` (stylistic sets with the font's own names, small caps, figure style and spacing, contextual alternates, ligatures). It builds a `CTFontDescriptor` with variation and feature attributes. Nothing is registered with the system. Reset per group.
+- **Playground persistence.** Settings are saved per brand + job + family as JSON next to the library DB (`<db path>.playground.json`, so a test DB copy gets its own file). This is a candidate to move into the core and the DB later, when Set needs the same numbers.
+- **Templates** (`Sources/FontDrop/Templates/`): Article, Landing hero, App UI, Poster. To add one: a new file with a small `View` that takes a `PairContext` and a `static let descriptor`, then one line in `Templates.all` (`Template.swift`). Sample copy is neutral.
+- **Copy.** All engine-to-designer wording lives in `Lexicon.swift` (source: `docs/copy/lexicon-and-strings.md`, sections 1 to 7). Book terms appear only in help popovers.
+
+Core additions: `font_candidates` (flat ranked list, unit-tested for limit, one per family, hidden and unfit exclusion) and `choice_clear`. `font_pairs` and the Tauri commands are unchanged.
 
 ## Run it in Xcode
 
@@ -44,7 +65,8 @@ macos/build.sh --rebuild-core   # regenerate the Rust lib and Swift bindings, th
 | `--db <path>` | Use this library DB. |
 | `--brand <name>` | Start with this brand selected. |
 | `--refresh` | Rescan the disk and reclassify before showing the library (can take a minute or more). |
-| `--screenshot <png> [--screen display\|reading\|set] [--appearance light\|dark] [--select <family>] [--no-inspector]` | Render the window to a PNG and quit. It captures the app's own window in-process (no screen-recording permission). |
+| `--screenshot <png> [--screen display\|reading\|set] [--appearance light\|dark] [--select <family>] [--no-inspector] [--template article\|hero\|appui\|poster] [--open-playground]` | Render the window to a PNG and quit. It captures the app's own window in-process (no screen-recording permission). Sheets are captured and composited onto it. Playground settings are read, never written, in this mode. |
+| `--demo-choose <family>` | With `--screenshot`: start with no brand and press "Use for Display" on this family, so the Name this brand sheet shows. `--no-brand` alone starts with no brand selected. |
 | `--bench` | Print load times and scroll frame times for the Display grid and Reading, then quit. |
 
 Screenshots in `docs/` were made with `--db <copy>`, brand "Acme" (a demo brand added to the copy only).
@@ -62,9 +84,14 @@ Sources/FontDrop/
   DisplayView.swift   family grid (Display, UI, Mono) and its inspector
   ReadingView.swift   lens menus, candidate cards, evidence inspector, shortlist
   SetView.swift       placeholder
+  TypeSettings.swift  playground settings, what a font file offers (axes, features), JSON store
+  FaceText.swift      FaceSpec + FaceText: text drawn with playground settings, font memo
+  Playground.swift    the inspector's playground group
+  Lexicon.swift       engine words to designer words, help text, strings
+  Templates/          Article, Landing hero, App UI, Poster + registry
   Components.swift    FontText, chips, tags, flow layout, inspector section
   Bench.swift         --screenshot and --bench
-Tests/FontDropTests/  lens tests (neutral fixture names)
+Tests/FontDropTests/  lens and lexicon tests, choose/undo flow, playground settings (neutral fixture names)
 FontDropCore/         local Swift package: generated UniFFI bindings + XCFramework (git-ignored output)
 ```
 
@@ -88,6 +115,10 @@ Stress case (stale DB copy: 3,339 "families", one card per style file):
 
 - Preload 245 ms. Five passes of 206,238 pt (about 2,060 frames each): p99 16.7 ms. Two passes had a 160 and a 207 ms frame (4 and 1 severe frames out of about 2,060). Memory 113 to about 300 MB.
 
+## Credits for the copy
+
+Sources named in the Why list as short titles: Better Web Typography (Matej Latin), Universal Principles of Typography (Elliot Jay Stocks), Typewolf checklist (Jeremiah Shoaf), Flexible Typesetting (Tim Brown), Smashing Book 6 (chapters by Douglas Bonneville and Dan Mayer), Typekit and Monotype guidance.
+
 ## Known gaps
 
-See the final report of wave 2 in the PR/handoff notes. Short list: no Claude advise box, no "Like my picks" sort, no popularity data (so "Unexpected first" uses fewer shortcut reasons), UI and Mono reuse the Display grid, Export is a disabled placeholder.
+See the final report of wave 2 in the PR/handoff notes. Short list: no Claude advise box, no "Like my picks" sort, no popularity data (so "Unexpected first" uses fewer shortcut reasons), UI and Mono reuse the Display grid, Export is a disabled placeholder. Wave 3 gaps: "N not made for long text" has no count yet (needs a core call), Set does not use the templates yet, only the first face of a .ttc collection is read, the Display card ignores the size slider.

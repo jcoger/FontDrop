@@ -44,26 +44,44 @@ final class LensEngineTests: XCTestCase {
     }
 
     func testSameAndCrossedHand() {
-        var l = Lenses(); l.contrast = .any; l.hand = .same
+        var l = Lenses(); l.contrast = .any; l.structure = .same
         XCTAssertEqual(Set(LensEngine.apply(cands, lenses: l).shown.map(\.id)), ["b", "c"])
-        l.hand = .crossed
+        l.structure = .mixed
         XCTAssertEqual(Set(LensEngine.apply(cands, lenses: l).shown.map(\.id)), ["a", "d"])
     }
 
     func testSameFoundry() {
-        var l = Lenses(); l.contrast = .any; l.foundry = .yes
+        var l = Lenses(); l.contrast = .any; l.foundry = .sameOnly
         XCTAssertEqual(LensEngine.apply(cands, lenses: l).shown.map(\.id), ["b"])
     }
 
     func testExtremeNeedsTextureOrCrossedHands() {
-        var l = Lenses(); l.contrast = .extreme
+        var l = Lenses(); l.contrast = .strong
         XCTAssertEqual(Set(LensEngine.apply(cands, lenses: l).shown.map(\.id)), ["a", "b"])
     }
 
-    func testUnexpectedFirstPutsLessObviousFirst() {
+    func testBestMatchKeepsTheEnginesOrder() {
         var l = Lenses(); l.contrast = .any
-        let ids = LensEngine.apply(cands, lenses: l).shown.map(\.id)
-        XCTAssertEqual(ids.last, "b")   // two "shortcut" reasons, so the most obvious pick goes last
+        XCTAssertEqual(LensEngine.apply(cands, lenses: l).shown.map(\.id), ["a", "b", "c", "d"])
+    }
+
+    func testContrastStepsAreOrderedForAFutureSlider() {
+        XCTAssertEqual(ContrastLens.steps, [.close, .clear, .strong])
+        XCTAssertNil(ContrastLens.any.stepIndex)
+    }
+
+    func testLexiconUsesDesignerWords() {
+        func e(_ lens: String, _ detail: String) -> Evidence {
+            Evidence(lens: lens, detail: detail, source: "", strength: "guideline", effect: 1)
+        }
+        XCTAssertEqual(Lexicon.chip(e("Skeleton", "both dynamic")), "Both humanist")
+        XCTAssertEqual(Lexicon.chip(e("Clear contrast", "serif + sans")), "Serif with sans")
+        XCTAssertEqual(Lexicon.chip(e("x-height", "within 0%")), "Same x-height")
+        XCTAssertEqual(Lexicon.chip(e("Near-duplicate", "x-height 1%")), "Too close to Display")
+        XCTAssertEqual(Lexicon.chip(e("Texture", "contrasting vs linear")), "Even stroke vs high-contrast Display")
+        XCTAssertEqual(Lexicon.chip(e("Foundry", "Acme Type")), "Same foundry")
+        XCTAssertEqual(Lexicon.strength("shortcut"), "Rule of thumb")
+        XCTAssertEqual(Lexicon.sources("LAT ch.5; TWC 69-70; BON p.145; MAY"), "Better Web Typography, Typewolf checklist, Smashing (Bonneville), Smashing (Mayer)")
     }
 
     func testXHeightSortAndNameSort() {

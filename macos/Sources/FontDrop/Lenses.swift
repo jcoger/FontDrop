@@ -6,36 +6,43 @@ import Foundation
 // No numeric score is shown or used here. The engine's own order (the position
 // in `Candidate.order`) is only a tie-break.
 
+/// How different the pair is. Three ordered steps plus Any. `steps` is the order a slider
+/// would use (Close to Strong), so the menu can become a slider without new copy.
 enum ContrastLens: String, CaseIterable, Identifiable {
-    case close = "Close", clear = "Clear", extreme = "Extreme", any = "Any"
+    case close = "Close", clear = "Clear", strong = "Strong", any = "Any"
     var id: String { rawValue }
+    static let steps: [ContrastLens] = [.close, .clear, .strong]
+    /// 0, 1, 2 for the three steps; nil for Any.
+    var stepIndex: Int? { Self.steps.firstIndex(of: self) }
 }
 
-enum HandLens: String, CaseIterable, Identifiable {
-    case same = "Same", crossed = "Crossed", either = "Either"
+/// Do the two faces share a structure (Same) or cross it (Mixed)? Not scored.
+enum StructureLens: String, CaseIterable, Identifiable {
+    case same = "Same", mixed = "Mixed", any = "Any"
     var id: String { rawValue }
 }
 
 enum FoundryLens: String, CaseIterable, Identifiable {
-    case yes = "Yes", any = "Any"
+    case sameOnly = "Same foundry only", any = "Any"
     var id: String { rawValue }
 }
 
+/// "Unexpected first" is gone until there is popularity data. Best match is the engine's order.
 enum ReadingSort: String, CaseIterable, Identifiable {
-    case unexpected = "Unexpected first", xHeight = "Best x-height", name = "Name"
+    case bestMatch = "Best match", xHeight = "Same x-height first", name = "Name"
     var id: String { rawValue }
 }
 
 struct Lenses: Equatable {
     var contrast: ContrastLens = .clear
-    var hand: HandLens = .either
+    var structure: StructureLens = .any
     var foundry: FoundryLens = .any
-    var sort: ReadingSort = .unexpected
+    var sort: ReadingSort = .bestMatch
 
-    var isNeutral: Bool { contrast == .any && hand == .either && foundry == .any }
+    var isNeutral: Bool { contrast == .any && structure == .any && foundry == .any }
 }
 
-/// One Reading candidate: a core `PairMatch` plus its position in the engine's order.
+/// One Reading candidate: a core `PairCandidate` plus its position in the engine's order.
 struct Candidate: Identifiable, Hashable {
     let id: String            // font_id
     let family: String
@@ -44,7 +51,7 @@ struct Candidate: Identifiable, Hashable {
     let evidence: [Evidence]
     let order: Int
 
-    init(_ m: PairMatch, order: Int) {
+    init(_ m: PairCandidate, order: Int) {
         id = m.fontId; family = m.family; filePath = m.filePath
         pairType = m.pairType; evidence = m.evidence; self.order = order
     }
@@ -72,9 +79,6 @@ struct Candidate: Identifiable, Hashable {
         return Double(digits)
     }
 
-    /// How many "shortcut" reasons this candidate leans on (shared foundry, designer, skeleton).
-    /// Fewer means less obvious. Stands in for "unexpected" until there is popularity data.
-    var obviousCount: Int { evidence.filter { $0.strength == "shortcut" }.count }
 }
 
 enum LensEngine {
@@ -85,8 +89,8 @@ enum LensEngine {
         let q = search.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty { shown = shown.filter { $0.family.localizedCaseInsensitiveContains(q) } }
         switch lenses.sort {
-        case .unexpected:
-            shown.sort { ($0.obviousCount, $0.order) < ($1.obviousCount, $1.order) }
+        case .bestMatch:
+            shown.sort { $0.order < $1.order }
         case .xHeight:
             shown.sort { ($0.xHeightGap ?? 99, $0.order) < ($1.xHeightGap ?? 99, $1.order) }
         case .name:
@@ -100,16 +104,16 @@ enum LensEngine {
         case .any: break
         case .close: if c.pairType != "uniform" { return false }
         case .clear: if c.pairType != "contrast" { return false }
-        case .extreme:
+        case .strong:
             // Contrast pairs that also differ in texture or cross hands: the far end.
             if c.pairType != "contrast" || !(c.has("Texture") || c.isCrossedHands) { return false }
         }
-        switch l.hand {
-        case .either: break
+        switch l.structure {
+        case .any: break
         case .same: if !c.isSameHand { return false }
-        case .crossed: if !c.isCrossedHands { return false }
+        case .mixed: if !c.isCrossedHands { return false }
         }
-        if l.foundry == .yes && !c.sharesFoundry { return false }
+        if l.foundry == .sameOnly && !c.sharesFoundry { return false }
         return true
     }
 }

@@ -4,6 +4,7 @@ import QuartzCore
 
 // Developer tools, off unless a flag is passed:
 //   --screenshot <png> [--screen display|reading|set] [--appearance light|dark] [--brand <name>] [--select <family>]
+//       [--template article|hero|appui|poster] [--open-playground] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
 //   --bench
 //       Measures load time and scroll frame times on the Display grid and Reading, prints "BENCH ..." lines, quits.
@@ -26,6 +27,28 @@ func capture(window: NSWindow) throws -> CGImage {
     return img
 }
 
+/// A sheet is its own window, so the window capture misses it. Capture each sheet and draw it onto the main image.
+@MainActor
+func compositeWithSheets(window: NSWindow) throws -> CGImage {
+    let base = try capture(window: window)
+    guard !window.sheets.isEmpty else { return base }
+    let scale = CGFloat(base.width) / window.frame.width
+    guard let ctx = CGContext(data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0,
+                              space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return base }
+    ctx.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
+    // Dim the window behind the sheet, as macOS does.
+    ctx.setFillColor(CGColor(gray: 0, alpha: 0.25))
+    ctx.fill(CGRect(x: 0, y: 0, width: base.width, height: base.height))
+    for sheet in window.sheets {
+        guard let img = try? capture(window: sheet) else { continue }
+        let x = (sheet.frame.minX - window.frame.minX) * scale
+        let y = (sheet.frame.minY - window.frame.minY) * scale      // CGContext origin is bottom-left, like AppKit
+        ctx.draw(img, in: CGRect(x: x, y: y, width: CGFloat(img.width), height: CGFloat(img.height)))
+    }
+    return ctx.makeImage() ?? base
+}
+
 @MainActor
 enum ScreenshotRunner {
     static func runIfRequested(model: AppModel) async {
@@ -44,12 +67,19 @@ enum ScreenshotRunner {
         }
         model.screen = model.options.screen
         if CommandLine.arguments.contains("--no-inspector") { model.showInspector = false }
-        if model.screen == .reading {
+        if model.screen == .reading && model.displayFamily == nil {
+            // Reading with no Display face: nothing to wait for.
+        } else if model.screen == .reading {
             while model.candidates.isEmpty && model.candidatesError == nil && model.displayFamily != nil {
                 try? await Task.sleep(for: .milliseconds(100))
             }
         } else {
             model.selectedFamily = model.options.select ?? model.chosen(model.screen) ?? model.visibleFamilies.first?.name
+        }
+        if let family = model.options.demoChoose {
+            // The "Name this brand" sheet: with --no-brand, pressing "Use for Display" opens it.
+            model.selectedFamily = family
+            await model.choose("display", family: family)
         }
         try? await Task.sleep(for: .seconds(3))
         NSApp.windows.first(where: { $0.isVisible })?.makeKeyAndOrderFront(nil)
@@ -68,13 +98,15 @@ enum ScreenshotRunner {
             walk(window.contentView!, 0)
         }
         do {
-            let rep = NSBitmapImageRep(cgImage: try capture(window: window))
+            let rep = NSBitmapImageRep(cgImage: try compositeWithSheets(window: window))
             try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
             print("SCREENSHOT written \(path) (\(rep.pixelsWide)x\(rep.pixelsHigh))")
         } catch {
             print("SCREENSHOT failed: \(error)")
         }
         fflush(stdout)
+        model.pending = nil                       // an open sheet would hold up quitting
+        try? await Task.sleep(for: .milliseconds(400))
         NSApp.terminate(nil)
     }
 }

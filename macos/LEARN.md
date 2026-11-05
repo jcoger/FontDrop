@@ -85,3 +85,32 @@ The old Tauri app used CSS `@font-face`. This app asks macOS directly: `CTFontMa
 ## Debug flags
 
 `AppModel.swift` (`LaunchOptions`) and `Bench.swift`. `--db <file>` points at a copy of the library. `--screenshot out.png --screen reading --appearance dark` renders a PNG without screen-recording permission. `--bench` scrolls the Display grid and prints frame times. See `macos/README.md`.
+
+## Wave 3 additions
+
+### .sheet ~ a modal dialog driven by state
+`RootView.swift` and `NameBrandSheet` (`Components.swift`). `.sheet(isPresented:)` shows a view over the window while a boolean is true. Here the boolean is "is `model.pending` set?", so the model decides when the sheet appears and the sheet clears it. In React: `{pending && <Modal />}` with the state in your store.
+
+### Binding(get:set:) ~ a controlled input with a custom onChange
+`Playground.swift`. A slider wants a `Binding<Double>`. The value does not live in the view, it lives in `TypeSettingsStore`. So each control builds a binding by hand: `get` reads the store, `set` writes it. In React: `<input value={store.x} onChange={e => store.set(x, e.target.value)} />`.
+
+### Codable ~ JSON.stringify and JSON.parse with types
+`TypeSettings.swift`. `struct TypeSettings: Codable` gets `JSONEncoder().encode` and `JSONDecoder().decode` for free. The store writes one JSON file, 0.4 seconds after the last slider move (a debounce, like `useDebouncedCallback`).
+
+### Core Text variation and features ~ font-variation-settings and font-feature-settings
+`TypeSettings.swift`, `FaceText.swift`. CSS sets axes with `font-variation-settings: "wght" 650` and features with `font-feature-settings: "ss05"`. Core Text takes the same two ideas as attributes on a font descriptor: `kCTFontVariationAttribute` (axis id to value) and `kCTFontFeatureSettingsAttribute` (type + selector pairs). `CTFontCopyVariationAxes` and `CTFontCopyFeatures` list what a font offers, so the controls are built from the font, not hard-coded. "ss05" shows up as type 35, selector 10.
+
+### Text + Text, and tracking and lineSpacing
+`FaceText.swift`. `Text("a") + Text("b")` joins styled runs into one text (`EvidenceChip` puts a warning icon in front of a label that way). `.tracking(points)` is `letter-spacing`. `.lineSpacing(points)` adds space on top of the font's natural line height, so a line height of 1.5 is `1.5 * size - natural`.
+
+### A registry of views ~ a routes table of components
+`Templates/Template.swift`. `Templates.all` is an array of `{ id, title, make }`. `make` returns `AnyView`, which erases the concrete type so different views fit one array. Adding a template is one file plus one line in the array. In React: `const templates = [{ id: "article", render: (ctx) => <Article {...ctx} /> }]`.
+
+### symbolEffect and Reduce Motion ~ a keyframe keyed on a counter, behind prefers-reduced-motion
+`ChosenPanel` in `Components.swift`. `.symbolEffect(.bounce, value: counter)` plays once each time the counter changes. `@Environment(\.accessibilityReduceMotion)` is `matchMedia("(prefers-reduced-motion)")`: when on, the value stays 0 and nothing plays. `withAnimationIfAllowed` (`Playground.swift`) does the same for toggles.
+
+### .popover ~ a tooltip you can click
+`HelpButton` and `GlossaryButton` (`Components.swift`). `.popover(isPresented:)` shows a small card anchored to a view. One line of help per term lives in `Lexicon.swift`, so a label never needs a book word.
+
+### One file for words
+`Lexicon.swift` is a plain `enum` of static functions and strings, like a `strings.ts` plus `formatEvidence()`. Views never switch on engine words. If a label looks wrong, there is one place to change it.
