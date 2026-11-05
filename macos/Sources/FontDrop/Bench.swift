@@ -5,7 +5,7 @@ import QuartzCore
 // Developer tools, off unless a flag is passed:
 //   --screenshot <png> [--screen display|reading|set] [--appearance light|dark] [--brand <name>] [--select <family>]
 //       [--template article|hero|appui|poster] [--open-playground]
-//       [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common|character-first] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
+//       [--difference close|distinct|strong|any] [--page <n>  (Reading candidates asked of the core, default 40)] [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common|character-first] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
 //       FD_WINDOW=WxH sets the capture window size (default 1360x860). --inspector / --no-inspector force the inspector.
 //       Reading flags: --demo-shortlist, --compare, --zoom, --trim-display, --trim-reading, --body-size, --ratio, FD_LOCK=1, --pick-reading (see applyReadingFlags).
@@ -129,6 +129,7 @@ func applyReadingFlags(_ model: AppModel) async {
         if let i = args.firstIndex(of: flag), i + 1 < args.count { return args[i + 1] }
         return ProcessInfo.processInfo.environment["FD_" + flag.dropFirst(2).uppercased().replacingOccurrences(of: "-", with: "_")]
     }
+    if let n = model.options.page { while model.candidateLimit < n && model.candidatesHasMore { await model.showMoreCandidates() } }
     if let list = value("--demo-shortlist") {
         for name in list.split(separator: ",") { await model.setShortlist("reading", family: String(name), on: true) }
     }

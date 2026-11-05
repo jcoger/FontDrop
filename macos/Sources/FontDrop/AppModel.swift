@@ -25,6 +25,8 @@ struct LaunchOptions {
     var savedOnly = false        // finder: only Saved
     var sources: String?         // finder: comma list of yours,google,system
     var sort: String?            // Reading sort: less-common, character-first
+    var difference: String?      // Reading Difference lens: close, distinct, strong, any
+    var page: Int?               // how many candidates Reading asks the core for (default 40)
     var demoSave: String?        // comma list of families to star (on the DB copy), for screenshots
     var search: String?          // start with this in the search box
     var bgRefresh = false        // debug: run the background rescan in screenshot mode too (FD_BG_REFRESH=1)
@@ -64,6 +66,8 @@ struct LaunchOptions {
         savedOnly = arguments.contains("--saved")
         sources = value("--sources")
         sort = value("--sort")
+        difference = value("--difference")
+        page = value("--page").flatMap(Int.init)
         demoSave = value("--demo-save")
         search = value("--search")
         bgRefresh = arguments.contains("--bg-refresh") || environment["FD_BG_REFRESH"] != nil
@@ -286,6 +290,7 @@ final class AppModel {
         filter = f
         if options.sort == "less-common" { lenses.sort = .lessCommon }
         if options.sort == "character-first" { lenses.sort = .characterFirst }
+        if let d = options.difference, let l = ContrastLens.allCases.first(where: { $0.rawValue.lowercased() == d }) { lenses.contrast = l }
         if let q = options.search { search = q }
     }
 
