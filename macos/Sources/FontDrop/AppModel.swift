@@ -154,7 +154,18 @@ final class AppModel {
     private(set) var phase: Phase = .loading
 
     // Navigation and search
-    var screen: Screen = .display { didSet { if screen != oldValue { rememberBrandState() } } }
+    var screen: Screen = .display {
+        didSet {
+            guard screen != oldValue else { return }
+            // Which way the screen change slides: Set sits to the right of Text, Text to the right of Display.
+            screenTravel = (Screen.allCases.firstIndex(of: screen) ?? 0) >= (Screen.allCases.firstIndex(of: oldValue) ?? 0) ? 1 : -1
+            rememberBrandState()
+        }
+    }
+    /// +1 when the last screen change moved right, -1 left. Read by the screen transition (Motion.swift).
+    private(set) var screenTravel: CGFloat = 1
+    /// Changes when the inspector shows something else: another screen, family or candidate. Drives its fade.
+    var inspectorFadeKey: String { "\(screen.rawValue)/\(selectedFamily ?? "")/\(selectedCandidate ?? "")" }
     var search = "" { didSet { if search != oldValue { scheduleFinder() } } }
     var showInspector = true
     /// Kept between launches. A screenshot or test run has its own throwaway defaults.

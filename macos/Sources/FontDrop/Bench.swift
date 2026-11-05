@@ -273,9 +273,31 @@ enum ScreenshotRunner {
         if CommandLine.arguments.contains("--dump-views") {
             func walk(_ v: NSView, _ d: Int) {
                 print(String(repeating: " ", count: d) + "\(type(of: v)) \(v.frame) hidden=\(v.isHidden) layer=\(v.layer.map { "\(type(of: $0)) sub=\($0.sublayers?.count ?? 0)" } ?? "nil")")
-                if d < 9 { v.subviews.forEach { walk($0, d + 1) } }
+                if d < 40 { v.subviews.forEach { walk($0, d + 1) } }
             }
             walk(window.contentView!, 0)
+        }
+        // FD_FRAMES=<dir>: switch to the other screen (FD_FRAMES_TO=reading|set|display) and write a frame at each delay in ms
+        // (FD_FRAMES_AT, default 0,50,100,150,200,300). Shows the screen transition and the sidebar pill gliding.
+        if let dir = env["FD_FRAMES"] {
+            let to = Screen(rawValue: env["FD_FRAMES_TO"] ?? "reading") ?? .reading
+            let delays = (env["FD_FRAMES_AT"] ?? "0,50,100,150,200,300").split(separator: ",").compactMap { Int($0) }
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            model.screen = to
+            var last = 0
+            for (i, at) in delays.enumerated() {
+                try? await Task.sleep(for: .milliseconds(max(at - last, 0))); last = at
+                if let img = try? capture(window: window) {
+                    try? NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?
+                        .write(to: URL(fileURLWithPath: "\(dir)/frame\(i)-\(at)ms.png"))
+                }
+            }
+            print("FRAMES written \(dir)"); fflush(stdout)
+            exit(0)
+        }
+        if let spec = args.firstIndex(of: "--open-menu").flatMap({ $0 + 1 < args.count ? args[$0 + 1] : nil }) ?? env["FD_OPEN_MENU"] {
+            await MenuShot.run(spec: spec, window: window, path: path)      // never returns: it quits when done
+            return
         }
         do {
             let rep = NSBitmapImageRep(cgImage: try compositeWithSheets(window: window))
@@ -484,5 +506,74 @@ enum ExportRunner {
             print("EXPORT failed: \(error)")
         }
         NSApp.terminate(nil)
+    }
+}
+
+// MARK: - Open a pop-up menu for a screenshot
+
+/// `--open-menu <x,y>` (or FD_OPEN_MENU): click that point (window points from the top-left) to open the menu
+/// under it, then write the window with the open menu drawn on top. A menu is its own window, so the normal
+/// capture misses it.
+@MainActor
+enum MenuShot {
+    static func run(spec: String, window: NSWindow, path: String) async {
+        let xy = spec.split(separator: ",").compactMap { Double($0) }
+        guard xy.count == 2 else { print("MENUSHOT needs x,y"); NSApp.terminate(nil); return }
+        // Window points from the top-left, as read off a normal screenshot (pixels / 2).
+        let point = NSPoint(x: xy[0], y: window.contentView!.bounds.height - xy[1])
+        func event(_ type: NSEvent.EventType) -> NSEvent? {
+            NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+        }
+        // A press starts the menu's own tracking loop, which returns only when the menu closes. So the capture is scheduled first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            MainActor.assumeIsolated {
+                do {
+                    let image = try composite(window: window)
+                    try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    print("MENUSHOT written \(path)")
+                } catch { print("MENUSHOT failed: \(error)") }
+                fflush(stdout)
+                exit(0)
+            }
+        }
+        if let move = event(.mouseMoved) { window.sendEvent(move) }
+        if let down = event(.leftMouseDown) { window.sendEvent(down) }
+        if let up = event(.leftMouseUp) { window.sendEvent(up) }
+    }
+
+    /// The window plus every other on-screen window of this process (the open menu), at their true places.
+    static func composite(window: NSWindow) throws -> CGImage {
+        let base = try capture(window: window)
+        let pid = getpid()
+        let info = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
+        func rect(_ d: [String: Any]) -> CGRect { CGRect(dictionaryRepresentation: d["kCGWindowBounds"] as! CFDictionary) ?? .zero }
+        guard let main = info.first(where: { ($0["kCGWindowNumber"] as? Int) == window.windowNumber }) else { return base }
+        let mainRect = rect(main)
+        let extras = info.filter {
+            ($0["kCGWindowOwnerPID"] as? Int32) == pid && ($0["kCGWindowNumber"] as? Int) != window.windowNumber
+                && ($0["kCGWindowLayer"] as? Int ?? 0) >= 100 && rect($0).width > 40
+        }
+        let scale = CGFloat(base.width) / mainRect.width
+        let canvas = extras.reduce(mainRect) { $0.union(rect($1)) }
+        let w = Int((canvas.width * scale).rounded()), h = Int((canvas.height * scale).rounded())
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return base }
+        // CG window bounds are top-left origin; the context is bottom-left.
+        func place(_ img: CGImage, _ r: CGRect) {
+            let x = (r.minX - canvas.minX) * scale
+            let y = (canvas.maxY - r.maxY) * scale
+            ctx.draw(img, in: CGRect(x: x, y: y, width: CGFloat(img.width), height: CGFloat(img.height)))
+        }
+        place(base, mainRect)
+        for e in extras {
+            guard let n = e["kCGWindowNumber"] as? Int else { continue }
+            typealias Fn = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+            guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { continue }
+            let fn = unsafeBitCast(sym, to: Fn.self)
+            if let img = fn(.null, 8, UInt32(n), 1)?.takeRetainedValue() { place(img, rect(e)) }
+        }
+        return ctx.makeImage() ?? base
     }
 }

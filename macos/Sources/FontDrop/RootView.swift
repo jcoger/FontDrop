@@ -18,12 +18,12 @@ struct RootView: View {
                         .accessibilityLabel(Lexicon.sidebarRegion)
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
-                ContentPanel { ContentRouter() }
+                ContentPanel { ContentRouter().screenTransition() }
                     .padding(.leading, ReadingLayout.hiddenSidebarInset(sidebarShown: model.showSidebar))   // clears the traffic lights
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(model.screen.title)
                 if model.showInspector && !model.hidesInspector {
-                    InspectorRouter()
+                    InspectorRouter().selectionFade(model.inspectorFadeKey)
                         .frame(width: 330)
                         .modifier(PanelChrome(fill: \.glassInspector, radius: 24))
                         .accessibilityElement(children: .contain)
@@ -41,8 +41,8 @@ struct RootView: View {
                 .onAppear { model.windowWidth = geo.size.width }
                 .onChange(of: geo.size.width) { _, w in model.windowWidth = w }
         })
-        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .snappy(duration: 0.22), value: model.showSidebar)
-        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .snappy(duration: 0.22), value: model.showInspector)
+        .animation(Motion.ok(Motion.standard), value: model.showSidebar)
+        .animation(Motion.ok(Motion.standard), value: model.showInspector)
         .onChange(of: model.screen) { _, _ in model.applyInspectorRule() }
         .onChange(of: model.windowWidth) { _, _ in model.applyInspectorRule() }
         .onChange(of: model.showSidebar) { _, _ in model.applyInspectorRule() }

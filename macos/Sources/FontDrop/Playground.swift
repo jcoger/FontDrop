@@ -260,13 +260,27 @@ struct PlaygroundGroup: View {
             HStack {
                 Text(c.label).font(.callout)
                 Spacer()
-                Picker(c.label, selection: Binding<Int>(
-                    get: { s.features["\(type)"] ?? -1 },
-                    set: { v in store.update(key, job: job) { $0.features["\(type)"] = v < 0 ? nil : v } })) {
-                    Text("Default").tag(-1)
-                    ForEach(options, id: \.selector) { Text($0.label).tag($0.selector) }
+                let current = s.features["\(type)"] ?? -1
+                let currentLabel = options.first { $0.selector == current }?.label ?? "Default"
+                // The same plain-text menu as Style: the system draws the checkmark.
+                Menu {
+                    Picker(c.label, selection: Binding<Int>(
+                        get: { current },
+                        set: { v in store.update(key, job: job) { $0.features["\(type)"] = v < 0 ? nil : v } })) {
+                        Text("Default").tag(-1)
+                        ForEach(options, id: \.selector) { Text($0.label).tag($0.selector) }
+                    }
+                    .pickerStyle(.inline).labelsHidden()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(currentLabel).font(.callout).foregroundStyle(theme.textSecondary.color).lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(theme.textSecondary.color)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .labelsHidden().pickerStyle(.menu).frame(maxWidth: 140)
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                .accessibilityLabel(c.label).accessibilityValue(currentLabel)
             }
         }
     }

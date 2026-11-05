@@ -30,7 +30,7 @@ struct FamilyInspector: View {
                 .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
             }
             .safeAreaInset(edge: .bottom) { action(family).background(.ultraThinMaterial) }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.choices[screen.job ?? ""] == family.name)
+            .animation(Motion.ok(Motion.quick), value: model.choices[screen.job ?? ""] == family.name)
         } else {
             EmptyScreen(label: Lexicon.R4.noSelection, line: Lexicon.R4.noSelectionHelp)
         }

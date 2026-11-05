@@ -59,6 +59,7 @@
 		795E503ACAE72B6CDF5F9E9A /* SetScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6523E329AE03B4FE628B55DB /* SetScreenTests.swift */; };
 		7B83E4754C360C07DBA1EDCC /* PosterSpecimen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57030ADD61FE303D2F09BD5 /* PosterSpecimen.swift */; };
 		842E06CDE29AA56AB26A8FE9 /* AppDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AFB737F07FE18ACCE826C0 /* AppDashboard.swift */; };
+		8588B77284C396B55CFAA092 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409C858DD08897F67998670B /* Motion.swift */; };
 		858AF1009D078B080B14624C /* FinderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 382020E250E4336580BD7B20 /* FinderTests.swift */; };
 		85CC14800D695A6D6CCB72C8 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F2FED0504D056B840CF694 /* AppModel.swift */; };
 		8C5A1BAED3DFCB3AD29E13F5 /* LaunchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDA6A0960BBCD2F4DAAF5A5 /* LaunchViews.swift */; };
@@ -70,6 +71,7 @@
 		95EE4A284A5CC8C9EBA6303D /* DisplayReasons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC6E77BB45421A8FFD863484 /* DisplayReasons.swift */; };
 		971C8AD2137E46192657E672 /* WriteBehind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25019841A5B6C5B29C894965 /* WriteBehind.swift */; };
 		9865FD6C5D19BCD996114F4A /* Parts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9661FDD8E17FF5AC3446ECA /* Parts.swift */; };
+		9AAD3BE99A8C8B70F1575F8F /* MotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734AE9B7FD597DB250A24BA7 /* MotionTests.swift */; };
 		9DD4463BA2D7FA954DAE49B2 /* TypeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED67507352AF793EB389C504 /* TypeSettings.swift */; };
 		A073812A15D502E474E1D4FA /* FontDropCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0A36EA16F2A08C02AA324632 /* FontDropCore */; };
 		A3DBFA936E8FE6AD78B4969A /* ColorsPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */; };
@@ -167,6 +169,7 @@
 		383DFDA5412103E4B0F4E62E /* FontLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontLoader.swift; sourceTree = "<group>"; };
 		3D64A8F316D5D188A36B826A /* EitherWayInTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EitherWayInTests.swift; sourceTree = "<group>"; };
 		402C3808858D795319E8CBDF /* TemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateTests.swift; sourceTree = "<group>"; };
+		409C858DD08897F67998670B /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		473506B3CBD640CAEF115FBE /* ArticleFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleFeature.swift; sourceTree = "<group>"; };
 		4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FontDropTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		52F2FED0504D056B840CF694 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -191,6 +194,7 @@
 		6E50B9E2B84A4525E66D1022 /* OFL-Doto.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Doto.txt"; sourceTree = "<group>"; };
 		7163C745E7CB7C64C0F4E0C3 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorsPopover.swift; sourceTree = "<group>"; };
+		734AE9B7FD597DB250A24BA7 /* MotionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionTests.swift; sourceTree = "<group>"; };
 		744705D2B3BEC8D76876176F /* HeroProduct.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroProduct.swift; sourceTree = "<group>"; };
 		74898072DE04330A09146301 /* FontDropApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontDropApp.swift; sourceTree = "<group>"; };
 		76A60A733017317A0A472D23 /* FaceVariants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceVariants.swift; sourceTree = "<group>"; };
@@ -328,6 +332,7 @@
 				7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */,
 				B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */,
 				0F442168D42BDC073BA9BB7F /* LensEngineTests.swift */,
+				734AE9B7FD597DB250A24BA7 /* MotionTests.swift */,
 				8AF1FCD3E65A483F85532FD1 /* NamesAndStructureTests.swift */,
 				D08AFBD8BF385333288AEDE8 /* PosterFitTests.swift */,
 				2963F865478DF374E2242255 /* R7Tests.swift */,
@@ -398,6 +403,7 @@
 				78465415000013A4F0E0E3B6 /* Lexicon.swift */,
 				E3592DEC34AE39075361953A /* LibraryProblem.swift */,
 				2C35C0292A1C6879F5B7BDAE /* main.swift */,
+				409C858DD08897F67998670B /* Motion.swift */,
 				FB7E40A12148869FE8B0E4EF /* NumberField.swift */,
 				0EF19A45A446759D5A06581E /* Playground.swift */,
 				A3A50F63875F1B31CC940932 /* RatioDial.swift */,
@@ -659,6 +665,7 @@
 				09D9C2664F48BA423431B2F7 /* Lenses.swift in Sources */,
 				F61AF17998E0C2E0208F43D6 /* Lexicon.swift in Sources */,
 				2536C7E134654CE9BC4E27F7 /* LibraryProblem.swift in Sources */,
+				8588B77284C396B55CFAA092 /* Motion.swift in Sources */,
 				D44CC2018CC271E3C2307CCE /* NumberField.swift in Sources */,
 				9865FD6C5D19BCD996114F4A /* Parts.swift in Sources */,
 				F876D3ACD3B8A296D16E8BB5 /* Playground.swift in Sources */,
@@ -707,6 +714,7 @@
 				119C0B28D1FCE012A42E1843 /* FlowTests.swift in Sources */,
 				AB5434D3B830C6E2B1CAF0FE /* LaunchPathTests.swift in Sources */,
 				1F182ADA6660560FBA4B31A4 /* LensEngineTests.swift in Sources */,
+				9AAD3BE99A8C8B70F1575F8F /* MotionTests.swift in Sources */,
 				6370F19AAC39B0FCF72BF482 /* NamesAndStructureTests.swift in Sources */,
 				4116874B2B6CFE70A59D5BB8 /* PosterFitTests.swift in Sources */,
 				58778079B4E190AA0CAA60AB /* R7Tests.swift in Sources */,

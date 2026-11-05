@@ -263,6 +263,6 @@ struct SetBar: View {
             InspectorToggle()
         }
         .padding(.horizontal, 16).padding(.top, 16)
-        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeOut(duration: 0.15), value: model.exportNotice)
+        .animation(Motion.ok(Motion.quick), value: model.exportNotice)
     }
 }

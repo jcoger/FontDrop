@@ -12,6 +12,7 @@ struct SidebarView: View {
     @State private var renameText = ""
     @State private var deleting: Brand?
     @FocusState private var rowsFocused: Bool
+    @Namespace private var glide
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -33,6 +34,7 @@ struct SidebarView: View {
                 model.screen = all[min(max(i + (press.key == .downArrow ? 1 : -1), 0), all.count - 1)]
                 return .handled
             }
+            .environment(\.glide, glide)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Lexicon.sidebarJobs)
             Spacer(minLength: 12)
@@ -83,18 +85,18 @@ struct SidebarView: View {
         } else {
             let current = model.brand
             Menu {
-                ForEach(model.brands) { brand in
-                    Button {
-                        Task { await model.selectBrand(brand.id) }
-                    } label: {
-                        if brand.id == model.brandID { Label(brand.name, systemImage: "checkmark") } else { Text(brand.name) }
-                    }
+                // An inline picker: the system draws the checkmark on the current brand.
+                Picker(Lexicon.brandsLabel, selection: Binding(get: { model.brandID }, set: { id in
+                    if let id, id != model.brandID { Task { await model.selectBrand(id) } }
+                })) {
+                    ForEach(model.brands) { Text($0.name).tag(Optional($0.id)) }
                 }
+                .pickerStyle(.inline).labelsHidden()
                 Divider()
-                Button(Lexicon.newBrand + "\u{2026}") { newName = ""; showNewBrand = true }
+                Button(Lexicon.newBrand + "\u{2026}", systemImage: "plus") { newName = ""; showNewBrand = true }
                 if let current {
-                    Button("Rename\u{2026}") { renameText = current.name; renaming = current }
-                    Button(Lexicon.BrandMenu.delete, role: .destructive) { deleting = current }
+                    Button("Rename\u{2026}", systemImage: "pencil") { renameText = current.name; renaming = current }
+                    Button(Lexicon.BrandMenu.delete, systemImage: "trash", role: .destructive) { deleting = current }
                 }
             } label: {
                 HStack(spacing: 10) {
