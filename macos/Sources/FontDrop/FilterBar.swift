@@ -41,6 +41,7 @@ struct FilterBar: View {
 
 /// One chip. A toggle: on is a tinted capsule, off is an outline. The count is quiet.
 struct FilterChip: View {
+    @Environment(\.theme) private var theme
     let title: String
     var symbol: String?
     var count: Int?
@@ -53,14 +54,13 @@ struct FilterChip: View {
             HStack(spacing: 5) {
                 if let symbol { Image(systemName: isOn ? symbol + ".fill" : symbol).font(.caption) }
                 Text(title)
-                if let count { Text(count.formatted()).foregroundStyle(.secondary).monospacedDigit() }
+                if let count { Text(count.formatted()).foregroundStyle(isOn ? theme.onPrimaryButton.color : theme.textSecondary.color).monospacedDigit() }
             }
             .font(.callout)
             .lineLimit(1)
             .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(Capsule().fill(isOn ? Color.accentColor.opacity(0.16) : .clear))
-            .overlay(Capsule().strokeBorder(isOn ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: 1))
-            .foregroundStyle(isOn ? Color.accentColor : Color.primary)
+            .background(Capsule().fill(isOn ? theme.textPrimary.color : theme.chipGround.color))
+            .foregroundStyle(isOn ? theme.onPrimaryButton.color : theme.textPrimary.color)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -112,6 +112,7 @@ struct MoreMenu: View {
 
 /// The star: Saved. Filled when on. Takes the family's state, holds none.
 struct StarButton: View {
+    @Environment(\.theme) private var theme
     let name: String
     let isOn: Bool
     let toggle: () -> Void
@@ -119,7 +120,7 @@ struct StarButton: View {
     var body: some View {
         Button(action: toggle) {
             Image(systemName: isOn ? "star.fill" : "star")
-                .foregroundStyle(isOn ? Color.accentColor : Color.secondary)
+                .foregroundStyle(isOn ? theme.textPrimary.color : theme.textSecondary.color)
                 .padding(6)
                 .contentShape(Rectangle())
         }

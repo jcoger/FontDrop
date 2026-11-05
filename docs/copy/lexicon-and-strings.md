@@ -473,3 +473,19 @@ Plain words. No em dashes.
 ### Gates for section 17
 
 A pass · B pass · C pass (no em dashes) · F pass after 17.7 · R pass
+
+## 18. The Instrument look, round R2a
+
+| # | Where | String | Note |
+|---|---|---|---|
+| 18.1 | Text inspector, scale line | **SCALE  15 · 1.333**, or **SCALE  Auto** | Doto readout, lock light only when locked. Click opens Set. Help: "Open Set to change the scale" |
+| 18.2 | Text inspector module labels | **01 · WHY IT PAIRS**, **02 · FACE**, **03 · LETTERS** | Geist Mono caps. Numbers drop to 01 and 02 when there is no Display face |
+| 18.3 | Why it pairs | Verdict (first scored evidence, e.g. "Clear difference. Serif with sans."), up to two chips, **Sources** | Same family: "Same family. Drawn as one set, the safest choice." with chips "16 styles" and "Body in Regular". The old evidence list sits behind Sources |
+| 18.4 | Face module | **Style**, **Spacing and features** (disclosure) | Trim, Tracking, Line height, optical size and OpenType controls live behind it |
+| 18.5 | OpenType group "Letters" | **Small caps and ligatures** | IA decision 4. Display name only; the core keeps "Letters" |
+| 18.6 | Letters tiles | Il1, ag, RGQ, 0O | Set in the candidate face at 21 pt. VoiceOver: "Letters in this face: ..." |
+| 18.7 | Sidebar status readout | **688 FAM · 4549 FILES**, **UPDATING** (red light), **UPDATE FAILED** + Retry | Doto. Replaces "688 fonts · 4549 families" prose and the spinner |
+| 18.8 | Set inspector | **Acme**, **TYPE SCALE · BOTH FACES**, **01 · SCALE**; empty: "Choose a Text face to set the scale." | Holds the existing Scale controls. The dial is R2b |
+| 18.9 | Text list head | "Text for Agrandir" / **37 faces · 1 on shortlist**; search field "Search families"; menus read "Difference · Distinct" | Search moved from the window toolbar into the content |
+| 18.10 | About window credits | "Doto and Geist Mono are bundled under the SIL Open Font License 1.1. The licence texts are in the app's Resources folder." | Fonts in Resources: Doto.ttf, GeistMono.ttf, OFL-Doto.txt, OFL-GeistMono.txt |
+| 18.11 | Menu | **Show or hide inspector** (option-command-I) | The window toolbar is gone, so the inspector button lives in the stage bar and the Display top row |

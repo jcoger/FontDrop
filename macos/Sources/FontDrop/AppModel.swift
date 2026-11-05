@@ -120,7 +120,7 @@ enum Screen: String, Hashable, CaseIterable, Identifiable {
         case .reading: "text.alignleft"
         case .ui: "rectangle.on.rectangle"
         case .mono: "chevron.left.forwardslash.chevron.right"
-        case .set: "slider.horizontal.3"
+        case .set: "square.stack"
         case .colors: "circle.lefthalf.filled"
         }
     }

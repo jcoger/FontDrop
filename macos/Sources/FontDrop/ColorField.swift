@@ -92,7 +92,7 @@ struct ColorField: View {
                         RoundedRectangle(cornerRadius: 5).fill(c.color)
                             .frame(width: 22, height: 22)
                             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.quaternary))
-                            .overlay { if c == color { RoundedRectangle(cornerRadius: 5).strokeBorder(Color.accentColor, lineWidth: 2) } }
+                            .overlay { if c == color { RoundedRectangle(cornerRadius: 5).strokeBorder(Color.primary, lineWidth: 2) } }
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

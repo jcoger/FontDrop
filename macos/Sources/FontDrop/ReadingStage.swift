@@ -7,20 +7,19 @@ import SwiftUI
 /// React: a canvas area with a `transform: scale()` wrapper, a toolbar above and a sticky action bar below.
 struct ReadingStage: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let compared = model.comparedFamilies
         let selected = model.candidate(model.selectedCandidate)
         VStack(spacing: 0) {
             StageBar(title: title(selected: selected, compared: compared), comparing: !compared.isEmpty)
-            Divider()
             GeometryReader { geo in
                 canvas(size: geo.size, selected: selected, compared: compared)
             }
-            .background(Color.primary.opacity(0.07))
-            Divider()
             DecideBar(selected: selected, comparing: !compared.isEmpty)
         }
+        .background(theme.stage.color)
         .task(id: taskID(selected: selected, compared: compared)) {
             let names = ([selected?.family, model.displayFamily?.name].compactMap { $0 }) + compared
             await model.preloadStyles(of: names)
@@ -65,7 +64,7 @@ struct ReadingStage: View {
                     HStack {
                         Text(name).font(.callout.weight(.semibold)).lineLimit(1)
                         Spacer(minLength: 4)
-                        Button(Lexicon.Reading.use) { use(name) }.controlSize(.small)
+                        Button(Lexicon.Reading.use) { use(name) }.buttonStyle(GlassButtonStyle()).controlSize(.small)
                     }
                     .frame(height: label - 6)
                     if let ctx = model.pairContext(reading: name) {
@@ -102,6 +101,7 @@ struct StageCanvas: View {
     var topAligned = false
     @State private var designHeight: CGFloat = 640
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let availW = max(size.width - padding * 2, 60), availH = max(size.height - padding * 2, 60)
@@ -111,7 +111,8 @@ struct StageCanvas: View {
             template.make(context)
                 .frame(width: width)
                 .onPreferenceChange(BoardHeightKey.self) { if $0 > 0 { designHeight = $0 } }
-                .shadow(color: .black.opacity(0.14), radius: 8, y: 2)
+                .shadow(color: theme.templateCardShadow.first?.color.color ?? .clear,
+                        radius: theme.templateCardShadow.first?.radius ?? 0, y: theme.templateCardShadow.first?.y ?? 0)
                 .padding(padding)
                 .frame(minWidth: size.width, minHeight: size.height, alignment: topAligned ? .top : .center)
         }
@@ -124,43 +125,43 @@ struct StageCanvas: View {
 
 struct StageBar: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
     let title: String
     let comparing: Bool
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                Text(title).font(.callout.weight(.semibold)).lineLimit(1)
-                Spacer(minLength: 8)
-                LayoutMenu()
-                ColorsButton()
-                ZoomControls().disabled(comparing)
-            }
-            HStack(spacing: 10) {
-                Spacer(minLength: 0)
-                LayoutMenu()
-                ColorsButton()
-                ZoomControls().disabled(comparing)
-            }
-            HStack(spacing: 10) {
-                LayoutMenu()
-                ZoomControls().disabled(comparing)
-            }
-            HStack(spacing: 10) {
-                Spacer(minLength: 0)
-                ZoomControls().disabled(comparing)
-            }
+            row(layout: true, colors: true)
+            row(layout: true, colors: false)
+            row(layout: false, colors: false)
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
+        .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 8)
         .frame(minWidth: 0, maxWidth: .infinity)
         .clipped()
-        .background(.bar)
+    }
+
+    private func row(layout: Bool, colors: Bool) -> some View {
+        HStack(spacing: 10) {
+            if comparing {
+                Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    .foregroundStyle(theme.textPrimary.color)
+                    .padding(.horizontal, 14).frame(height: 36)
+                    .glass(\.glassBar, in: Capsule(), bar: true)
+            }
+            if layout { LayoutMenu().padding(.horizontal, 14).frame(height: 36).glass(\.glassBar, in: Capsule(), bar: true) }
+            if colors { ColorsButton().padding(.horizontal, 14).frame(height: 36).glass(\.glassBar, in: Capsule(), bar: true) }
+            Spacer(minLength: 8)
+            ZoomControls().disabled(comparing)
+                .padding(.horizontal, 10).frame(height: 36).glass(\.glassBar, in: Capsule(), bar: true)
+            InspectorToggle()
+        }
     }
 }
 
 /// One menu for template and layout together, grouped by template: "Article · Essay".
 struct LayoutMenu: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let current = Templates.descriptor(model.templateID)
@@ -181,9 +182,13 @@ struct LayoutMenu: View {
                 }
             }
         } label: {
-            Text("\(current.title) \u{00B7} \(variantTitle)")
+            HStack(spacing: 6) {
+                Text("\(current.title) \u{00B7} \(variantTitle)").font(.system(size: 13)).foregroundStyle(theme.textPrimary.color)
+                Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
+            }
+            .contentShape(Rectangle())
         }
-        .menuStyle(.button).fixedSize()
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
         .help(Lexicon.Reading.layoutHelp)
         .accessibilityLabel(Lexicon.Colors.layoutLabel)
         .accessibilityValue("\(current.title), \(variantTitle)")
@@ -193,6 +198,7 @@ struct LayoutMenu: View {
 /// Minus, Fit, plus. Command-minus, command-0 and command-plus.
 struct ZoomControls: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let zoom = model.stageZoom
@@ -215,6 +221,7 @@ struct ZoomControls: View {
                 .keyboardShortcut("+", modifiers: .command)
                 .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
         }
+        .buttonStyle(.plain).font(.system(size: 13)).foregroundStyle(theme.textPrimary.color)
         .fixedSize()
     }
 }
@@ -223,6 +230,7 @@ struct ZoomControls: View {
 /// After a choice it turns into the confirmation with Undo and the next step.
 struct DecideBar: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let selected: Candidate?
     let comparing: Bool
@@ -234,9 +242,10 @@ struct DecideBar: View {
             else if isChosen { chosenBar }
             else { chooseBar }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(8)
+        .glass(\.glassBar, in: Capsule(), bar: true)
+        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 16)
         .frame(minWidth: 0, maxWidth: .infinity)
-        .background(.bar)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isChosen)
     }
 
@@ -250,20 +259,23 @@ struct DecideBar: View {
             Label(on ? Lexicon.Reading.shortlistOn : Lexicon.Reading.addToShortlist,
                   systemImage: on ? "checkmark.circle.fill" : "plus.circle")
         }
+        .buttonStyle(GlassButtonStyle())
         .disabled(selected == nil)
         let toggleIcon = Button {
             if let c = selected { Task { await model.setShortlist("reading", family: c.family, on: !on) } }
         } label: {
             Image(systemName: on ? "checkmark.circle.fill" : "plus.circle")
         }
+        .buttonStyle(GlassButtonStyle())
         .help(on ? Lexicon.Reading.removeFromShortlist : Lexicon.Reading.addToShortlist)
         .accessibilityLabel(on ? Lexicon.Reading.removeFromShortlist : Lexicon.Reading.addToShortlist)
         .disabled(selected == nil)
         let compare = Button(Lexicon.Reading.compare(shortlistCount)) { model.compareMode = true }
+            .buttonStyle(GlassButtonStyle())
         let use = Button(Lexicon.useFor("reading")) {
             if let c = selected { Task { await model.choose("reading", family: c.family) } }
         }
-        .buttonStyle(.borderedProminent).disabled(selected == nil)
+        .buttonStyle(PrimaryButtonStyle()).disabled(selected == nil)
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
                 hint
@@ -293,13 +305,14 @@ struct DecideBar: View {
     }
 
     private var hint: some View {
-        Text(Lexicon.Reading.hint).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        Text(Lexicon.Reading.hint).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color).lineLimit(1)
+            .padding(.leading, 8)
     }
 
     private var compareBar: some View {
         HStack(spacing: 8) {
             Spacer(minLength: 0)
-            Button(Lexicon.Reading.backToOne) { model.compareMode = false }
+            Button(Lexicon.Reading.backToOne) { model.compareMode = false }.buttonStyle(GlassButtonStyle())
         }
     }
 
@@ -307,12 +320,12 @@ struct DecideBar: View {
         let justChosen = model.canUndo("reading")
         let noDisplay = model.displayFamily == nil
         return HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill").font(.title3).foregroundStyle(Color.accentColor)
+            Image(systemName: "checkmark.circle.fill").font(.title3).foregroundStyle(theme.textPrimary.color)
                 .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : model.choicePulse)
             Text(justChosen ? Lexicon.picked("reading") : Lexicon.current("reading")).font(.callout.weight(.semibold)).lineLimit(1)
-            if justChosen { Button(Lexicon.undo) { Task { await model.undo("reading") } }.buttonStyle(.link) }
+            if justChosen { Button(Lexicon.undo) { Task { await model.undo("reading") } }.buttonStyle(.themeLink) }
             Button(Lexicon.clearFace("reading")) { Task { await model.clear("reading") } }
-                .buttonStyle(.link).foregroundStyle(.secondary).font(.caption).lineLimit(1)
+                .buttonStyle(.themeLink).foregroundStyle(theme.textSecondary.color).font(.caption).lineLimit(1)
             Spacer(minLength: 8)
             Button {
                 model.screen = noDisplay ? .display : .set
@@ -322,7 +335,7 @@ struct DecideBar: View {
                     Image(systemName: "arrow.right")
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(PrimaryButtonStyle())
         }
     }
 }

@@ -6,12 +6,17 @@ struct FontDropApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel(options: LaunchOptions())
 
+    init() { InstrumentFonts.registerFonts() }
+
     var body: some Scene {
         WindowGroup("FontDrop") {
-            RootView()
-                .environment(model)
-                .frame(minWidth: 1000, minHeight: 640)
+            ThemeRoot {
+                RootView()
+                    .environment(model)
+                    .frame(minWidth: 1000, minHeight: 640)
+            }
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1360, height: 860)
         .commands {
             // One window: a second one would share this model and run the open and rescan again.
@@ -24,6 +29,18 @@ struct FontDropApp: App {
                             .keyboardShortcut(key, modifiers: .command)
                     }
                 }
+            }
+            CommandGroup(replacing: .appInfo) {
+                Button("About FontDrop") {
+                    NSApp.orderFrontStandardAboutPanel(options: [
+                        .credits: NSAttributedString(string: Lexicon.aboutCredits,
+                                                     attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]),
+                    ])
+                }
+            }
+            CommandGroup(after: .sidebar) {
+                Button("Show or hide inspector") { model.inspectorTouched = true; model.showInspector.toggle() }
+                    .keyboardShortcut("i", modifiers: [.command, .option])
             }
             CommandMenu(Lexicon.typeMenu) {
                 ForEach(["display", "reading"], id: \.self) { job in

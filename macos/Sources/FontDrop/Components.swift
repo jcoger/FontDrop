@@ -36,13 +36,14 @@ struct FontText: View {
 
 /// Neutral tag, e.g. "Trial". Never a warning colour: trial fonts are welcome while exploring.
 struct TagPill: View {
+    @Environment(\.theme) private var theme
     let text: String
     var body: some View {
         Text(text)
-            .font(.caption2.weight(.medium))
-            .padding(.horizontal, 7).padding(.vertical, 2)
-            .overlay(Capsule().stroke(.secondary.opacity(0.5), lineWidth: 1))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 11, weight: .medium))
+            .padding(.horizontal, 8).padding(.vertical, 2)
+            .pill(chip: true)
+            .foregroundStyle(theme.textSecondary.color)
     }
 }
 
@@ -50,6 +51,7 @@ struct TagPill: View {
 /// drawn neutral with a dashed outline. Meaning never rests on colour alone: "against"
 /// carries a minus sign and "not scored" a dashed edge.
 struct EvidenceChip: View {
+    @Environment(\.theme) private var theme
     let text: String
     let effect: Int8
     var help: String = ""
@@ -62,13 +64,14 @@ struct EvidenceChip: View {
 
     var body: some View {
         label
-            .font(.caption)
+            .font(.system(size: 12))
             .lineLimit(1)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Capsule().fill(.quaternary.opacity(effect == 0 ? 0 : 0.6)))
-            .overlay(Capsule().strokeBorder(.secondary.opacity(0.4),
-                                            style: StrokeStyle(lineWidth: 1, dash: effect == 0 ? [3, 2] : [])))
-            .foregroundStyle(effect == 0 || warning ? Color.secondary : Color.primary)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(Capsule().fill(effect == 0 ? .clear : theme.chipGround.color))
+            .overlay { if effect == 0 {   // "not scored" keeps its dashed edge: meaning never rests on colour alone
+                Capsule().strokeBorder(theme.textSecondary.color.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+            } }
+            .foregroundStyle(effect == 0 || warning ? theme.textSecondary.color : theme.textPrimary.color)
             .help(help)
     }
 }
@@ -100,7 +103,7 @@ struct GlossaryButton: View {
 
     var body: some View {
         Button("What do these mean?") { shown.toggle() }
-            .buttonStyle(.link).font(.caption)
+            .buttonStyle(.themeLink).font(.caption)
             .popover(isPresented: $shown, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Lexicon.Term.allCases) { term in
@@ -145,26 +148,24 @@ struct FlowLayout: Layout {
     }
 }
 
-/// A grouped block in the inspector: small title, rounded surface.
+/// A module in the inspector: a Geist Mono caps label over its content. No card, no rules.
 struct InspectorSection<Content: View>: View {
+    @Environment(\.theme) private var theme
     let title: String
     var trailing: String?
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text(title).moduleLabel()
                 Spacer()
-                if let trailing { Text(trailing).font(.caption).foregroundStyle(.secondary) }
+                if let trailing { Text(trailing).moduleLabel() }
             }
-            .padding(.horizontal, 2)
             VStack(alignment: .leading, spacing: 0) { content }
-                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(.background.secondary))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
         }
+        .padding(.top, 22).padding(.bottom, 10)
     }
 }
 
@@ -178,11 +179,9 @@ struct DecisionButton: View {
         Button(action: action) {
             Text(title).frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .buttonStyle(PrimaryButtonStyle(large: true))
         .disabled(disabled)
         .padding(14)
-        .background(.bar)
     }
 }
 
@@ -193,6 +192,7 @@ struct DecisionButton: View {
 struct ChosenPanel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
     let job: String
     var nextTitle: String?
     var next: (() -> Void)?
@@ -202,17 +202,17 @@ struct ChosenPanel: View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.title3).foregroundStyle(Color.accentColor)
+                    .font(.title3).foregroundStyle(theme.textPrimary.color)
                     .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? 0 : model.choicePulse)
                 Text(justChosen ? Lexicon.picked(job) : Lexicon.current(job))
                     .font(.callout.weight(.semibold))
                 Spacer()
                 if justChosen {
                     Button(Lexicon.undo) { Task { await model.undo(job) } }
-                        .buttonStyle(.link)
+                        .buttonStyle(.themeLink)
                 }
                 Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }
-                    .buttonStyle(.link).foregroundStyle(.secondary).font(.caption)
+                    .buttonStyle(.themeLink).foregroundStyle(theme.textSecondary.color).font(.caption)
             }
             if let nextTitle, let next {
                 Button(action: next) {
@@ -222,12 +222,10 @@ struct ChosenPanel: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(PrimaryButtonStyle(large: true))
             }
         }
         .padding(14)
-        .background(.bar)
         .accessibilityElement(children: .contain)
     }
 }
@@ -254,7 +252,7 @@ struct NameBrandSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(Lexicon.BrandSheet.ok, action: create)
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(trimmed.isEmpty)
             }
         }

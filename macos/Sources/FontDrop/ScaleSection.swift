@@ -7,15 +7,16 @@ import SwiftUI
 /// React: a controlled form over a per-brand store, with the readout derived from the same solver the templates call.
 struct ScaleSection: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
     let family: String
     var fallbackPath: String?
 
     var body: some View {
         let scale = model.scale
         let sizes = model.solvedSizes(reading: family, fallbackPath: fallbackPath)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(Lexicon.Scale.title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text("01 \u{00B7} \(Lexicon.Scale.title)").moduleLabel()
                 Spacer()
                 Toggle(Lexicon.Scale.lock, isOn: Binding(
                     get: { scale.locked },
@@ -23,7 +24,7 @@ struct ScaleSection: View {
                         if on { model.lockScale(reading: family, fallbackPath: fallbackPath) }
                         else { model.updateScale { $0.locked = false } }
                     }))
-                    .toggleStyle(.switch).controlSize(.mini).font(.caption)
+                    .toggleStyle(.theme).fixedSize().font(.system(size: 12))
                     .help(Lexicon.Scale.lockHelp)
                     .accessibilityLabel(Lexicon.Scale.lockHelp)
             }
@@ -38,8 +39,7 @@ struct ScaleSection: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(.background.secondary))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.controlGround.color))
         }
     }
 

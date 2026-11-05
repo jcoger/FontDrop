@@ -3,34 +3,27 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView {
-            SidebarView()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 235, max: 300)
-        } detail: {
-            ContentRouter()
-                .inspector(isPresented: Binding(get: { model.showInspector && model.screen != .set },
-                                                set: { model.showInspector = $0 })) {
+        ZStack {
+            WindowBackdrop()
+            HStack(spacing: 8) {
+                SidebarView()
+                    .frame(width: 235)
+                    .modifier(PanelChrome(fill: \.glassSidebar, radius: 24))
+                ContentPanel { ContentRouter() }
+                if model.showInspector {
                     InspectorRouter()
-                        .inspectorColumnWidth(min: 280, ideal: 330, max: 460)
-                }
-        }
-        .searchable(text: $model.search, prompt: model.screen == .reading ? "Search families" : Lexicon.Finder.searchPrompt)
-        .navigationTitle(model.brand?.name ?? "FontDrop")
-        .navigationSubtitle(subtitle)
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                // Export returns in round R6, when it has something to export. No dead button until then.
-                if model.screen != .set {
-                    Button { model.inspectorTouched = true; model.showInspector.toggle() } label: {
-                        Label("Inspector", systemImage: "sidebar.trailing")
-                    }
-                    .help("Show or hide the inspector")
+                        .frame(width: 330)
+                        .modifier(PanelChrome(fill: \.glassInspector, radius: 24))
                 }
             }
+            .padding(8)
         }
+        .ignoresSafeArea()
+        .background(WindowConfigurator())
         .background(GeometryReader { geo in
             Color.clear
                 .onAppear { model.windowWidth = geo.size.width }
@@ -49,15 +42,6 @@ struct RootView: View {
         .task { await model.bootstrap() }
         .task { await ScreenshotRunner.runIfRequested(model: model) }
         .task { await Bench.runIfRequested(model: model) }
-    }
-
-    private var subtitle: String {
-        switch model.screen {
-        case .display, .ui, .mono: "\(model.screen.title) \u{00B7} \(model.visibleFamilies.count) families"
-        case .reading: Lexicon.Reading.subtitle(model.shortlist("reading").count)
-        case .set: Lexicon.Scale.sidebarLine(model.scale)
-        case .colors: ""
-        }
     }
 
     @ViewBuilder
@@ -97,8 +81,126 @@ struct InspectorRouter: View {
         switch model.screen {
         case .display, .ui, .mono: FamilyInspector(screen: model.screen)
         case .reading: ReadingInspector()
-        case .set, .colors:
-            EmptyView()
+        case .set: SetInspector()
+        case .colors: EmptyView()
         }
     }
+}
+
+// MARK: - Window and panels
+
+/// The window behind the panels: a quiet two-stop gradient from the theme.
+struct WindowBackdrop: View {
+    @Environment(\.theme) private var theme
+    var body: some View {
+        LinearGradient(colors: [theme.windowTop.color, theme.windowBottom.color], startPoint: .top, endPoint: .bottom)
+    }
+}
+
+/// A rounded glass panel with grain (dark only). Clips its content to the corner.
+struct PanelChrome: ViewModifier {
+    let fill: KeyPath<Theme, RGBA>
+    let radius: CGFloat
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        content
+            .background(Grain().clipShape(shape))
+            .clipShape(shape)
+            .glass(fill, in: shape)
+    }
+}
+
+/// The middle panel: the white (or #1C1C1B) page the list, the stage and the Display grid sit on.
+struct ContentPanel<Content: View>: View {
+    @Environment(\.theme) private var theme
+    @Environment(AppModel.self) private var model
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        VStack(spacing: 0) {
+            if model.screen == .display || model.screen == .ui || model.screen == .mono { DisplayTopRow() }
+            content
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+        .background(theme.panelContent.color)
+        .background(Grain())
+        .clipShape(shape)
+        .overlay { if let ring = theme.panelRing { shape.strokeBorder(ring.color, lineWidth: 1) } }
+        .shadow(color: theme.panelShadow.first?.color.color ?? .clear, radius: theme.panelShadow.first?.radius ?? 0, y: theme.panelShadow.first?.y ?? 0)
+        .shadow(color: theme.panelShadow.last?.color.color ?? .clear, radius: theme.panelShadow.last?.radius ?? 0, y: theme.panelShadow.last?.y ?? 0)
+    }
+}
+
+/// Display has no stage toolbar, so its search field and the inspector toggle sit in a row above the grid.
+struct DisplayTopRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SearchField(prompt: Lexicon.Finder.searchPrompt)
+                .frame(maxWidth: 280)
+            Spacer(minLength: 0)
+            InspectorToggle()
+        }
+        .padding(.horizontal, 20).padding(.top, 16)
+    }
+}
+
+/// A search field on the control ground. Replaces the window toolbar's field.
+struct SearchField: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+    let prompt: String
+
+    var body: some View {
+        @Bindable var model = model
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
+            TextField(prompt, text: $model.search)
+                .textFieldStyle(.plain).font(.system(size: 12))
+            if !model.search.isEmpty {
+                Button { model.search = "" } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 12)) }
+                    .buttonStyle(.plain).foregroundStyle(theme.textSecondary.color)
+                    .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .pill()
+    }
+}
+
+/// Shows or hides the inspector. The window has no toolbar any more, so the button lives with the content.
+struct InspectorToggle: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button { model.inspectorTouched = true; model.showInspector.toggle() } label: {
+            Image(systemName: "sidebar.trailing").font(.system(size: 14))
+                .foregroundStyle(theme.textSecondary.color)
+                .frame(width: 28, height: 24).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Show or hide the inspector")
+        .accessibilityLabel("Inspector")
+    }
+}
+
+/// Full-size content under a transparent title bar: the traffic lights sit inside the sidebar panel.
+struct WindowConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            guard let w = view.window else { return }
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
+            w.styleMask.insert(.fullSizeContentView)
+            w.isMovableByWindowBackground = true
+            w.title = "FontDrop"
+        }
+        return view
+    }
+    func updateNSView(_ view: NSView, context: Context) {}
 }
