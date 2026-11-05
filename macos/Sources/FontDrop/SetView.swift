@@ -49,7 +49,8 @@ struct SetView: View {
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 18)
                 ForEach(ScaleStep.stageOrder) { step in
-                    row(step, sizes: sizes, display: (display.name, displayFace), text: (reading.name, textFace),
+                    row(step, sizes: sizes, display: (Lexicon.SetScreen.faceAndStyle(display.name, model.styleLabel(displayFace, family: display.name)), displayFace),
+                        text: (Lexicon.SetScreen.faceAndStyle(reading.name, model.styleLabel(textFace, family: reading.name)), textFace),
                         specWidth: specWidth, stacked: stacked, tick: tick)
                 }
                 scaledNote(sizes: sizes, display: displayFace, text: textFace, specWidth: specWidth)
@@ -67,17 +68,7 @@ struct SetView: View {
 
     // MARK: Rows
 
-    private func line(for step: ScaleStep) -> String {
-        switch step {
-        case .display: Lexicon.SetScreen.displayLine
-        case .h1: Lexicon.SetScreen.h1Line
-        case .h2: Lexicon.SetScreen.h2Line
-        case .h3: Lexicon.SetScreen.h3Line
-        case .lead: Lexicon.SetScreen.leadLine
-        case .body: SampleCopy.paragraphs.joined(separator: " ")
-        case .caption: Lexicon.SetScreen.captionLine
-        }
-    }
+    private func line(for step: ScaleStep) -> String { step.sampleLine }
 
     private func row(_ step: ScaleStep, sizes: SetSizes, display: (name: String, face: FaceSpec), text: (name: String, face: FaceSpec),
                      specWidth: CGFloat, stacked: Bool, tick: Int) -> some View {
