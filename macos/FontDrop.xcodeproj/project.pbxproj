@@ -70,9 +70,11 @@
 		971C8AD2137E46192657E672 /* WriteBehind.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25019841A5B6C5B29C894965 /* WriteBehind.swift */; };
 		9865FD6C5D19BCD996114F4A /* Parts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9661FDD8E17FF5AC3446ECA /* Parts.swift */; };
 		9DD4463BA2D7FA954DAE49B2 /* TypeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED67507352AF793EB389C504 /* TypeSettings.swift */; };
+		A073812A15D502E474E1D4FA /* FontDropCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0A36EA16F2A08C02AA324632 /* FontDropCore */; };
 		A3DBFA936E8FE6AD78B4969A /* ColorsPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72FEC7919F76B0860FFDC3AC /* ColorsPopover.swift */; };
 		A727B8A31F0FC4F4EE615485 /* DisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF45315ED86D1A62A42E9D5D /* DisplayView.swift */; };
 		A852010CD99968F953D52A1D /* TemplatePalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A70A5AEF9AB9A8B3AD2F94 /* TemplatePalette.swift */; };
+		A912FD57AB0057D50BB6815F /* ReviewFixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B7E269D36AE33CA0851118 /* ReviewFixTests.swift */; };
 		AB5434D3B830C6E2B1CAF0FE /* LaunchPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */; };
 		ADB5583D1B3AAAC566EAE8C4 /* ReadingSafeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A90A99F5624F81E5DA41C20 /* ReadingSafeTests.swift */; };
 		B1E74AC6DD431E1FA7E45EC3 /* DisplaySortMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F9E53CD974A61BC39BBE4D1 /* DisplaySortMenu.swift */; };
@@ -98,6 +100,7 @@
 		DB5A8E1944294858E657D5CA /* ReadingStageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6046E775A350959D59C8B1AC /* ReadingStageTests.swift */; };
 		E2C1E584F0AE9772E5C098B2 /* ArticleEssay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A79E2313EB9FCB289A2ED9C /* ArticleEssay.swift */; };
 		E6636500B920DF0985DBA7B8 /* BrandStyleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03FCE0C902BCCC8183838589 /* BrandStyleStore.swift */; };
+		E7E7E3E8A239CAB0F1D99E1E /* KeyboardUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8495AC34974ACC7FB5A90EB /* KeyboardUITests.swift */; };
 		EDAD3CD9C22447948721050D /* Board.swift in Sources */ = {isa = PBXBuildFile; fileRef = 634794C976B9676703946C88 /* Board.swift */; };
 		F535109DB7A1EB65EF76D51E /* ArticleFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473506B3CBD640CAEF115FBE /* ArticleFeature.swift */; };
 		F61AF17998E0C2E0208F43D6 /* Lexicon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78465415000013A4F0E0E3B6 /* Lexicon.swift */; };
@@ -111,6 +114,13 @@
 
 /* Begin PBXContainerItemProxy section */
 		B265A5E21318087A0BE4D22A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 163ED80E23E01A7CBA8BC880 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0B2BF46E910A9F12DFF72E91;
+			remoteInfo = FontDrop;
+		};
+		B6FD36169D23394EF54C407D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 163ED80E23E01A7CBA8BC880 /* Project object */;
 			proxyType = 1;
@@ -176,6 +186,7 @@
 		74898072DE04330A09146301 /* FontDropApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontDropApp.swift; sourceTree = "<group>"; };
 		76A60A733017317A0A472D23 /* FaceVariants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceVariants.swift; sourceTree = "<group>"; };
 		78465415000013A4F0E0E3B6 /* Lexicon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Lexicon.swift; sourceTree = "<group>"; };
+		79B7E269D36AE33CA0851118 /* ReviewFixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewFixTests.swift; sourceTree = "<group>"; };
 		7ADB4D43D65B2EBB073C4F0F /* DialAndLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialAndLaunchTests.swift; sourceTree = "<group>"; };
 		7D06AF68B19101ECB7C5CE50 /* FlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTests.swift; sourceTree = "<group>"; };
 		7FEC62CCE0CDC6DFD6996346 /* ExportActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportActions.swift; sourceTree = "<group>"; };
@@ -200,7 +211,9 @@
 		B29E2CE371430A13343A03A4 /* LaunchPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchPathTests.swift; sourceTree = "<group>"; };
 		B57030ADD61FE303D2F09BD5 /* PosterSpecimen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSpecimen.swift; sourceTree = "<group>"; };
 		B7FBF5567DA13C4003CE4BDA /* Copy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Copy.swift; sourceTree = "<group>"; };
+		C3985B613B2DAF85F338D271 /* FontDropUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FontDropUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C732E56B7B9C84CC59264D58 /* PosterEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterEvent.swift; sourceTree = "<group>"; };
+		C8495AC34974ACC7FB5A90EB /* KeyboardUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardUITests.swift; sourceTree = "<group>"; };
 		C9D14720706D523AAC6B788D /* ContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContrastTests.swift; sourceTree = "<group>"; };
 		CFDA6A0960BBCD2F4DAAF5A5 /* LaunchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchViews.swift; sourceTree = "<group>"; };
 		D08AFBD8BF385333288AEDE8 /* PosterFitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterFitTests.swift; sourceTree = "<group>"; };
@@ -224,6 +237,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		87D88DAA2EA8902C78C97283 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A073812A15D502E474E1D4FA /* FontDropCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8A52DFC9C60C930D208A7F86 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -301,6 +322,7 @@
 				0A90A99F5624F81E5DA41C20 /* ReadingSafeTests.swift */,
 				6046E775A350959D59C8B1AC /* ReadingStageTests.swift */,
 				94A986121FCC102B0FA12D9B /* RescanAndClearTests.swift */,
+				79B7E269D36AE33CA0851118 /* ReviewFixTests.swift */,
 				AC4E2EF4D0A0D90BD4D091EA /* SameFamilyTests.swift */,
 				D8F9CDBE642597B3B4A3EE75 /* SetFaceStyleTests.swift */,
 				6523E329AE03B4FE628B55DB /* SetScreenTests.swift */,
@@ -324,6 +346,7 @@
 			children = (
 				56E24347D2961718B7171E05 /* FontDrop.app */,
 				4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */,
+				C3985B613B2DAF85F338D271 /* FontDropUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -384,10 +407,19 @@
 			path = FontDrop;
 			sourceTree = "<group>";
 		};
+		C0F779DEECFAF9C9DCF4EAA2 /* FontDropUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C8495AC34974ACC7FB5A90EB /* KeyboardUITests.swift */,
+			);
+			path = FontDropUITests;
+			sourceTree = "<group>";
+		};
 		CCCD99DA5FB1ADDCDAAC06D5 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
 				8DE61A4CEAF1A615A7BDECC5 /* FontDropTests */,
+				C0F779DEECFAF9C9DCF4EAA2 /* FontDropUITests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -473,6 +505,26 @@
 			productReference = 4FE63CAC05FA796978C5FC00 /* FontDropTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		D4E1CF9D20A5BE793B15D6E8 /* FontDropUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EC60CF64CE04C0B2CE4017A3 /* Build configuration list for PBXNativeTarget "FontDropUITests" */;
+			buildPhases = (
+				3BDBB69E9D6EE8E91298F523 /* Sources */,
+				87D88DAA2EA8902C78C97283 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2FBE6181289591AB223E659D /* PBXTargetDependency */,
+			);
+			name = FontDropUITests;
+			packageProductDependencies = (
+				0A36EA16F2A08C02AA324632 /* FontDropCore */,
+			);
+			productName = FontDropUITests;
+			productReference = C3985B613B2DAF85F338D271 /* FontDropUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -487,6 +539,10 @@
 					};
 					3BA405026722A52C83DDDD7F = {
 						ProvisioningStyle = Automatic;
+					};
+					D4E1CF9D20A5BE793B15D6E8 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 0B2BF46E910A9F12DFF72E91;
 					};
 				};
 			};
@@ -509,6 +565,7 @@
 			targets = (
 				0B2BF46E910A9F12DFF72E91 /* FontDrop */,
 				3BA405026722A52C83DDDD7F /* FontDropTests */,
+				D4E1CF9D20A5BE793B15D6E8 /* FontDropUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -530,6 +587,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3BDBB69E9D6EE8E91298F523 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E7E7E3E8A239CAB0F1D99E1E /* KeyboardUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		76E9FCEA8E9FD25E6BBF0FDE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -627,6 +692,7 @@
 				ADB5583D1B3AAAC566EAE8C4 /* ReadingSafeTests.swift in Sources */,
 				DB5A8E1944294858E657D5CA /* ReadingStageTests.swift in Sources */,
 				FF51E5A10EDFE2B480988E93 /* RescanAndClearTests.swift in Sources */,
+				A912FD57AB0057D50BB6815F /* ReviewFixTests.swift in Sources */,
 				3CC84A4FA94EFC19170C5695 /* SameFamilyTests.swift in Sources */,
 				BD10F571CFB81692487DFE4E /* SetFaceStyleTests.swift in Sources */,
 				795E503ACAE72B6CDF5F9E9A /* SetScreenTests.swift in Sources */,
@@ -639,6 +705,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		2FBE6181289591AB223E659D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0B2BF46E910A9F12DFF72E91 /* FontDrop */;
+			targetProxy = B6FD36169D23394EF54C407D /* PBXContainerItemProxy */;
+		};
 		CA18610BA4A03640AB738DF7 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 0B2BF46E910A9F12DFF72E91 /* FontDrop */;
@@ -770,6 +841,40 @@
 			};
 			name = Release;
 		};
+		71773720CDB4AE3EEAAEF183 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = co.dynolabs.fontdrop.mac.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = FontDrop;
+			};
+			name = Release;
+		};
+		74A22AE17C55B06948BDA614 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = co.dynolabs.fontdrop.mac.uitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = FontDrop;
+			};
+			name = Debug;
+		};
 		8D47D570AFC43E482048172F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -883,6 +988,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		EC60CF64CE04C0B2CE4017A3 /* Build configuration list for PBXNativeTarget "FontDropUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				74A22AE17C55B06948BDA614 /* Debug */,
+				71773720CDB4AE3EEAAEF183 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -893,6 +1007,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0A36EA16F2A08C02AA324632 /* FontDropCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FontDropCore;
+		};
 		295C722A69BA7B3CEFA2757F /* FontDropCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FontDropCore;

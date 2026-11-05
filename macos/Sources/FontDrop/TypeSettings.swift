@@ -273,6 +273,17 @@ final class TypeSettingsStore {
         for key in map.keys where Self.split(key)?.0 == brand { map[key] = nil }
     }
 
+    /// The first brand was just made: settings made with no brand yet ("0/job/family") move onto it and are saved.
+    /// What the brand already holds (from the database) stays.
+    func adoptUnbranded(into brand: Int64) {
+        for (key, settings) in map {
+            guard let (b, job, family) = Self.split(key), b == 0 else { continue }
+            map[key] = nil
+            let target = Self.key(brand: brand, job: job, family: family)
+            if map[target] == nil { map[target] = settings; writer.mark(target) }
+        }
+    }
+
     func flush() { writer.flush() }
 
     static func key(brand: Int64?, job: String, family: String) -> String { "\(brand ?? 0)/\(job)/\(family)" }

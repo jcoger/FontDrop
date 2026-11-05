@@ -19,6 +19,7 @@ struct LaunchOptions {
     var appearance: String?      // "light" | "dark"
     var brand: String?
     var select: String?          // family to select (Display) or candidate (Reading)
+    var isolated = false         // --isolated: a normal run (window, rescan of --scan-folders) that saves no preferences. For UI tests.
     var noBrand = false          // start with no brand selected (to see the "Name this brand" sheet)
     var demoChoose: String?      // with --no-brand: act as if "Use for Display" was pressed on this family
     var template: String?        // Reading template id: article | hero | appui | poster
@@ -59,6 +60,7 @@ struct LaunchOptions {
         appearance = value("--appearance")
         brand = value("--brand")
         select = value("--select")
+        isolated = arguments.contains("--isolated")
         noBrand = arguments.contains("--no-brand")
         demoChoose = value("--demo-choose")
         if demoChoose != nil { noBrand = true }       // the sheet only shows when there is no brand
@@ -155,7 +157,8 @@ final class AppModel {
     var screen: Screen = .display { didSet { if screen != oldValue { rememberBrandState() } } }
     var search = "" { didSet { if search != oldValue { scheduleFinder() } } }
     var showInspector = true
-    var showSidebar = true
+    /// Kept between launches. A screenshot or test run has its own throwaway defaults.
+    var showSidebar = true { didSet { if showSidebar != oldValue { defaults.set(showSidebar, forKey: "showSidebar") } } }
 
     // Library (read once, then filtered in memory)
     private(set) var families: [FamilySummary] = []          // user-installed first, then by name
@@ -237,8 +240,9 @@ final class AppModel {
     func applyInspectorRule() {
         guard !inspectorTouched, windowWidth > 0 else { return }
         if screen == .reading {
-            if !ReadingLayout.inspectorFits(windowWidth: windowWidth), showInspector { showInspector = false; inspectorAutoClosed = true }
-            else if ReadingLayout.inspectorFits(windowWidth: windowWidth), inspectorAutoClosed { showInspector = true; inspectorAutoClosed = false }
+            let fits = ReadingLayout.inspectorFits(windowWidth: windowWidth, sidebarShown: showSidebar)
+            if !fits, showInspector { showInspector = false; inspectorAutoClosed = true }
+            else if fits, inspectorAutoClosed { showInspector = true; inspectorAutoClosed = false }
         } else if inspectorAutoClosed {
             showInspector = true; inspectorAutoClosed = false
         }
@@ -364,13 +368,14 @@ final class AppModel {
     /// `defaults` is for tests that want their own suite. Left out, a bench or screenshot run gets a throwaway one.
     init(options: LaunchOptions, defaults: UserDefaults? = nil) {
         self.options = options
-        let isolated = options.screenshot != nil || options.bench
+        let isolated = options.screenshot != nil || options.bench || options.isolated
         let store = defaults ?? (isolated ? Self.throwawayDefaults() : .standard)
         self.defaults = store
         typeSettings = TypeSettingsStore(persist: !isolated)
         scaleStore = ScaleStore(persist: !isolated)
         brandStyle = BrandStyleStore(persist: !isolated, defaults: store)
         templateID = store.string(forKey: "readingTemplate") ?? "article"
+        showSidebar = store.object(forKey: "showSidebar") as? Bool ?? true
         if let t = options.template { templateID = t }
         // Screenshot and bench runs start from the standard filter so they repeat.
         var f = isolated ? FinderFilter.standard : FinderFilter.load(from: store)
@@ -689,7 +694,7 @@ final class AppModel {
     // MARK: finding fonts
 
     private func persistFilter() {
-        if options.screenshot == nil && !options.bench { filter.save(to: defaults) }
+        if options.screenshot == nil && !options.bench && !options.isolated { filter.save(to: defaults) }
     }
 
     /// Asks the core again, soon. Typing in the search box calls this on every key; only the last answer is used.
@@ -775,11 +780,20 @@ final class AppModel {
         let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !n.isEmpty else { return nil }
         do {
+            let first = brands.isEmpty
             let b = try await background { try $0.brandCreate(name: n) }
             brands = try await background { try $0.brandsList() }
+            if first { takeUnbrandedSettings(into: b.id) }
             await selectBrand(b.id, restore: false)
             return b.id
         } catch { report(error); return nil }
+    }
+
+    /// The first brand takes what was set before any brand existed. The core already moved what the old JSON files held
+    /// under "no brand"; the stores read that back, then the values set in this session (kept in memory) go on top.
+    func takeUnbrandedSettings(into id: Int64) {
+        if let lib = core { typeSettings.attach(lib); scaleStore.attach(lib); brandStyle.attach(lib) }
+        typeSettings.adoptUnbranded(into: id); scaleStore.adoptUnbranded(into: id); brandStyle.adoptUnbranded(into: id)
     }
 
     /// The "Name this brand" sheet's Create button: make the brand, then apply the choice that asked for it.

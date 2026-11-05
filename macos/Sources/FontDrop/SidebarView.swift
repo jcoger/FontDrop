@@ -11,11 +11,13 @@ struct SidebarView: View {
     @State private var renaming: Brand?
     @State private var renameText = ""
     @State private var deleting: Brand?
+    @FocusState private var rowsFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Color.clear.frame(height: 36)                 // the traffic lights sit here
-            sectionLabel("Brands")
+            Color.clear.frame(height: 36)                 // the traffic lights sit here; an empty strip, so it drags the window
+                .background(WindowDragHandle())
+            sectionLabel(Lexicon.brandsLabel)
             brandSwitcher.padding(.bottom, 18)
             sectionLabel("Type")
             VStack(spacing: 2) {
@@ -23,6 +25,8 @@ struct SidebarView: View {
             }
             // Arrow keys move between Display, Text and Set once the list has keyboard focus (Tab, or full keyboard access).
             .focusable()
+            .focused($rowsFocused)
+            .focusEffectDisabled()                       // no ring around the group; the selected row shows it instead
             .onKeyPress(keys: [.upArrow, .downArrow]) { press in
                 let all = Screen.sidebar
                 guard let i = all.firstIndex(of: model.screen) else { model.screen = all[0]; return .handled }
@@ -36,7 +40,7 @@ struct SidebarView: View {
         }
         .padding(12)
         .frame(maxHeight: .infinity, alignment: .top)
-        .alert("New brand", isPresented: $showNewBrand) {
+        .alert(Lexicon.newBrand, isPresented: $showNewBrand) {
             TextField("Name", text: $newName)
             Button("Create") { Task { await model.createBrand(newName) } }
             Button("Cancel", role: .cancel) {}
@@ -70,7 +74,7 @@ struct SidebarView: View {
                 Text(Lexicon.brandsEmpty).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
                 Spacer()
                 Button { newName = ""; showNewBrand = true } label: { Image(systemName: "plus") }
-                    .buttonStyle(.plain).help("New brand").accessibilityLabel("New brand")
+                    .buttonStyle(.plain).help(Lexicon.newBrand).accessibilityLabel(Lexicon.newBrand)
             }
             .padding(.horizontal, 12)
         } else {
@@ -84,7 +88,7 @@ struct SidebarView: View {
                     }
                 }
                 Divider()
-                Button("New brand\u{2026}") { newName = ""; showNewBrand = true }
+                Button(Lexicon.newBrand + "\u{2026}") { newName = ""; showNewBrand = true }
                 if let current {
                     Button("Rename\u{2026}") { renameText = current.name; renaming = current }
                     Button(Lexicon.BrandMenu.delete, role: .destructive) { deleting = current }
@@ -131,6 +135,9 @@ struct SidebarView: View {
             .frame(height: 44)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(SelectionPill(on: selected, sidebar: true, radius: 12))
+            .overlay { if selected && rowsFocused {
+                RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
+            } }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

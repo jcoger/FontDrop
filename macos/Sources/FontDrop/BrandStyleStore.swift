@@ -54,6 +54,14 @@ final class BrandStyleStore {
     /// The brand is gone (the database already dropped its colors).
     func forget(brand: Int64) { palettes[brand] = nil }
 
+    /// The first brand was just made: the colors set with no brand yet become its colors, and are saved.
+    func adoptUnbranded(into brand: Int64) {
+        guard let p = unbranded else { return }
+        palettes[brand] = p
+        unbranded = nil
+        writer.mark(brand)
+    }
+
     func flush() { writer.flush() }
 
     // MARK: Colors

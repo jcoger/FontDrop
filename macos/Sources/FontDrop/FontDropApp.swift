@@ -61,8 +61,9 @@ struct FontDropApp: App {
                 Button(model.preview == nil ? Lexicon.Keyboard.previewFace : Lexicon.Keyboard.closePreview) { model.togglePreview() }
                     .keyboardShortcut("y", modifiers: .command)
                     .disabled(model.preview == nil && model.selectedFaceName == nil)
+                // Command-= is the menu's key (no Shift on a US keyboard). Command-+ also works: see RootView.
                 Button(Lexicon.Reading.zoomIn) { model.stageZoom.zoomIn() }
-                    .keyboardShortcut("+", modifiers: .command)
+                    .keyboardShortcut("=", modifiers: .command)
                     .disabled(!model.canZoomStage || !model.stageZoom.canZoomIn)
                 Button(Lexicon.Reading.zoomOut) { model.stageZoom.zoomOut() }
                     .keyboardShortcut("-", modifiers: .command)
@@ -86,23 +87,42 @@ struct FontDropApp: App {
         }
     }
 
-    /// Command-Z. A text box that is being edited gets it first, so typing can be undone as usual.
+    /// Command-Z. A text box that is being edited gets it first, so typing can be undone as usual. Otherwise it takes
+    /// back a face choice, but only from the main window with nothing sitting on it: not behind a sheet or an alert,
+    /// and not from the About panel.
     @MainActor
     static func undo(_ model: AppModel) {
-        if let text = NSApp.keyWindow?.firstResponder as? NSTextView, text.undoManager?.canUndo == true {
-            text.undoManager?.undo()
-        } else {
-            Task { await model.undoLast() }
+        let text = NSApp.keyWindow?.firstResponder as? NSTextView
+        switch UndoRoute.route(textCan: text?.undoManager?.canUndo == true, window: NSApp.keyWindow) {
+        case .text: text?.undoManager?.undo()
+        case .model: Task { await model.undoLast() }
+        case .ignore: break
         }
     }
 
     @MainActor
     static func redo(_ model: AppModel) {
-        if let text = NSApp.keyWindow?.firstResponder as? NSTextView, text.undoManager?.canRedo == true {
-            text.undoManager?.redo()
-        } else {
-            Task { await model.redoLast() }
+        let text = NSApp.keyWindow?.firstResponder as? NSTextView
+        switch UndoRoute.route(textCan: text?.undoManager?.canRedo == true, window: NSApp.keyWindow) {
+        case .text: text?.undoManager?.redo()
+        case .model: Task { await model.redoLast() }
+        case .ignore: break
         }
+    }
+}
+
+/// Where Command-Z goes.
+enum UndoRoute: Equatable {
+    case text, model, ignore
+
+    static func route(textCan: Bool, window: NSWindow?) -> UndoRoute {
+        route(textCan: textCan, isMainWindow: window.map { $0.canBecomeMain && $0.sheetParent == nil } ?? false,
+              hasSheet: window?.attachedSheet != nil)
+    }
+
+    static func route(textCan: Bool, isMainWindow: Bool, hasSheet: Bool) -> UndoRoute {
+        if textCan { return .text }
+        return isMainWindow && !hasSheet ? .model : .ignore
     }
 }
 

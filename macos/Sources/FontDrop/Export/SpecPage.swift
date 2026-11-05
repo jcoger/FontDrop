@@ -182,13 +182,26 @@ private extension Color {
 
 @MainActor
 enum SpecPage {
+    /// `url` when nothing is there, else "name 2.ext", "name 3.ext" and so on.
+    static func freeURL(_ url: URL, exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> URL {
+        guard exists(url) else { return url }
+        let stem = url.deletingPathExtension().lastPathComponent, ext = url.pathExtension
+        var n = 2
+        while true {
+            let candidate = url.deletingLastPathComponent().appendingPathComponent("\(stem) \(n)").appendingPathExtension(ext)
+            if !exists(candidate) { return candidate }
+            n += 1
+        }
+    }
+
     /// Writes `<base>.pdf` and `<base>.png`. The PDF is vector, one page as tall as the content. The PNG is 2x.
     @discardableResult
     static func write(spec: ExportSpec, displayFace: FaceSpec, textFace: FaceSpec, base: URL) throws -> (pdf: URL, png: URL) {
         let renderer = ImageRenderer(content: SpecPageView(spec: spec, displayFace: displayFace, textFace: textFace))
         renderer.proposedSize = ProposedViewSize(width: SpecPageView.width, height: nil)
         let pdf = base.deletingPathExtension().appendingPathExtension("pdf")
-        let png = base.deletingPathExtension().appendingPathExtension("png")
+        // The save panel asked about the PDF. The PNG beside it is never written over: it takes a free name.
+        let png = freeURL(base.deletingPathExtension().appendingPathExtension("png"))
         var wrote = false
         renderer.render { size, draw in
             var box = CGRect(origin: .zero, size: size)

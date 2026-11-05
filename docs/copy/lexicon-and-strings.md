@@ -638,3 +638,16 @@ Every command lives in a menu with its shortcut. The lists also take the bare ke
 
 C pass (no em dashes) · R pass
 
+
+## 25. Review fixes (R7b, 2026-11-05)
+
+Strings moved into `Lexicon` or changed. No new wording for the designer except the Zoom In key. Plain words. No em dashes.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 25.1 | chrome.sidebar | **Sidebar** | Lexicon.sidebarRegion. VoiceOver name of the left panel. Was a literal in RootView |
+| 25.2 | chrome.inspector | **Inspector** | Lexicon.inspectorRegion. VoiceOver name of the right panel and of its toggle button |
+| 25.3 | chrome.brands | **Brands** | Lexicon.brandsLabel. Section label above the brand switcher |
+| 25.4 | chrome.newBrand | **New brand** · **New brand...** | Lexicon.newBrand. Alert title, the plus button's help and VoiceOver name, and the menu item (with an ellipsis) |
+| 25.5 | view.zoom | **Zoom in** | Command-= in the View menu. Command-+ also works (no menu item of its own) |
+| 25.6 | export.tailwind | **--font-weight-display-style** · **--font-weight-text-style** | In the Tailwind export. They make the classes `font-display-style` and `font-text-style`. The old names `--font-weight-display` and `--font-weight-text` made no class, and `font-display` is the family |

@@ -135,8 +135,8 @@ final class ExportTests: XCTestCase {
         @theme {
           --font-display: "Agrandir", sans-serif;
           --font-text: "PP Neue Machina", sans-serif;
-          --font-weight-display: 800;
-          --font-weight-text: 400;
+          --font-weight-display-style: 800;
+          --font-weight-text-style: 400;
           --text-display: 63px;
           --text-display--line-height: 1.05;
           --text-h1: 47px;
@@ -299,6 +299,51 @@ final class ExportTests: XCTestCase {
         await model.choose("reading", family: "Georgia")
         XCTAssertTrue(model.canExport)
         XCTAssertNil(model.exportReason)
+    }
+
+    // MARK: escaping
+
+    func testABrandNameCannotCloseTheCommentOrBreakAString() {
+        var spec = self.spec
+        spec.brandName = "Evil */ .x { color: red } Co"
+        spec.display.family = "Back\\slash \"Quote\""
+        for out in [Exporters.css(spec), Exporters.theme(spec), Exporters.theme(spec, paper: true)] {
+            // Every comment that opens also closes, and the injected rule never leaves the comment.
+            let opens = out.components(separatedBy: "/*").count - 1
+            let closes = out.components(separatedBy: "*/").count - 1
+            XCTAssertEqual(opens, closes, out)
+            XCTAssertTrue(out.contains("Evil * / .x { color: red } Co"), "the name stays inside the comment")
+        }
+        // The family inside a quoted string: the backslash and the quote are escaped.
+        XCTAssertEqual(Exporters.quoted("Back\\slash \"Quote\""), "\"Back\\\\slash \\\"Quote\\\"\"")
+        XCTAssertEqual(Exporters.quoted("a\nb"), "\"a\\a b\"")
+        XCTAssertTrue(Exporters.css(spec).contains("font-family: \"Back\\\\slash \\\"Quote\\\"\";"))
+    }
+
+    func testThePNGNeverOverwritesAFileThatIsThere() {
+        let taken: Set<String> = ["/t/Acme.png", "/t/Acme 2.png"]
+        let free = SpecPage.freeURL(URL(fileURLWithPath: "/t/Acme.png"), exists: { taken.contains($0.path) })
+        XCTAssertEqual(free.path, "/t/Acme 3.png")
+        XCTAssertEqual(SpecPage.freeURL(URL(fileURLWithPath: "/t/Other.png"), exists: { taken.contains($0.path) }).path, "/t/Other.png")
+    }
+
+    func testTheSpecPageKeepsAnExistingPNG() async throws {
+        let dir = try fixtureFolder()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let model = await makeModel(folder: dir)
+        await model.choose("display", family: "Georgia")
+        await model.choose("reading", family: "Arial")
+        let made = await ExportSpec.make(model: model)
+        let spec = try XCTUnwrap(made)
+        let d = try XCTUnwrap(model.displayFamily), r = try XCTUnwrap(model.readingFamily)
+        let base = URL(fileURLWithPath: NSTemporaryDirectory() + "fontdrop-keep-\(UUID().uuidString)")
+        let existing = base.appendingPathExtension("png")
+        try Data("mine".utf8).write(to: existing)
+        let out = try SpecPage.write(spec: spec, displayFace: model.face("display", d), textFace: model.face("reading", r), base: base)
+        XCTAssertEqual(try Data(contentsOf: existing), Data("mine".utf8), "the file that was there is untouched")
+        XCTAssertNotEqual(out.png, existing)
+        XCTAssertEqual(Array(try Data(contentsOf: out.png).prefix(4)), [0x89, 0x50, 0x4E, 0x47])
+        for url in [existing, out.pdf, out.png] { try? FileManager.default.removeItem(at: url) }
     }
 
     func testTheSpecPageWritesAPDFAndAPNG() async throws {

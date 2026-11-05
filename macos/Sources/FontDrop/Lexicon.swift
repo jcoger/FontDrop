@@ -225,6 +225,11 @@ enum Lexicon {
     static let auto = "Auto"
     // View menu
     static let sidebarJobs = "Display, Text and Set"
+    /// Names of the window's regions for VoiceOver, and the brand switcher's words.
+    static let sidebarRegion = "Sidebar"
+    static let inspectorRegion = "Inspector"
+    static let brandsLabel = "Brands"
+    static let newBrand = "New brand"
     static let showSidebar = "Show Sidebar"
     static let hideSidebar = "Hide Sidebar"
     static let showInspector = "Show Inspector"

@@ -56,6 +56,20 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/FontDrop.app/Contents/MacOS/FontDrop"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  FontDropUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: Tests/FontDropUITests
+    dependencies:
+      - target: FontDrop
+      - package: FontDropCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.dynolabs.fontdrop.mac.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: FontDrop
+
 schemes:
   FontDrop:
     build:
@@ -71,3 +85,14 @@ schemes:
       config: Debug
       targets:
         - FontDropTests
+  # The key-event tests drive the real app and need Automation permission for the test runner, so they live in their
+  # own scheme: `xcodebuild test -scheme FontDropUI`. The FontDrop scheme stays runnable with no permission prompt.
+  FontDropUI:
+    build:
+      targets:
+        FontDrop: all
+        FontDropUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - FontDropUITests

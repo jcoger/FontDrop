@@ -76,6 +76,61 @@ enum DialMath {
     }
 }
 
+/// The scroll wheel's arithmetic: one stop for every 14 points of travel, the remainder kept between events.
+struct DialScroll: Equatable {
+    static let pointsPerStop: CGFloat = 14
+    var remainder: CGFloat = 0
+
+    /// Adds one event's travel. Returns the stops to move: +1 turns up, -1 down. A line-based wheel
+    /// (no precise deltas) counts six points a line.
+    mutating func add(deltaY: CGFloat, precise: Bool) -> [Int] {
+        remainder += precise ? deltaY : deltaY * 6
+        var out: [Int] = []
+        while abs(remainder) >= Self.pointsPerStop {
+            let direction = remainder > 0 ? 1 : -1
+            remainder -= CGFloat(direction) * Self.pointsPerStop
+            out.append(direction)
+        }
+        return out
+    }
+
+    mutating func reset() { remainder = 0 }
+}
+
+/// The dial's live state for the scroll monitor, held in a reference so the one installed monitor always sees the
+/// current view. `step` is replaced on every body pass with a closure over that pass's scale, Auto ratio and turn handler.
+@MainActor
+final class DialLive {
+    var hovering = false
+    var step: (Int) -> Void = { _ in }
+    private var scroll = DialScroll()
+    private var monitor: Any?
+
+    /// The wheel (or two-finger scroll) steps the dial while the pointer is over it. Returns true when it took the event.
+    func scrolled(deltaY: CGFloat, precise: Bool, ended: Bool) -> Bool {
+        guard hovering else { return false }
+        for direction in scroll.add(deltaY: deltaY, precise: precise) { step(direction) }
+        if ended { scroll.reset() }
+        return true
+    }
+
+    func installMonitor() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            let delta = event.scrollingDeltaY, precise = event.hasPreciseScrollingDeltas
+            let ended = event.phase == .ended || event.momentumPhase == .ended
+            let took = MainActor.assumeIsolated { self?.scrolled(deltaY: delta, precise: precise, ended: ended) ?? false }
+            return took ? nil : event
+        }
+    }
+
+    func removeMonitor() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        scroll.reset()
+    }
+}
+
 // MARK: - The dial
 
 struct RatioDial: View {
@@ -94,9 +149,9 @@ struct RatioDial: View {
     @State private var dragAngle: Double?
     @State private var turning = false
     @State private var settle: Task<Void, Never>?
-    @State private var hovering = false
-    @State private var scrollRemainder: CGFloat = 0
-    @State private var monitor: Any?
+    /// What the scroll-wheel monitor reads. The monitor is installed once, so it must not capture this view's values:
+    /// it reads them from here, and every body pass refreshes the box.
+    @State private var live = DialLive()
 
     // The drawing is laid out on a 160 x 100 board and scaled to the frame.
     private static let board = CGSize(width: 160, height: 100)
@@ -112,6 +167,9 @@ struct RatioDial: View {
     }
 
     var body: some View {
+        let _ = live.step = { direction in
+            turn(toStop: DialMath.step(from: currentStop, by: direction), onlyIfChanged: false)
+        }
         GeometryReader { geo in
             let k = min(geo.size.width / Self.board.width, geo.size.height / Self.board.height)
             ZStack(alignment: .topLeading) {
@@ -143,7 +201,7 @@ struct RatioDial: View {
                 let hit: CGFloat = 16
                 if dist <= hit { returnToAuto() }
             }
-            .onHover { hovering = $0 }
+            .onHover { live.hovering = $0 }
         }
         .frame(height: 88)
         .focusable()
@@ -155,8 +213,8 @@ struct RatioDial: View {
             }
             return .handled
         }
-        .onAppear(perform: installScrollMonitor)
-        .onDisappear(perform: removeScrollMonitor)
+        .onAppear { live.installMonitor() }
+        .onDisappear { live.removeMonitor() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Lexicon.Dial.label)
         .accessibilityValue(Lexicon.Dial.accessibilityValue(scale, autoRatio: autoRatio))
@@ -256,30 +314,6 @@ struct RatioDial: View {
 
     private func haptic() {
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
-    }
-
-    // MARK: Scroll wheel
-
-    /// The wheel (or two-finger scroll) steps one stop for every 14 points while the pointer is over the dial.
-    private func installScrollMonitor() {
-        guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard hovering else { return event }
-            let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 6
-            scrollRemainder += delta
-            while abs(scrollRemainder) >= 14 {
-                let direction = scrollRemainder > 0 ? 1 : -1
-                scrollRemainder -= CGFloat(direction) * 14
-                turn(toStop: DialMath.step(from: currentStop, by: direction), onlyIfChanged: false)
-            }
-            if event.phase == .ended || event.momentumPhase == .ended { scrollRemainder = 0 }
-            return nil
-        }
-    }
-
-    private func removeScrollMonitor() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
     }
 }
 

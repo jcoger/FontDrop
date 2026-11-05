@@ -42,7 +42,13 @@ pub fn create_brand(conn: &Connection, name: &str) -> Result<Brand, String> {
         return Err("brand name is empty".into());
     }
     conn.execute("INSERT INTO brands (name) VALUES (?1)", params![name]).map_err(|e| e.to_string())?;
-    Ok(Brand { id: conn.last_insert_rowid(), name: name.into(), logo_svg: None })
+    let id = conn.last_insert_rowid();
+    // The first brand takes whatever was set before any brand existed.
+    let brands: i64 = conn.query_row("SELECT COUNT(*) FROM brands", [], |r| r.get(0)).map_err(|e| e.to_string())?;
+    if brands == 1 {
+        crate::brand_settings::adopt_unbranded(conn, id)?;
+    }
+    Ok(Brand { id, name: name.into(), logo_svg: None })
 }
 
 pub fn list_brands(conn: &Connection) -> Result<Vec<Brand>, String> {

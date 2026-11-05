@@ -37,11 +37,18 @@ struct FacePreviewState: Equatable {
 
 extension AppModel {
     /// The family the arrow keys have selected on the current screen: the Display grid's card, or the Text list's row.
+    /// Nil when that face is not on screen (a filter or the search box hides it): Return and Space then do nothing,
+    /// and the first arrow press starts from the first face you can see.
     var selectedFaceName: String? {
         switch screen {
-        case .display, .ui, .mono: selectedFamily
-        case .reading: candidate(selectedCandidate)?.family
-        case .set, .colors: nil
+        case .display, .ui, .mono:
+            guard let name = selectedFamily, visibleFamilies.contains(where: { $0.name == name }) else { return nil }
+            return name
+        case .reading:
+            let rows = ReadingRows.rows(current: currentReadingCandidate, shown: readingResult.shown, search: search)
+            guard let id = selectedCandidate, rows.contains(where: { $0.id == id }) else { return nil }
+            return candidate(id)?.family
+        case .set, .colors: return nil
         }
     }
 
@@ -131,6 +138,9 @@ struct FacePreview: View {
         .focusEffectDisabled()
         .onAppear { focused = true }
         .onKeyPress(keys: [.escape, .space]) { _ in model.closePreview(); return .handled }
+        // Tab leaves the preview: it closes and the keys go back to the list, so the controls under it can be reached.
+        .onKeyPress(keys: [.tab]) { _ in model.closePreview(); model.requestListFocus(); return .handled }
+        .onExitCommand { model.closePreview() }
         .onKeyPress(keys: [.return]) { _ in
             let job = state.job, name = state.family
             model.closePreview()
