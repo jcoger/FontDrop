@@ -176,9 +176,14 @@ pub struct ImportReport {
     pub scales: u32,
     pub colors: u32,
     pub faces: u32,
-    /// Entries for a brand that does not exist (including the "no brand" key 0): not importable.
+    /// Entries for a brand that does not exist: not importable.
     pub skipped: u32,
+    /// Entries kept for "no brand yet" (key 0): the first brand created takes them (`adopt_unbranded`).
+    pub unbranded: u32,
 }
+
+/// The meta row that holds settings made before any brand existed, until the first brand adopts them.
+pub const UNBRANDED_META_KEY: &str = "unbranded_settings";
 
 /// The side file for `db_path`: `<db>.scale.json` and so on.
 fn side_file(db_path: &Path, suffix: &str) -> std::path::PathBuf {
@@ -222,10 +227,27 @@ pub fn import_legacy_json(conn: &Connection, db_path: &Path) -> Result<Option<Im
         return Ok(None);
     }
     let mut report = ImportReport::default();
+    // Key 0 is "no brand yet". With no brand to hang it on, it waits in `meta` for the first brand.
+    let mut unbranded = Map::new();
+    let no_brands_yet = conn.query_row("SELECT EXISTS(SELECT 1 FROM brands)", [], |r| r.get::<_, i64>(0)).map(|n| n == 0).unwrap_or(false);
+    let keep = |m: &mut Map<String, Value>, k: &str, v: Value| -> bool {
+        if !no_brands_yet { return false }
+        m.insert(k.into(), v);
+        true
+    };
+    let keep_face = |m: &mut Map<String, Value>, face: Value| -> bool {
+        if !no_brands_yet { return false }
+        if let Value::Array(a) = m.entry("faces").or_insert_with(|| Value::Array(vec![])) { a.push(face) }
+        true
+    };
     conn.execute_batch("BEGIN").map_err(|e| e.to_string())?;
     let result = (|| -> Result<(), String> {
         // Scale: {"<brand>": {"body": 15, "ratio": 1.333, "locked": true}}
         for (key, v) in read_object(&side_file(db_path, "scale")) {
+            if key == "0" {
+                if keep(&mut unbranded, "scale", v) { report.unbranded += 1 } else { report.skipped += 1 }
+                continue;
+            }
             let Some(id) = key.parse::<i64>().ok().filter(|id| brand_exists(conn, *id)) else { report.skipped += 1; continue };
             let n = conn
                 .execute(
@@ -238,6 +260,10 @@ pub fn import_legacy_json(conn: &Connection, db_path: &Path) -> Result<Option<Im
         }
         // Colors: {"<brand>": {"background": "#FFFFFF", "text": "#0A0A0A", "accent": "#E5341D"}}
         for (key, v) in read_object(&side_file(db_path, "colors")) {
+            if key == "0" {
+                if keep(&mut unbranded, "colors", v) { report.unbranded += 1 } else { report.skipped += 1 }
+                continue;
+            }
             let Some(id) = key.parse::<i64>().ok().filter(|id| brand_exists(conn, *id)) else { report.skipped += 1; continue };
             let (Some(b), Some(t), Some(a)) = (
                 v.get("background").and_then(Value::as_str),
@@ -255,6 +281,15 @@ pub fn import_legacy_json(conn: &Connection, db_path: &Path) -> Result<Option<Im
         // Face settings: {"<brand>/<job>/<family>": {...}}. A family name can hold a slash, so split into three.
         for (key, v) in read_object(&side_file(db_path, "playground")) {
             let parts: Vec<&str> = key.splitn(3, '/').collect();
+            if parts.len() == 3 && parts[0] == "0" {
+                let mut face = v.clone();
+                if let Value::Object(m) = &mut face {
+                    m.insert("job".into(), parts[1].into());
+                    m.insert("family".into(), parts[2].into());
+                }
+                if keep_face(&mut unbranded, face) { report.unbranded += 1 } else { report.skipped += 1 }
+                continue;
+            }
             let id = parts.first().and_then(|p| p.parse::<i64>().ok()).filter(|id| brand_exists(conn, *id));
             let (Some(id), 3) = (id, parts.len()) else { report.skipped += 1; continue };
             let n = conn
@@ -269,6 +304,13 @@ pub fn import_legacy_json(conn: &Connection, db_path: &Path) -> Result<Option<Im
                 )
                 .map_err(|e| e.to_string())?;
             report.faces += n as u32;
+        }
+        if !unbranded.is_empty() {
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO NOTHING",
+                params![UNBRANDED_META_KEY, Value::Object(unbranded.clone()).to_string()],
+            )
+            .map_err(|e| e.to_string())?;
         }
         conn.execute(
             "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO NOTHING",
@@ -285,6 +327,54 @@ pub fn import_legacy_json(conn: &Connection, db_path: &Path) -> Result<Option<Im
         }
     }
     Ok(Some(report))
+}
+
+/// Settings made with no brand yet (kept by the legacy import under key 0) move onto `brand` and are forgotten.
+/// Rows the brand already has win. Returns how many entries moved. Nothing to adopt: Ok(0).
+pub fn adopt_unbranded(conn: &Connection, brand: i64) -> Result<u32, String> {
+    let raw: Option<String> = conn
+        .query_row("SELECT value FROM meta WHERE key = ?1", params![UNBRANDED_META_KEY], |r| r.get(0))
+        .optional()
+        .map_err(|e| e.to_string())?;
+    let Some(raw) = raw else { return Ok(0) };
+    let v: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    let mut moved = 0u32;
+    if let Some(s) = v.get("scale") {
+        moved += conn
+            .execute(
+                "INSERT OR IGNORE INTO brand_scale (brand_id, body, ratio, locked) VALUES (?1, ?2, ?3, ?4)",
+                params![brand, num(s, "body").unwrap_or(15.0).clamp(9.0, 24.0), num(s, "ratio").unwrap_or(1.333),
+                        s.get("locked").and_then(Value::as_bool).unwrap_or(false) as i64],
+            )
+            .map_err(|e| e.to_string())? as u32;
+    }
+    if let Some(c) = v.get("colors") {
+        if let (Some(b), Some(t), Some(a)) = (
+            c.get("background").and_then(Value::as_str),
+            c.get("text").and_then(Value::as_str),
+            c.get("accent").and_then(Value::as_str),
+        ) {
+            moved += conn
+                .execute("INSERT OR IGNORE INTO brand_colors (brand_id, background, text, accent) VALUES (?1, ?2, ?3, ?4)",
+                         params![brand, b, t, a])
+                .map_err(|e| e.to_string())? as u32;
+        }
+    }
+    for f in v.get("faces").and_then(Value::as_array).into_iter().flatten() {
+        let (Some(job), Some(family)) = (f.get("job").and_then(Value::as_str), f.get("family").and_then(Value::as_str)) else { continue };
+        moved += conn
+            .execute(
+                "INSERT OR IGNORE INTO face_settings
+                 (brand_id, job, family, style_path, tracking, line_height, trim, axes_json, features_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![brand, job, family, f.get("stylePath").and_then(Value::as_str),
+                        num(f, "tracking").unwrap_or(0.0), num(f, "lineHeight").unwrap_or(1.3),
+                        num(f, "trim").unwrap_or(1.0).clamp(0.75, 1.35), json_object(f, "axes"), json_object(f, "features")],
+            )
+            .map_err(|e| e.to_string())? as u32;
+    }
+    conn.execute("DELETE FROM meta WHERE key = ?1", params![UNBRANDED_META_KEY]).map_err(|e| e.to_string())?;
+    Ok(moved)
 }
 
 #[cfg(test)]
@@ -427,7 +517,7 @@ mod tests {
         assert_eq!(userdata::create_brand(&conn, "Acme").unwrap().id, 1);
 
         let report = import_legacy_json(&conn, &path).unwrap().expect("first run imports");
-        assert_eq!(report, ImportReport { scales: 1, colors: 1, faces: 2, skipped: 3 });
+        assert_eq!(report, ImportReport { scales: 1, colors: 1, faces: 2, skipped: 3, unbranded: 0 });
         let s = scales(&conn).unwrap();
         assert_eq!((s[0].brand_id, s[0].body, s[0].ratio, s[0].locked, s[0].measure), (1, 17.0, 1.25, true, None));
         assert_eq!(colors(&conn).unwrap()[0].background, "#101312");
@@ -455,6 +545,47 @@ mod tests {
             let on_disk = std::fs::read_to_string(dir.join(format!("lib.db.{name}.json"))).unwrap();
             assert_eq!(on_disk, body, "{name}.json is untouched");
         }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Key-0 settings from the old files, then the first brand created: it takes them, once.
+    #[test]
+    fn the_first_brand_takes_the_unbranded_settings_from_the_legacy_import() {
+        let dir = temp_dir("unbranded");
+        let path = dir.join("lib.db");
+        std::fs::write(dir.join("lib.db.scale.json"), SCALE_JSON).unwrap();
+        std::fs::write(dir.join("lib.db.playground.json"), PLAY_JSON).unwrap();
+        let conn = crate::db::try_open_db_at(&path).unwrap();
+        let report = import_legacy_json(&conn, &path).unwrap().unwrap();
+        assert_eq!((report.unbranded, report.scales, report.faces), (2, 0, 0), "nothing on a brand yet, two kept");
+        assert!(scales(&conn).unwrap().is_empty());
+
+        let first = userdata::create_brand(&conn, "Acme").unwrap().id;
+        let s = scales(&conn).unwrap();
+        assert_eq!((s.len(), s[0].brand_id, s[0].body, s[0].ratio, s[0].locked), (1, first, 12.0, 1.2, false));
+        let f = faces(&conn).unwrap();
+        assert_eq!((f.len(), f[0].brand_id, f[0].job.as_str(), f[0].family.as_str()), (1, first, "reading", "Orphan"));
+        let left: i64 = conn.query_row("SELECT COUNT(*) FROM meta WHERE key = ?1", params![UNBRANDED_META_KEY], |r| r.get(0)).unwrap();
+        assert_eq!(left, 0, "adopted once");
+
+        // A second brand starts clean.
+        let second = userdata::create_brand(&conn, "Beta").unwrap().id;
+        assert!(scales(&conn).unwrap().iter().all(|s| s.brand_id != second));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// With a brand already in the library, key 0 has nowhere to go and is skipped, not kept for a later brand.
+    #[test]
+    fn unbranded_entries_are_skipped_when_a_brand_already_exists() {
+        let dir = temp_dir("unbranded-late");
+        let path = dir.join("lib.db");
+        std::fs::write(dir.join("lib.db.scale.json"), SCALE_JSON).unwrap();
+        let conn = crate::db::try_open_db_at(&path).unwrap();
+        userdata::create_brand(&conn, "Acme").unwrap();
+        let report = import_legacy_json(&conn, &path).unwrap().unwrap();
+        assert_eq!((report.unbranded, report.skipped), (0, 2));
+        let later = userdata::create_brand(&conn, "Beta").unwrap().id;
+        assert!(scales(&conn).unwrap().iter().all(|s| s.brand_id != later));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
