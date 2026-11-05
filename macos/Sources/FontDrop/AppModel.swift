@@ -1061,8 +1061,7 @@ final class AppModel {
         let keeping = family ?? restoreCandidateFamily.flatMap { r in list.contains { $0.family == r } ? r : nil }
         restoreCandidateFamily = nil
         selectedCandidate = CandidateSelection.pick(list.map { ($0.id, $0.family) }, current: selectedCandidate,
-                                                    keeping: keeping, preferred: preferred,
-                                                    first: readingResult.shown.first?.id)
+                                                    keeping: keeping, preferred: preferred)
     }
 
     /// Reading as a starting point: no Display face yet, so the list is every family fit for long text

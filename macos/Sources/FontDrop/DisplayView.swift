@@ -65,6 +65,8 @@ struct FamilyPickerView: View {
             }
             .padding(20)
             .background(GeometryReader { geo in Color.clear.onChange(of: geo.size.width, initial: true) { _, w in gridWidth = w - 40 } })
+            .background(Color.clear.contentShape(Rectangle())            // behind the cards: a click on empty ground gives the grid the keys back
+                .onTapGesture { keyboardNav = false; focused = true })
         }
         .focusable()
         .focused($focused)
@@ -72,7 +74,7 @@ struct FamilyPickerView: View {
         .onAppear { focused = true }
         .onChange(of: model.focusListTick) { _, _ in focused = true }
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, .space]) { press in
-            guard press.modifiers.isEmpty else { return .ignored }
+            guard press.isPlain else { return .ignored }
             switch press.key {
             case .return:
                 guard model.canUseSelected else { return .ignored }
@@ -205,7 +207,7 @@ struct FamilyCard: View {
         } }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction(named: isSaved ? Lexicon.Finder.removeSaved : Lexicon.Finder.save, toggleSaved)
     }
 }

@@ -328,9 +328,9 @@ enum FontInstances {
 /// family name does not, so the selection follows the family.
 enum CandidateSelection {
     static func pick(_ list: [(id: String, family: String)], current: String?, keeping family: String?,
-                     preferred: String?, first: String?) -> String? {
+                     preferred: String?) -> String? {
         if let family, let hit = list.first(where: { $0.family == family }) { return hit.id }
         if let current, list.contains(where: { $0.id == current }) { return current }
-        return preferred ?? first
+        return preferred                 // nothing else: a new brand or a changed list selects nothing until a key or click
     }
 }

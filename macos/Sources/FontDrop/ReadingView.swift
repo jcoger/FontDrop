@@ -68,15 +68,15 @@ struct ReadingList: View {
                 .focusable()
                 .focused($focused)
                 .focusEffectDisabled()      // the ring is drawn on the row (CandidateRow), distinct from the pill
-                .onKeyPress(.upArrow) { move(-1, rows) }
-                .onKeyPress(.downArrow) { move(1, rows) }
+                .onKeyPress(keys: [.upArrow]) { press in press.isPlain ? move(-1, rows) : .ignored }
+                .onKeyPress(keys: [.downArrow]) { press in press.isPlain ? move(1, rows) : .ignored }
                 .onKeyPress(keys: [.return]) { press in
-                    guard press.modifiers.isEmpty, model.canUseSelected else { return .ignored }
+                    guard press.isPlain, model.canUseSelected else { return .ignored }
                     Task { await model.useSelected() }
                     return .handled
                 }
                 .onKeyPress(keys: [.space]) { press in
-                    guard press.modifiers.isEmpty, model.selectedFaceName != nil else { return .ignored }
+                    guard press.isPlain, model.selectedFaceName != nil else { return .ignored }
                     model.togglePreview()
                     return .handled
                 }

@@ -29,6 +29,12 @@ enum GridNav {
     }
 }
 
+extension KeyPress {
+    /// True when no real modifier (Command, Control, Option, Shift) is held. The arrow keys always report the
+    /// numeric-pad flag on a Mac, so `modifiers.isEmpty` is never true for them: a bare arrow press is "plain".
+    var isPlain: Bool { modifiers.isDisjoint(with: [.command, .control, .option, .shift]) }
+}
+
 /// A face on show in the large preview.
 struct FacePreviewState: Equatable {
     let job: String          // "display" or "reading"

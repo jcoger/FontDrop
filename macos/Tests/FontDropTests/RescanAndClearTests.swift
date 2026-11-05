@@ -80,11 +80,13 @@ final class RescanAndClearTests: XCTestCase {
 
     func testSelectionFollowsTheFamilyWhenIdsChange() {
         let list = [(id: "new-1", family: "Alpha"), (id: "new-2", family: "Beta")]
-        XCTAssertEqual(CandidateSelection.pick(list, current: "old-2", keeping: "Beta", preferred: nil, first: "new-1"), "new-2")
-        XCTAssertEqual(CandidateSelection.pick(list, current: "new-1", keeping: nil, preferred: nil, first: "new-2"), "new-1")
-        XCTAssertEqual(CandidateSelection.pick(list, current: "gone", keeping: "Gone", preferred: nil, first: "new-1"), "new-1")
-        XCTAssertEqual(CandidateSelection.pick(list, current: nil, keeping: nil, preferred: "new-2", first: "new-1"), "new-2")
-        XCTAssertNil(CandidateSelection.pick([], current: "x", keeping: "X", preferred: nil, first: nil))
+        XCTAssertEqual(CandidateSelection.pick(list, current: "old-2", keeping: "Beta", preferred: nil), "new-2")
+        XCTAssertEqual(CandidateSelection.pick(list, current: "new-1", keeping: nil, preferred: nil), "new-1")
+        XCTAssertNil(CandidateSelection.pick(list, current: "gone", keeping: "Gone", preferred: nil),
+                     "a selection that is gone is not replaced by the first row")
+        XCTAssertNil(CandidateSelection.pick(list, current: nil, keeping: nil, preferred: nil), "a new brand selects nothing")
+        XCTAssertEqual(CandidateSelection.pick(list, current: nil, keeping: nil, preferred: "new-2"), "new-2")
+        XCTAssertNil(CandidateSelection.pick([], current: "x", keeping: "X", preferred: nil))
     }
 
     /// A rescan replaces the family list. Choices and the shortlist are keyed by name and carry over.

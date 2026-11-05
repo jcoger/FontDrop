@@ -74,6 +74,7 @@ struct SampleModule: View {
     @Environment(\.theme) private var theme
     let job: String
     let family: FamilySummary
+    @FocusState private var typing: Bool
 
     var body: some View {
         let face = model.face(job, family)
@@ -90,6 +91,8 @@ struct SampleModule: View {
                           axis: .vertical)
                     .textFieldStyle(.plain).font(.system(size: 13))
                     .lineLimit(1...3)
+                    .focused($typing)
+                    .onExitCommand { typing = false; model.requestListFocus() }       // Escape: the keys go back to the list
                     .accessibilityLabel(Lexicon.R4.sample)
                 if model.customSample != nil {
                     Button { model.setSample("") } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 12)) }

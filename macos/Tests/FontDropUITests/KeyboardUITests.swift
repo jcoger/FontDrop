@@ -74,30 +74,50 @@ final class KeyboardUITests: XCTestCase {
         }
         XCTAssertTrue(chosen, "Down then Return chose a Text face")
 
-        // Set: command-3. Scroll the dial: each turn is one stop, from the live value, not from the first one.
+        // Set: command-3. (With both faces chosen, Set shows the dial.) Scroll the dial: each turn is one stop, from the live value, not from the first one.
         app.typeKey("3", modifierFlags: .command)
         let dial = app.descendants(matching: .any)["Ratio"].firstMatch
         XCTAssertTrue(dial.waitForExistence(timeout: 10))
-        func value() -> String { (dial.value as? String) ?? "" }
+        // The dial's own accessibility value is a description XCUITest cannot read, so read the ratio where the app also
+        // shows it: the sidebar's Set row, "Set, 15 pt · 1.2" once the scale is locked.
+        func ratio() -> String {
+            let rows = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Set, "))
+            guard rows.count > 0 else { return "" }
+            return rows.firstMatch.label.components(separatedBy: "\u{00B7} ").last ?? ""
+        }
         dial.hover()
         // Down to the first stop (1.2), however far Auto started from it.
-        for _ in 0..<5 where !value().hasPrefix("1.2,") {
+        for _ in 0..<5 where ratio() != "1.2" {
             dial.scroll(byDeltaX: 0, deltaY: -40)
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         }
-        XCTAssertEqual(value(), "1.2, locked", "scrolling down reached the first stop")
+        XCTAssertEqual(ratio(), "1.2", "scrolling down reached the first stop")
         dial.scroll(byDeltaX: 0, deltaY: 40)
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(value(), "1.25, locked", "the first scroll up moved one stop")
+        XCTAssertEqual(ratio(), "1.25", "the first scroll up moved one stop")
         dial.scroll(byDeltaX: 0, deltaY: 40)
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        XCTAssertEqual(value(), "1.333, locked", "the second scroll moved a second stop, not the same one again")
+        XCTAssertEqual(ratio(), "1.333", "the second scroll moved a second stop, not the same one again")
     }
 
     /// A drag that starts on a control must not move the window.
     func testDraggingTheDialDoesNotMoveTheWindow() throws {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 20))
+        // Set only shows the dial once Display and Text each have a face.
+        _ = wait(6) { self.app.staticTexts["Arial"].exists || self.app.staticTexts["Georgia"].exists }
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(wait(8) { self.chosenFace("Display") != nil })
+        app.typeKey("2", modifierFlags: .command)
+        var chosen = false
+        for _ in 0..<10 where !chosen {
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            app.typeKey(.downArrow, modifierFlags: [])
+            app.typeKey(.return, modifierFlags: [])
+            chosen = wait(1.5) { self.chosenFace("Text") != nil }
+        }
+        XCTAssertTrue(chosen)
         app.typeKey("3", modifierFlags: .command)
         let dial = app.descendants(matching: .any)["Ratio"].firstMatch
         XCTAssertTrue(dial.waitForExistence(timeout: 20))
