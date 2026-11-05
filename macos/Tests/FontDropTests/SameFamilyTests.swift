@@ -41,7 +41,7 @@ final class SameFamilyTests: XCTestCase {
     }
 
     func testBodyStyleStartsTheStylePickerAndIsKeptOnChoice() {
-        let store = TypeSettingsStore(dbPath: NSTemporaryDirectory() + "same-family-test.db", persist: false)
+        let store = TypeSettingsStore(persist: false)
         let key = TypeSettingsStore.key(brand: 1, job: "reading", family: "Acme Display")
         XCTAssertNil(store.settings(key, job: "reading").stylePath)
         store.setSuggestedStyles([key: "/x/Acme-Regular.otf"])

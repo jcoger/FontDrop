@@ -624,6 +624,66 @@ enum Lexicon {
         static func recentLabel(_ hex: String) -> String { "Recent color, \(hex)" }
         static func presetColorLabel(_ hex: String) -> String { "Preset color, \(hex)" }
     }
+
+    // MARK: Set and brand delete (R5, docs/copy section 22)
+
+    enum SetScreen {
+        static func stageTitle(display: String, text: String) -> String { "Type scale \u{00B7} \(display) with \(text)" }
+        static let stepDisplay = "Display"
+        static let stepH1 = "H1"
+        static let stepH2 = "H2"
+        static let stepH3 = "H3"
+        static let stepLead = "Lead"
+        static let stepBody = "Body"
+        static let stepCaption = "Caption"
+        /// "63 pt", set in caps by the label style.
+        static func points(_ pt: Double) -> String { "\(Int(pt.rounded())) pt" }
+        /// The label of the body block: "Body \u{00B7} 15 pt \u{00B7} 66 ch \u{00B7} 1.45".
+        static func bodyBlockLabel(pt: Double, measure: Int, lineHeight: Double) -> String {
+            "Body \u{00B7} \(Int(pt.rounded())) pt \u{00B7} \(measure) ch \u{00B7} " + String(format: "%.2f", lineHeight)
+        }
+        static let displayLine = "Rooms that stay"
+        static let h1Line = "Small hotels, run upstairs"
+        static let h2Line = "A table for four, held"
+        static let h3Line = "Your name is on the list"
+        static let leadLine = "The kitchen knows, and the first round is poured."
+        static let captionLine = "Fig. 1 Breakfast on the roof, May."
+        static let needsDisplay = "Choose a Display face to see it here."
+        static let needsText = "Choose a Text face to see it here."
+        static let previewScaled = "Preview scaled to fit. The size shown is the real size."
+
+        static let titleText = "Text"
+        static let measure = "Measure"
+        static let measureUnit = "ch"
+        static let lineHeight = "Line height"
+        static let lineHeightFollows = "Follows the measure"
+        static let backToAuto = "Back to Auto"
+        static func measureRule(_ measure: Int) -> String {
+            TextRules.isComfortable(measure)
+                ? "Measure sits inside 55 to 75 characters. Line height follows the measure."
+                : (measure < 55 ? "Under 55 characters. Short lines read choppy past a few paragraphs."
+                                : "Over 75 characters. Long lines lose the eye on the way back.")
+        }
+        static let measureHelp = "Characters per line of body text, counted on the real text in the Text face"
+        static let lineHeightHelp = "Body line height. Left alone it follows the measure: tighter for short lines, looser for long ones."
+
+        static let titleFaces = "Faces"
+        static let opticalSize = "Optical size"
+        static let styleAxis = "Style"
+        static func opticalSizeReadout(_ pt: Double, auto: Bool) -> String { auto ? "Auto" : "\(Int(pt.rounded())) pt" }
+        static let opticalHelp = "Follows the size drawn until you move it"
+        static let styleHelp = "This face blends two styles on one axis"
+        static let fixedCut = "A fixed cut. It has no axes to set."
+        static let noOpticalOrStyle = "No optical size or style axis. Weight and width are under Style on the Text screen."
+    }
+
+    enum BrandMenu {
+        static let delete = "Delete brand\u{2026}"
+        static func confirmTitle(_ name: String) -> String { "Delete \(name)?" }
+        static let confirmMessage = "This removes its picks, shortlist, scale, colors and settings. Your fonts are not touched. This cannot be undone."
+        static let confirmButton = "Delete brand"
+        static let cancel = "Cancel"
+    }
 }
 
 extension String {

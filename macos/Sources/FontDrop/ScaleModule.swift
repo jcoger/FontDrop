@@ -116,12 +116,16 @@ struct BodyControl: View {
     }
 }
 
-/// A ruler of ticks over a thin track with a thumb. Whole points. VoiceOver adjusts it a point at a time.
+/// A ruler of ticks over a thin track with a thumb. Whole points by default (`step`). VoiceOver adjusts it a step at a time.
+/// Set uses it for Measure, Line height and the face axes too, with their own label and readout text.
 struct BodySlider: View {
     @Environment(\.theme) private var theme
     let value: Double
     let range: ClosedRange<Double>
     let enabled: Bool
+    var step: Double = 1
+    var label = Lexicon.Scale.body
+    var valueText: (Double) -> String = Lexicon.Scale.bodyReadout
     let onChange: (Double) -> Void
 
     private let thumb: CGFloat = 16
@@ -151,20 +155,21 @@ struct BodySlider: View {
             .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
                 guard enabled else { return }
                 let t = min(max((drag.location.x - thumb / 2) / usable, 0), 1)
-                let v = (range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)).rounded()
-                if v != value { onChange(v) }
+                let raw = range.lowerBound + Double(t) * (range.upperBound - range.lowerBound)
+                let v = min(max((raw / step).rounded() * step, range.lowerBound), range.upperBound)
+                if abs(v - value) > step / 100 { onChange(v) }
             })
         }
         .frame(height: 32)
         .opacity(enabled ? 1 : 0.55)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Lexicon.Scale.body)
-        .accessibilityValue(Lexicon.Scale.bodyReadout(value))
+        .accessibilityLabel(label)
+        .accessibilityValue(valueText(value))
         .accessibilityAdjustableAction { direction in
             guard enabled else { return }
             switch direction {
-            case .increment: onChange(min(value + 1, range.upperBound))
-            case .decrement: onChange(max(value - 1, range.lowerBound))
+            case .increment: onChange(min(value + step, range.upperBound))
+            case .decrement: onChange(max(value - step, range.lowerBound))
             @unknown default: break
             }
         }

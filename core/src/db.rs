@@ -164,7 +164,32 @@ const MIGRATIONS: &[&str] = &[
     // Mean advance of "n", "o" and "H" over the em (classifier.rs), a measured width. NULL = not measured; the
     // classifier version bump measures every file once.
     "ALTER TABLE fonts ADD COLUMN advance_ratio REAL;",
+    // Round R5. brands.id becomes AUTOINCREMENT so a deleted brand's id is never handed to the next brand
+    // (a reused id would inherit the old brand's rows). SQLite cannot add AUTOINCREMENT in place, so the table
+    // is rebuilt. foreign_keys is switched off for the rebuild: with it on, DROP TABLE would delete the brand
+    // rows one by one and cascade into the shortlist and choices. The pragma is a no-op inside a transaction,
+    // so it sits outside BEGIN/COMMIT.
+    "PRAGMA foreign_keys=OFF;
+     BEGIN;
+     CREATE TABLE brands_new (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, logo_svg TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+     INSERT INTO brands_new (id, name, logo_svg, created_at) SELECT id, name, logo_svg, created_at FROM brands;
+     DROP TABLE brands;
+     ALTER TABLE brands_new RENAME TO brands;
+     COMMIT;
+     PRAGMA foreign_keys=ON;",
+    // Per-brand type settings (brand_settings.rs). Each table cascades from brands. They replace the side files
+    // <db>.scale.json, <db>.colors.json and <db>.playground.json, which are imported once and then left alone.
+    // measure (characters per line) and line_height are NULL until the designer sets them: NULL means "follow the type rules".
+    "CREATE TABLE IF NOT EXISTS brand_scale (brand_id INTEGER PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE, body REAL NOT NULL, ratio REAL NOT NULL, locked INTEGER NOT NULL DEFAULT 0, measure INTEGER, line_height REAL);",
+    "CREATE TABLE IF NOT EXISTS brand_colors (brand_id INTEGER PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE, background TEXT NOT NULL, text TEXT NOT NULL, accent TEXT NOT NULL);",
+    "CREATE TABLE IF NOT EXISTS face_settings (brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, job TEXT NOT NULL, family TEXT NOT NULL, style_path TEXT, tracking REAL NOT NULL DEFAULT 0, line_height REAL NOT NULL, trim REAL NOT NULL DEFAULT 1, axes_json TEXT NOT NULL DEFAULT '{}', features_json TEXT NOT NULL DEFAULT '{}', PRIMARY KEY (brand_id, job, family));",
 ];
+
+/// The migrations that shipped before the `brands` rebuild (test seam: an install from before round R5).
+#[cfg(test)]
+pub(crate) fn migrations_before_brands_rebuild() -> &'static [&'static str] {
+    &MIGRATIONS[..MIGRATIONS.len() - 4]
+}
 
 /// Apply any migrations with index >= the DB's current user_version, then
 /// stamp user_version to MIGRATIONS.len(). Tolerates "duplicate column"

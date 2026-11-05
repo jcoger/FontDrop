@@ -1,4 +1,5 @@
 import CoreText
+import FontDropCore
 import Foundation
 import Observation
 
@@ -216,30 +217,63 @@ enum StylePathRepair {
 
 // MARK: - Store
 
-/// Settings per brand + job + family. Saved as JSON next to the library DB, so a test
-/// DB copy gets its own file and never touches the live one. A candidate to move into
-/// the core (and the DB) later, once the Set screen needs the same numbers.
+/// Settings per brand + job + family, kept in memory and saved in the library database (the core's `face_settings`
+/// table). The key is "brand/job/family". Settings made with no brand yet stay in memory: there is no brand row to
+/// hang them on. Screenshot, bench and test runs read the database but never write it.
 @MainActor @Observable
 final class TypeSettingsStore {
     private(set) var map: [String: TypeSettings] = [:]
-    private let url: URL
-    private let persist: Bool
-    private var saveTask: Task<Void, Never>?
+    private let writer: WriteBehind<String>
 
-    init(dbPath: String, persist: Bool = true) {
-        url = URL(fileURLWithPath: dbPath + ".playground.json")
-        self.persist = persist
-        if let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode([String: TypeSettings].self, from: data) {
-            // The key is "brand/job/family". `size` is not saved, so give each face its job's base size.
-            map = decoded.reduce(into: [:]) { out, entry in
-                var s = entry.value
-                let parts = entry.key.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
-                s.size = TypeSettings.defaults(job: parts.count == 3 ? String(parts[1]) : "reading").size
-                out[entry.key] = s
-            }
+    init(persist: Bool = true) {
+        var read: (@MainActor (String) -> TypeSettings?)?
+        writer = WriteBehind(persist: persist) { key in
+            guard let (brand, job, family) = Self.split(key), brand != 0 else { return nil }
+            guard let s = read?(key) else { return { try $0.faceClear(brand: brand, job: job, family: family) } }
+            let row = FaceSettings(brandId: brand, job: job, family: family, stylePath: s.stylePath, tracking: s.tracking,
+                                   lineHeight: s.lineHeight, trim: s.trim,
+                                   axesJson: Self.json(s.axes), featuresJson: Self.json(s.features))
+            return { try $0.faceSet(face: row) }
+        }
+        read = { [weak self] key in self?.map[key] }
+    }
+
+    /// The library is open: read every brand's face settings from it, and write changes to it from now on.
+    func attach(_ library: Library) {
+        writer.library = library
+        let rows = (try? library.facesList()) ?? []
+        for row in rows {
+            let decoder = JSONDecoder()
+            var s = TypeSettings.defaults(job: row.job)         // `size` is the job's base size, never saved
+            s.stylePath = row.stylePath
+            s.tracking = row.tracking
+            s.lineHeight = row.lineHeight
+            s.trim = min(max(row.trim, TypeSettings.trimRange.lowerBound), TypeSettings.trimRange.upperBound)
+            s.axes = (try? decoder.decode([String: Double].self, from: Data(row.axesJson.utf8))) ?? [:]
+            s.features = (try? decoder.decode([String: Int].self, from: Data(row.featuresJson.utf8))) ?? [:]
+            map[Self.key(brand: row.brandId, job: row.job, family: row.family)] = s
         }
     }
+
+    private static func json<V: Encodable>(_ value: V) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    }
+
+    /// "1/display/Acme Serif" -> (1, "display", "Acme Serif"). The family may itself hold a slash.
+    nonisolated static func split(_ key: String) -> (Int64, String, String)? {
+        let parts = key.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count == 3, let brand = Int64(parts[0]) else { return nil }
+        return (brand, String(parts[1]), String(parts[2]))
+    }
+
+    /// The brand is gone (the database already dropped its rows).
+    func forget(brand: Int64) {
+        for key in map.keys where Self.split(key)?.0 == brand { map[key] = nil }
+    }
+
+    func flush() { writer.flush() }
 
     static func key(brand: Int64?, job: String, family: String) -> String { "\(brand ?? 0)/\(job)/\(family)" }
 
@@ -272,12 +306,12 @@ final class TypeSettingsStore {
         var s = settings(key, job: job)
         change(&s)
         map[key] = s
-        scheduleSave()
+        writer.mark(key)
     }
 
     func reset(_ key: String) {
         map[key] = nil
-        scheduleSave()
+        writer.mark(key)
     }
 
     /// A saved Style is a file path. When the file moved or was replaced, the path points at nothing and every
@@ -299,21 +333,9 @@ final class TypeSettingsStore {
             let fixed = StylePathRepair.repaired(path, valid: valid)
             guard fixed != path else { continue }
             map[key]?.stylePath = fixed         // nil drops it
+            writer.mark(key)
             changed += 1
         }
-        if changed > 0 { scheduleSave() }
         return changed
-    }
-
-    private func scheduleSave() {
-        guard persist else { return }       // screenshot and bench runs read settings but never write them
-        let url = self.url
-        saveTask?.cancel()
-        let snapshot = map
-        saveTask = Task.detached(priority: .utility) {
-            try? await Task.sleep(for: .milliseconds(400))      // a slider drag is many updates; write once
-            guard !Task.isCancelled, let data = try? JSONEncoder().encode(snapshot) else { return }
-            try? data.write(to: url, options: .atomic)
-        }
     }
 }

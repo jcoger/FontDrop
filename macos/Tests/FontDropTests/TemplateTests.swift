@@ -1,5 +1,6 @@
 import CoreText
 import SwiftUI
+import FontDropCore
 import XCTest
 @testable import FontDrop
 
@@ -78,9 +79,9 @@ final class TemplateTests: XCTestCase {
 
     // MARK: Variants and the style store
 
-    private func makeStore(_ suite: String, dbPath: String = NSTemporaryDirectory() + "style-\(UUID().uuidString).db") -> BrandStyleStore {
+    private func makeStore(_ suite: String) -> BrandStyleStore {
         let defaults = UserDefaults(suiteName: suite)!
-        return BrandStyleStore(dbPath: dbPath, persist: true, defaults: defaults)
+        return BrandStyleStore(persist: true, defaults: defaults)
     }
 
     func testEveryTemplateListsItsVariants() {
@@ -125,21 +126,25 @@ final class TemplateTests: XCTestCase {
         XCTAssertEqual(seen?.variant, "feature")
     }
 
-    func testPalettesAreSavedPerBrand() async throws {
+    func testPalettesAreSavedPerBrand() throws {
         let suite = "fontdrop.tests.\(UUID().uuidString)"
         defer { UserDefaults().removePersistentDomain(forName: suite) }
-        let db = NSTemporaryDirectory() + "style-\(UUID().uuidString).db"
-        let a = makeStore(suite, dbPath: db)
-        a.setColor(.accent, try XCTUnwrap(HexColor(hex: "2B5C93")), brand: 1)
-        a.setPalette(.night, brand: 2)
-        XCTAssertEqual(a.palette(brand: 1).accent.hex, "#2B5C93")
-        XCTAssertEqual(a.palette(brand: 1).background, TemplatePalette.paper.background, "only the accent changed")
-        XCTAssertEqual(a.palette(brand: 2), .night)
-        XCTAssertEqual(a.palette(brand: 3), .paper, "a brand with nothing saved reads Paper")
-        try await Task.sleep(for: .milliseconds(900))        // the store writes after a short pause
-        let b = makeStore(suite, dbPath: db)
-        XCTAssertEqual(b.palette(brand: 1).accent.hex, "#2B5C93")
-        XCTAssertEqual(b.palette(brand: 2), .night)
+        let lib = try Library.open(path: NSTemporaryDirectory() + "style-\(UUID().uuidString).db")
+        let one = try lib.brandCreate(name: "One").id, two = try lib.brandCreate(name: "Two").id, three = try lib.brandCreate(name: "Three").id
+        let a = makeStore(suite)
+        a.attach(lib)
+        a.setColor(.accent, try XCTUnwrap(HexColor(hex: "2B5C93")), brand: one)
+        a.setPalette(.night, brand: two)
+        XCTAssertEqual(a.palette(brand: one).accent.hex, "#2B5C93")
+        XCTAssertEqual(a.palette(brand: one).background, TemplatePalette.paper.background, "only the accent changed")
+        XCTAssertEqual(a.palette(brand: two), .night)
+        XCTAssertEqual(a.palette(brand: three), .paper, "a brand with nothing saved reads Paper")
+        a.flush()
+        // A new store over the same database, as after a relaunch.
+        let b = makeStore(suite)
+        b.attach(lib)
+        XCTAssertEqual(b.palette(brand: one).accent.hex, "#2B5C93")
+        XCTAssertEqual(b.palette(brand: two), .night)
     }
 
     func testRecentColorsKeepTheLastEightNewestFirstWithoutRepeats() throws {

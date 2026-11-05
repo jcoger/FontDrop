@@ -64,6 +64,10 @@ pub fn update_brand(conn: &Connection, id: i64, name: &str, logo_svg: Option<&st
 pub fn delete_brand(conn: &Connection, id: i64) -> Result<(), String> {
     conn.execute("DELETE FROM shortlist WHERE brand_id = ?1", params![id]).map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM choices WHERE brand_id = ?1", params![id]).map_err(|e| e.to_string())?;
+    // The cascade does this too; explicit so a connection with foreign keys off still leaves nothing behind.
+    for table in ["brand_scale", "brand_colors", "face_settings"] {
+        conn.execute(&format!("DELETE FROM {table} WHERE brand_id = ?1"), params![id]).map_err(|e| e.to_string())?;
+    }
     conn.execute("DELETE FROM brands WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
     Ok(())
 }

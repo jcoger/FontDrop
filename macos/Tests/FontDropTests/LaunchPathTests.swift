@@ -93,7 +93,7 @@ final class LaunchPathTests: XCTestCase {
     }
 
     func testStoreRepairsSavedStylePathsAfterTheLibraryChanges() {
-        let store = TypeSettingsStore(dbPath: NSTemporaryDirectory() + "fontdrop-repair-\(UUID().uuidString).db", persist: false)
+        let store = TypeSettingsStore(persist: false)
         store.update("1/reading/Alpha", job: "reading") { $0.stylePath = "/old/Alpha-Bold.otf" }
         store.update("1/reading/Beta", job: "reading") { $0.stylePath = "/gone/Beta-Black.otf" }
         store.update("1/display/Gamma", job: "display") { $0.stylePath = "/kept/Gamma-Bold.otf" }     // family not in the library

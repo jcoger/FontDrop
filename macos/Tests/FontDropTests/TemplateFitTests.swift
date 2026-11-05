@@ -63,24 +63,29 @@ final class TemplateFitTests: XCTestCase {
     }
 
     func testStoreGivesLoadedFacesTheirJobsBaseSize() throws {
-        let path = NSTemporaryDirectory() + "fontdrop-fit-\(UUID().uuidString).db"
-        try Data("{\"1\\/display\\/A\":{\"size\":63,\"lineHeight\":1.1},\"1\\/reading\\/B\":{\"size\":9,\"lineHeight\":1.5}}".utf8)
-            .write(to: URL(fileURLWithPath: path + ".playground.json"))
-        defer { try? FileManager.default.removeItem(atPath: path + ".playground.json") }
-        let store = TypeSettingsStore(dbPath: path, persist: false)
-        XCTAssertEqual(store.settings("1/display/A", job: "display").size, 40)
-        XCTAssertEqual(store.settings("1/reading/B", job: "reading").size, 15)
-        XCTAssertFalse(store.isModified("1/display/A", job: "display"))
+        let lib = try Library.open(path: NSTemporaryDirectory() + "fontdrop-fit-\(UUID().uuidString).db")
+        let id = try lib.brandCreate(name: "Acme").id
+        // Rows as an older build left them: a point size meant something else then, and is never saved now.
+        try lib.faceSet(face: FaceSettings(brandId: id, job: "display", family: "A", stylePath: nil, tracking: 0, lineHeight: 1.1, trim: 1, axesJson: "{}", featuresJson: "{}"))
+        try lib.faceSet(face: FaceSettings(brandId: id, job: "reading", family: "B", stylePath: nil, tracking: 0, lineHeight: 1.5, trim: 1, axesJson: "{}", featuresJson: "{}"))
+        let store = TypeSettingsStore(persist: false)
+        store.attach(lib)
+        XCTAssertEqual(store.settings("\(id)/display/A", job: "display").size, 40)
+        XCTAssertEqual(store.settings("\(id)/reading/B", job: "reading").size, 15)
+        XCTAssertFalse(store.isModified("\(id)/display/A", job: "display"))
     }
 
     func testScaleStoreRoundTripsAndClampsBody() throws {
-        let path = NSTemporaryDirectory() + "fontdrop-scale-\(UUID().uuidString).db"
-        let store = ScaleStore(dbPath: path, persist: false)
-        XCTAssertFalse(store.scale(brand: 1).locked)
-        store.update(brand: 1) { $0.body = 99; $0.locked = true }
-        XCTAssertEqual(store.scale(brand: 1).body, 24)
-        XCTAssertEqual(store.scale(brand: 2).body, 15, "per brand")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: path + ".scale.json"), "persist false never writes")
+        let lib = try Library.open(path: NSTemporaryDirectory() + "fontdrop-scale-\(UUID().uuidString).db")
+        let one = try lib.brandCreate(name: "One").id, two = try lib.brandCreate(name: "Two").id
+        let store = ScaleStore(persist: false)
+        store.attach(lib)
+        XCTAssertFalse(store.scale(brand: one).locked)
+        store.update(brand: one) { $0.body = 99; $0.locked = true }
+        XCTAssertEqual(store.scale(brand: one).body, 24)
+        XCTAssertEqual(store.scale(brand: two).body, 15, "per brand")
+        store.flush()
+        XCTAssertTrue(try lib.scalesList().isEmpty, "persist false never writes")
     }
 
     // MARK: Samples from a DB copy
