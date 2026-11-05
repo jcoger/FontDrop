@@ -1,31 +1,19 @@
 import SwiftUI
 
-/// Headline, deck, byline, two paragraphs and a pull quote.
+/// Article: a long read. A is an essay (one column, a pull quote, a figure). B is a magazine feature
+/// (reversed opener, drop cap, two columns, a timetable).
 struct ArticleTemplate: View {
     let ctx: PairContext
 
-    static let descriptor = TemplateDescriptor(id: "article", title: "Article") { AnyView(ArticleTemplate(ctx: $0)) }
+    static let descriptor = TemplateDescriptor(
+        id: "article", title: "Article",
+        variants: [TemplateVariant(id: "essay", title: "Essay"), TemplateVariant(id: "feature", title: "Feature")]
+    ) { AnyView(ArticleTemplate(ctx: $0)) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ctx.headline(TemplateCopy.articleHeadline)
-                .lineLimit(3).minimumScaleFactor(0.5)
-            ctx.text(TemplateCopy.articleDeck, 1.15)
-                .foregroundStyle(.secondary)
-            ctx.text(TemplateCopy.byline, 0.8)
-                .foregroundStyle(.tertiary)
-            Divider().padding(.vertical, 2)
-            ForEach(TemplateCopy.paragraphs, id: \.self) { ctx.text($0) }
-            HStack(alignment: .top, spacing: 10) {
-                Rectangle().fill(.primary).frame(width: 2)
-                ctx.headline(TemplateCopy.pullQuote, 0.55)
-                    .lineLimit(3).minimumScaleFactor(0.6)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 4)
+        switch ctx.variant {
+        case "feature": ArticleFeature(ctx: ctx)
+        default: ArticleEssay(ctx: ctx)
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

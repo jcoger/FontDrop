@@ -234,3 +234,57 @@ Notes.
 ### Gates for section 9
 
 A pass · B pass · C pass (no em dashes) · D pass (9.1, 9.4 read alone) · E pass (9.2 says what to do) · F pass · K pass (the warning chip carries meaning through icon, not color alone) · Q pass · R pass (no "evidence", "lens" or "skeleton" in a label) · H pending cold read
+
+## 10. Template layouts and colors (wave 4b, 2026-10-22)
+
+Strings for the layout menu, the Colors button and popover, the color field and the readout poster. Checked against sections 1 to 8: plain words, no em dashes (the range dash in sample dates is an en dash, and the numeric separator is a middle dot), every label reads alone (Gate D). Keys live in `Lexicon.Colors` and `Lexicon.Readout` in `Lexicon.swift`. Sample copy inside the templates ("Acme", "Porto") is in `Templates/Copy.swift` and comes from the Paper boards.
+
+### 10.1 Layout and Colors button
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 10.1 | layout.label | **Layout** | Menu beside the template picker. Also its VoiceOver label |
+| 10.2 | layout.help | **Show the template in a different layout** | Tooltip |
+| 10.3 | layout.* | **Essay · Feature**, **Statement · Product**, **Detail · Dashboard**, **Event · Specimen · Readout · Blocks · Layered** | One word each, the names on the Paper boards. Remembered per template |
+| 10.4 | colors.button | **Colors** | Button with three overlapping dots (background, text, accent). VoiceOver value: the preset name, or **Custom** |
+| 10.5 | colors.help | **Set the colors the templates use** | Tooltip |
+
+### 10.2 Popover
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 10.6 | presets | **Presets** | Paper, Night, Bone, Signal. VoiceOver: **Night preset, selected** |
+| 10.7 | role.* | **Background · Text · Accent** | The three editable roles. Not "Primary" or "Surface": the designer sees what each one does |
+| 10.8 | role.label | **Background color, #FFFFFF** | VoiceOver label for a role row. Hint: **Edit the background color** |
+| 10.9 | contrast | **Text contrast 19.8:1** | WCAG 2 ratio, one decimal. Never rounds up across a band edge (4.49 reads 4.4) |
+| 10.10 | contrast.fine | **Fine for body text** | 4.5 or above. Check mark icon |
+| 10.11 | contrast.large | **Large text only** | 3 to 4.5. Exclamation icon |
+| 10.12 | contrast.low | **Too low to read** | Below 3. Stop icon. Each band has its own icon: meaning never rests on color alone |
+| 10.13 | saved | **Saved to Acme** | The brand's name. With no brand yet: **Saved to your brand** (the same fallback the Reading header uses) |
+| 10.14 | brand.use | **Use brand colors** | Hidden. Appears only for a brand that has colors of its own. None do yet |
+
+### 10.3 Color field
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 10.15 | hex.label | **Hex color** | VoiceOver label of the text field. Takes 3 or 6 digits, with or without #. Placeholder: **RRGGBB** |
+| 10.16 | hex.invalid | **Use 3 or 6 hex digits, like 2B5C93** | Shown under the field with a warning icon. Says what is accepted, with an example (Gate E) |
+| 10.17 | eyedropper | **Pick a color from the screen** | Tooltip and VoiceOver label of the eyedropper button |
+| 10.18 | recent | **Recent** | Last 8 colors, newest first, the same for every brand. VoiceOver: **Recent color, #2B5C93** |
+| 10.19 | presets.colors | **Presets** | The colors the four presets use. VoiceOver: **Preset color, #E5341D** |
+| 10.20 | area | **Saturation and brightness** | VoiceOver label of the square. Value: **Saturation 80 percent, brightness 90 percent**. Arrow keys move it by 1 percent, with Shift by 10 |
+| 10.21 | hue | **Hue** | VoiceOver label of the strip. Value: **210 degrees** |
+
+### 10.4 Readout poster
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 10.22 | readout.bands | **Display · Display italic · Reading** | Names of the three bands |
+| 10.23 | readout.weight | **Weight 400** · **Reading · 400** | The playground's real weight. The Reading band leads with its name |
+| 10.24 | readout.italic | **Italic on · Italic off** | Whether the style being drawn is an italic |
+| 10.25 | readout.tracking | **Tracking 0** · **Tracking +0.020 em** | Reading band only |
+| 10.26 | readout.size | **15 pt** | The playground's size slider value, not the size of the sample on the poster |
+
+### Gates for section 10
+
+A pass (10.9 is the WCAG 2 ratio, and 10.10 to 10.12 use its published bands) · B pass · C pass (no em dashes) · D pass (10.4, 10.7, 10.15 read alone) · E pass (10.16 says what works) · F pass · G n/a · H pending cold read · K pass (contrast bands carry an icon and a word, not color alone; selected preset says "selected" to VoiceOver) · N pass · Q pass · R pass (no engine words)

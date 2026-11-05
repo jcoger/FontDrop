@@ -28,26 +28,75 @@ func capture(window: NSWindow) throws -> CGImage {
     return img
 }
 
-/// A sheet is its own window, so the window capture misses it. Capture each sheet and draw it onto the main image.
+/// A sheet or a popover is its own window, so the window capture misses it. Capture each one and draw it
+/// onto the main image. A sheet also dims the window behind it, as macOS does.
 @MainActor
 func compositeWithSheets(window: NSWindow) throws -> CGImage {
     let base = try capture(window: window)
-    guard !window.sheets.isEmpty else { return base }
+    let popovers = NSApp.windows.filter {
+        $0 !== window && $0.isVisible && !window.sheets.contains($0) && $0.frame.intersects(window.frame)
+            && $0.frame.width > 40 && String(describing: type(of: $0)).contains("Popover")
+    }
+    guard !window.sheets.isEmpty || !popovers.isEmpty else { return base }
     let scale = CGFloat(base.width) / window.frame.width
-    guard let ctx = CGContext(data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0,
+    // A popover can hang past the window's edge, so the canvas is the window plus every popover.
+    let canvas = popovers.reduce(window.frame) { $0.union($1.frame) }
+    let w = Int((canvas.width * scale).rounded()), h = Int((canvas.height * scale).rounded())
+    guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                               space: CGColorSpace(name: CGColorSpace.sRGB)!,
                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return base }
-    ctx.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
-    // Dim the window behind the sheet, as macOS does.
-    ctx.setFillColor(CGColor(gray: 0, alpha: 0.25))
-    ctx.fill(CGRect(x: 0, y: 0, width: base.width, height: base.height))
-    for sheet in window.sheets {
-        guard let img = try? capture(window: sheet) else { continue }
-        let x = (sheet.frame.minX - window.frame.minX) * scale
-        let y = (sheet.frame.minY - window.frame.minY) * scale      // CGContext origin is bottom-left, like AppKit
+    let ox = (window.frame.minX - canvas.minX) * scale, oy = (window.frame.minY - canvas.minY) * scale
+    ctx.draw(base, in: CGRect(x: ox, y: oy, width: CGFloat(base.width), height: CGFloat(base.height)))
+    if !window.sheets.isEmpty {
+        ctx.setFillColor(CGColor(gray: 0, alpha: 0.25))
+        ctx.fill(CGRect(x: ox, y: oy, width: CGFloat(base.width), height: CGFloat(base.height)))
+    }
+    for extra in window.sheets + popovers {
+        guard let img = try? capture(window: extra) else { continue }
+        let x = (extra.frame.minX - canvas.minX) * scale
+        let y = (extra.frame.minY - canvas.minY) * scale      // CGContext origin is bottom-left, like AppKit
         ctx.draw(img, in: CGRect(x: x, y: y, width: CGFloat(img.width), height: CGFloat(img.height)))
     }
     return ctx.makeImage() ?? base
+}
+
+/// Screenshot flags for the Reading templates and the Colors popover:
+///   --variant <id>             the layout (essay, feature, statement, product, detail, dashboard, event, specimen, readout, blocks, layered)
+///   --colors <preset>          paper | night | bone | signal, or three hex values: --colors FFFFFF,0A0A0A,E5341D
+///   --open-colors <role>       open the Colors popover, with this role's color field open (background | text | accent | none)
+///   --tabular-display-figures  draw the big numbers in tabular figures, to show what the default avoids
+@MainActor
+func applyStyleFlags(_ model: AppModel) {
+    let args = CommandLine.arguments
+    // Each flag can also come from an environment variable (--open-colors -> FD_OPEN_COLORS). Long argument
+    // lists sometimes stop macOS from opening the window when the app is launched from a script.
+    func value(_ flag: String) -> String? {
+        if let i = args.firstIndex(of: flag), i + 1 < args.count { return args[i + 1] }
+        let name = "FD_" + flag.dropFirst(2).uppercased().replacingOccurrences(of: "-", with: "_")
+        return ProcessInfo.processInfo.environment[name]
+    }
+    if let t = value("--template"), Templates.all.contains(where: { $0.id == t }) {
+        let saved = UserDefaults.standard.string(forKey: "readingTemplate")
+        model.templateID = t
+        UserDefaults.standard.set(saved, forKey: "readingTemplate")     // a screenshot run never changes the remembered template
+    }
+    let template = Templates.descriptor(model.templateID)
+    if let v = value("--variant") { model.brandStyle.setVariant(v, template: template) }
+    if let c = value("--colors") {
+        if let preset = TemplatePalette.presets.first(where: { $0.id == c.lowercased() }) {
+            model.brandStyle.setPalette(preset.palette, brand: model.brandID)
+        } else {
+            let parts = c.split(separator: ",").compactMap { HexColor(hex: String($0)) }
+            if parts.count == 3 {
+                model.brandStyle.setPalette(TemplatePalette(background: parts[0], text: parts[1], accent: parts[2]), brand: model.brandID)
+            }
+        }
+    }
+    TemplateDebug.tabularDisplayFigures = args.contains("--tabular-display-figures") || value("--tabular-display-figures") != nil
+    if let role = value("--open-colors") {
+        model.brandStyle.editingRole = ColorRole(rawValue: role)
+        model.brandStyle.showColors = true
+    }
 }
 
 @MainActor
@@ -58,7 +107,7 @@ enum ScreenshotRunner {
             if case .failed(let m) = model.phase { print("SCREENSHOT failed: \(m)"); NSApp.terminate(nil); return }
             try? await Task.sleep(for: .milliseconds(100))
         }
-        switch model.options.appearance {
+        switch model.options.appearance ?? ProcessInfo.processInfo.environment["FD_APPEARANCE"] {
         case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
         case "light": NSApp.appearance = NSAppearance(named: .aqua)
         default: break
@@ -67,6 +116,7 @@ enum ScreenshotRunner {
             window.setContentSize(NSSize(width: 1360, height: 860))
         }
         model.screen = model.options.screen
+        applyStyleFlags(model)
         if CommandLine.arguments.contains("--no-inspector") { model.showInspector = false }
         if model.screen == .reading && model.displayFamily == nil {
             // Reading with no Display face: nothing to wait for.

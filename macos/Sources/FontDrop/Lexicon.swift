@@ -275,6 +275,67 @@ enum Lexicon {
     static let licenseOK = "Not marked as trial"
     static let licenseTrial = "Trial version \u{00B7} License before you ship"
     static let getLicense = "Get the license"
+
+    // MARK: Template colors and layouts (10.x)
+
+    /// The readout poster's bar labels. They print the playground's real values.
+    enum Readout {
+        static let display = "Display"
+        static let displayItalic = "Display italic"
+        static let reading = "Reading"
+        static func weight(_ w: Int) -> String { "Weight \(w)" }
+        static func readingWeight(_ w: Int) -> String { "Reading \u{00B7} \(w)" }
+        static func italic(_ on: Bool) -> String { on ? "Italic on" : "Italic off" }
+        static func tracking(_ em: Double) -> String { abs(em) < 0.0005 ? "Tracking 0" : String(format: "Tracking %+.3f em", em) }
+        static func size(_ pt: Int) -> String { "\(pt) pt" }
+    }
+
+    enum Colors {
+        static let button = "Colors"
+        static let buttonHelp = "Set the colors the templates use"
+        static let layoutLabel = "Layout"
+        static let layoutHelp = "Show the template in a different layout"
+        static let presets = "Presets"
+        static let background = "Background"
+        static let text = "Text"
+        static let accent = "Accent"
+        static let useBrand = "Use brand colors"
+        static func savedTo(_ brand: String) -> String { "Saved to \(brand)" }
+        static let savedToBrand = "Saved to this brand"
+        static func contrast(_ ratio: String) -> String { "Text contrast \(ratio):1" }
+        static func band(_ band: ContrastBand) -> String {
+            switch band {
+            case .fine: "Fine for body text"
+            case .largeOnly: "Large text only"
+            case .tooLow: "Too low to read"
+            }
+        }
+        static func bandSymbol(_ band: ContrastBand) -> String {
+            switch band {
+            case .fine: "checkmark.circle.fill"
+            case .largeOnly: "exclamationmark.circle.fill"
+            case .tooLow: "xmark.octagon.fill"
+            }
+        }
+        /// VoiceOver: "Background color, #FFFFFF".
+        static func swatchLabel(_ role: String, _ hex: String) -> String { "\(role) color, \(hex)" }
+        static func swatchHint(_ role: String) -> String { "Edit the \(role.lowercased()) color" }
+        static func presetLabel(_ name: String, selected: Bool) -> String { selected ? "\(name) preset, selected" : "\(name) preset" }
+        // Color field
+        static let hexLabel = "Hex color"
+        static let hexPlaceholder = "RRGGBB"
+        static let hexInvalid = "Use 3 or 6 hex digits, like 2B5C93"
+        static let eyedropper = "Pick a color from the screen"
+        static let recent = "Recent"
+        static let fromPresets = "Presets"
+        static let done = "Done"
+        static let areaLabel = "Saturation and brightness"
+        static func areaValue(_ s: Int, _ b: Int) -> String { "Saturation \(s) percent, brightness \(b) percent" }
+        static let hueLabel = "Hue"
+        static func hueValue(_ degrees: Int) -> String { "\(degrees) degrees" }
+        static func recentLabel(_ hex: String) -> String { "Recent color, \(hex)" }
+        static func presetColorLabel(_ hex: String) -> String { "Preset color, \(hex)" }
+    }
 }
 
 extension String {
