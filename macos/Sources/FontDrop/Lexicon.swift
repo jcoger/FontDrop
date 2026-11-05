@@ -400,6 +400,22 @@ enum Lexicon {
             default: nil
             }
         }
+        /// One piece of helping evidence as a Display card line, in the Text face's name. Nil for evidence that makes no
+        /// card line (the pair type has its own, above).
+        static func evidenceLine(_ e: Evidence, text: String) -> String? {
+            switch e.lens {
+            case "Skeleton":
+                guard let word = e.detail.split(separator: " ").last else { return nil }
+                return "\(Lexicon.structure(String(word))), like \(text)"
+            case "x-height":
+                let n = Double(e.detail.filter { $0.isNumber || $0 == "." }) ?? 0
+                return n < 1 ? "Same x-height as \(text)" : "x-height within \(Int(n))% of \(text)"
+            case "Texture": return "Stroke contrast with \(text)"
+            case "Foundry": return "Same foundry as \(text)"
+            case "Designer": return "Same designer as \(text)"
+            default: return nil
+            }
+        }
         static func subtitle(brand: String, count: Int, text: String) -> String {
             "\(brand) set in each of \(count) families. The best partners for \(text) come first."
         }

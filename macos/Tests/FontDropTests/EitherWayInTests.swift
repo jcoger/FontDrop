@@ -64,6 +64,34 @@ final class EitherWayInTests: XCTestCase {
         }
     }
 
+    // MARK: The card line says what sets the pair apart
+
+    private func ev(_ lens: String, _ detail: String, strength: String = "guideline", effect: Int8 = 1) -> Evidence {
+        Evidence(lens: lens, detail: detail, source: "", strength: strength, effect: effect)
+    }
+
+    func testEachCardShowsTheEvidenceFewOthersShare() {
+        // Four cards: all contrast, all x-height within 2%; only one shares the foundry, one has a rarer skeleton.
+        let common = [ev("Clear contrast", "serif + sans"), ev("x-height", "within 2%")]
+        let entries = [
+            DisplayReasons.Entry(family: "A", pairType: "contrast", evidence: common + [ev("Foundry", "Acme Foundry", strength: "shortcut")]),
+            DisplayReasons.Entry(family: "B", pairType: "contrast", evidence: common + [ev("Skeleton", "both rational")]),
+            DisplayReasons.Entry(family: "C", pairType: "contrast", evidence: common),
+            DisplayReasons.Entry(family: "D", pairType: "contrast", evidence: common),
+        ]
+        let lines = DisplayReasons.lines(entries, text: "Timeless Sans")
+        XCTAssertEqual(lines["A"], "Same foundry as Timeless Sans")
+        XCTAssertEqual(lines["B"], "Rational, like Timeless Sans")
+        XCTAssertEqual(lines["C"], "Clear contrast with Timeless Sans", "everything it has is common: the pair type's line")
+        XCTAssertEqual(lines["D"], lines["C"])
+        XCTAssertNotEqual(lines["A"], lines["B"])
+    }
+
+    func testAWarningIsNeverTheLineOfAHelpingReason() {
+        let e = [DisplayReasons.Entry(family: "A", pairType: "middle", evidence: [ev("The middle", "x", effect: -1)])]
+        XCTAssertEqual(DisplayReasons.lines(e, text: "T")["A"], "Too close to T")
+    }
+
     // MARK: The Display grid, end to end
 
     private func fixtureFolder() throws -> String {
@@ -96,7 +124,8 @@ final class EitherWayInTests: XCTestCase {
         XCTAssertEqual(model.displaySort, .pairsWith, "a Text face and no Display face: Pairs with is the default")
         await model.loadDisplayPairs()
         XCTAssertTrue(model.displayPairsAreCurrent)
-        XCTAssertEqual(model.displayReason(for: "Arial"), "Clear contrast with Georgia", "a sans headline over a serif Text face")
+        XCTAssertNotNil(model.displayReason(for: "Arial"), "a sans headline over a serif Text face has a line")
+        XCTAssertTrue(model.displayReason(for: "Arial")?.contains("Georgia") ?? false, "in the Text face's name")
         XCTAssertNil(model.displayReason(for: "Georgia"), "the Text face has no partner line for itself")
         let order = model.displayGridFamilies.map(\.name)
         XCTAssertEqual(order.last, "Georgia", "the Text face's own family has no rank and follows the ranked ones: \(order)")
