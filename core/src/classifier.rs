@@ -278,25 +278,45 @@ fn foot_ratio(font: &FontRef, ch: char) -> Option<f32> {
     Some(foot / stem)
 }
 
-/// Serif test: a wide foot on both 'l' and 'i'. Requiring both stops a tailed
-/// 'l' (DIN, Seravek) from reading as a serif. Falls back to 'l' or 'I' alone
-/// when 'i' is missing. Slab and bracketed serifs read wide; flared (Optima)
-/// reads sans.
+/// Serif test: a wide foot on both 'l' and 'i', and on a body stem too. Requiring both
+/// 'l' and 'i' stops a tailed 'l' (DIN, Seravek) from reading as a serif. Requiring a
+/// foot on 'n', 'h' or 'm' stops a sans that only serifs its I, l and i (PP Neue
+/// Machina) from reading as a serif face: a serif face serifs its body stems as well.
+/// Falls back to 'l' or 'I' alone when 'i' is missing. Slab and bracketed serifs read
+/// wide; flared (Optima) reads sans.
 fn measure_serif(font: &FontRef) -> Option<bool> {
+    measure_serif_with(font, true)
+}
+
+/// The widest foot on a stem other than I, l and i: 'n', 'h', 'm' and the capitals 'H' and 'N'. None when
+/// none can be measured. The capitals matter: some real serifs (Heldane) leave n, h and m bare-footed but
+/// serif their capitals. Not 'u': its right stem carries a spur at the baseline in many sans faces.
+fn body_foot(font: &FontRef) -> Option<f32> {
+    ['n', 'h', 'm', 'H', 'N'].iter().filter_map(|c| foot_ratio(font, *c)).fold(None, |acc, v| Some(acc.map_or(v, |a: f32| a.max(v))))
+}
+
+fn measure_serif_with(font: &FontRef, check_body: bool) -> Option<bool> {
     // Monospaced faces do the Mono job and aren't judged as serif or sans for
     // pairing. Their 'l' carries a foot bar that reads as a serif.
     if is_monospaced(font) {
         return Some(false);
     }
     let l = foot_ratio(font, 'l').or_else(|| foot_ratio(font, 'I'))?;
-    match foot_ratio(font, 'i') {
-        // Sans measure 1.0; flared sans (Optima) about 1.2; wedge serifs
-        // (OT Jubilee) about 1.33; bracketed serifs 2.5 and up. The line sits
-        // between flared and wedge. Very subtle serifs (PP Museum, 1.09) still
-        // read as sans: a known miss, not tuned away.
-        Some(i) => Some(l > 1.27 && i > 1.27),
-        None => Some(l > 1.27),
-    }
+    // Sans measure 1.0; flared sans (Optima) about 1.2; wedge serifs
+    // (OT Jubilee) about 1.33; bracketed serifs 2.5 and up. The line sits
+    // between flared and wedge. Very subtle serifs (PP Museum, 1.09) still
+    // read as sans: a known miss, not tuned away.
+    let on_ends = match foot_ratio(font, 'i') {
+        Some(i) => l > 1.27 && i > 1.27,
+        None => l > 1.27,
+    };
+    // Italics end their stems in curves, not feet, so a slanted serif face has no body serifs to find.
+    // (Family-level serif comes from the upright face anyway.)
+    use skrifa::raw::TableProvider;
+    let slanted = font.post().map(|p| p.italic_angle().to_f64().abs() > 0.5).unwrap_or(false);
+    if !on_ends || !check_body || slanted { return Some(on_ends); }
+    // A body stem that cannot be measured leaves the verdict as it was.
+    Some(body_foot(font).map_or(true, |b| b > 1.27))
 }
 
 /// Aperture of 'c': how far apart the two stroke ends sit. From mid-height,
@@ -802,6 +822,30 @@ mod tests {
         assert_eq!(classify_by_name("Futura").skeleton, "geometric");
     }
 
+    /// Serif or sans from the outlines: a serif face serifs its body stems, not just I, l and i.
+    fn serif_of(path: &str) -> Option<Option<bool>> {
+        let data = std::fs::read(path).ok()?;
+        let font = FontRef::from_index(&data, 0).ok()?;
+        Some(measure_serif(&font))
+    }
+
+    #[test]
+    fn a_serif_face_reads_serif_and_a_plain_sans_reads_sans() {
+        if let Some(r) = serif_of("/System/Library/Fonts/Supplemental/Times New Roman.ttf") { assert_eq!(r, Some(true)); }
+        if let Some(r) = serif_of("/System/Library/Fonts/Supplemental/Georgia.ttf") { assert_eq!(r, Some(true)); }
+        if let Some(r) = serif_of("/System/Library/Fonts/Supplemental/Arial.ttf") { assert_eq!(r, Some(false)); }
+        if let Some(r) = serif_of("/System/Library/Fonts/Supplemental/Verdana.ttf") { assert_eq!(r, Some(false)); }
+    }
+
+    /// PP Neue Machina serifs its I, l and i only. It is a sans. Skipped where the font is not installed.
+    #[test]
+    fn a_sans_that_serifs_only_i_l_and_i_reads_sans() {
+        let home = std::env::var("HOME").unwrap_or_default();
+        for weight in ["PlainRegular", "PlainUltrabold", "InktrapLight"] {
+            if let Some(r) = serif_of(&format!("{home}/Library/Fonts/PPNeueMachina-{weight}.otf")) { assert_eq!(r, Some(false), "{weight}"); }
+        }
+    }
+
     #[test]
     fn unknown_name_is_unknown_skeleton() {
         assert_eq!(classify_by_name("Zzqwx Plain").skeleton, "unknown");
@@ -908,6 +952,27 @@ mod tests {
         println!("\nskeleton answer set: {right} of {}", ANSWERS.len());
     }
 
+    /// Which files change their serif reading with the body-stem check, on every file of a DB copy:
+    ///   FONTDROP_DB=<copy> cargo test --lib serif_body_diff -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn serif_body_diff() {
+        let path = std::env::var("FONTDROP_DB").expect("set FONTDROP_DB to a copy");
+        let conn = rusqlite::Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let files: Vec<(String, String)> = conn.prepare("SELECT file_path, font_family FROM fonts").unwrap()
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))).unwrap().flatten()
+            .filter(|(p, _)| Path::new(p).exists()).collect();
+        let (mut changed, mut serif_before) = (0, 0);
+        for (p, fam) in &files {
+            let Ok(data) = std::fs::read(p) else { continue };
+            let Ok(f) = FontRef::from_index(&data, 0) else { continue };
+            let (a, b) = (measure_serif_with(&f, false), measure_serif_with(&f, true));
+            if a == Some(true) { serif_before += 1; }
+            if a != b { changed += 1; println!("serif to sans  {:<28} {}", fam, p.rsplit('/').next().unwrap()); }
+        }
+        println!("\n{} files, {} read serif before, {} changed", files.len(), serif_before, changed);
+    }
+
     /// Print foot ratios for files in FOOT_FILES (comma-separated paths).
     #[test]
     #[ignore]
@@ -915,7 +980,9 @@ mod tests {
         for path in std::env::var("FOOT_FILES").unwrap_or_default().split(',').filter(|p| !p.is_empty()) {
             let data = std::fs::read(path).unwrap();
             let f = FontRef::from_index(&data, 0).unwrap();
-            println!("{:<40} l {:?} i {:?}", path.rsplit('/').next().unwrap(), foot_ratio(&f, 'l'), foot_ratio(&f, 'i'));
+            println!("{:<40} l {:?} i {:?} n {:?} h {:?} m {:?} u {:?}", path.rsplit('/').next().unwrap(),
+                foot_ratio(&f, 'l'), foot_ratio(&f, 'i'), foot_ratio(&f, 'n'), foot_ratio(&f, 'h'), foot_ratio(&f, 'm'), foot_ratio(&f, 'u'));
+            println!("{:<40} H {:?} N {:?} E {:?} I {:?}", "", foot_ratio(&f, 'H'), foot_ratio(&f, 'N'), foot_ratio(&f, 'E'), foot_ratio(&f, 'I'));
         }
     }
 }

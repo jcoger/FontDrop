@@ -339,6 +339,20 @@ pub fn enrich_from_name_tables(conn: &Connection) {
         )
         .ok();
     }
+    // Where the name table named no manufacturer, the vendor code names the foundry. Runs on every call, so it also
+    // reaches rows read by an older build.
+    let unnamed: Vec<(String, String)> = match conn.prepare("SELECT font_id, vendor_id FROM fonts WHERE (foundry IS NULL OR foundry = '') AND vendor_id IS NOT NULL AND vendor_id != ''") {
+        Ok(mut st) => st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map(|it| it.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default(),
+        Err(_) => Vec::new(),
+    };
+    for (font_id, vendor) in unnamed {
+        if let Some(foundry) = crate::names::foundry_for_vendor(&vendor) {
+            conn.execute("UPDATE fonts SET foundry = ?1 WHERE font_id = ?2", params![foundry, font_id]).ok();
+        }
+    }
     if let Some(tx) = tx {
         tx.commit().ok();
     }
@@ -422,7 +436,7 @@ fn drop_stale_twins(conn: &Connection, scanned: &[ScannedFont]) {
 
 /// Bump when the classifier's rules change: every non-override font is then
 /// reclassified once on the next launch instead of only the 'unknown' ones.
-pub const CLASSIFIER_VERSION: i64 = 9;      // 9: width (advance_ratio) is measured too
+pub const CLASSIFIER_VERSION: i64 = 10;     // 10: serif needs a foot on a body stem too (a sans with a serifed I/l/i is sans)
 
 fn meta_get(conn: &Connection, key: &str) -> Option<String> {
     conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| r.get(0)).ok()
@@ -545,9 +559,12 @@ fn unify_family_serif(conn: &Connection) {
             .unwrap_or_default(),
         Err(_) => return,
     };
+    // A family whose files all carry style "italic" (Test Heldane) ties on distance. The tie goes to a file whose
+    // name is not slanted, never to whichever row came first: row order moves between scans.
     let mut best: std::collections::HashMap<String, (i64, i32)> = std::collections::HashMap::new();
     for (family, file_name, style, weight, serif) in rows {
-        let dist = upright_distance(weight, is_slanted(&file_name, &style));
+        let name_slanted = is_slanted(&file_name, "");
+        let dist = upright_distance(weight, is_slanted(&file_name, &style)) * 2 + name_slanted as i64;
         let entry = best.entry(family).or_insert((i64::MAX, 0));
         if dist < entry.0 {
             *entry = (dist, serif);
