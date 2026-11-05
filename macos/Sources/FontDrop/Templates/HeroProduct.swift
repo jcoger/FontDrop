@@ -13,6 +13,10 @@ enum TemplateDebug {
 /// elsewhere in the templates use tabular.
 struct HeroProduct: View {
     let ctx: PairContext
+
+    /// 64px on the board, 3 to 4 lines in a 520 column, never taller than 240.
+    static let headline = HeadlineSpec(text: TemplateCopy.productHeadline, px: 64, track: -0.035, lh: 0.97, width: 520,
+                                       lines: 3...4, maxHeight: 240)
     private var p: TemplatePalette { ctx.palette }
     private var numberFigures: Figures { TemplateDebug.tabularDisplayFigures ? .tabular : .proportional }
 
@@ -22,12 +26,11 @@ struct HeroProduct: View {
                 Spacer(minLength: 0)
                 VStack(spacing: 22) {
                     badge
-                    ctx.display(TemplateCopy.productHeadline, 64, track: -0.035, lh: 0.97, width: 520, align: .center, maxHeight: 240)
+                    ctx.headline(Self.headline, align: .center)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 520)
-                    ctx.reading(TemplateCopy.productSub, 16, lh: 1.5, color: p.secondary)
+                    ctx.reading(TemplateCopy.productSub, 16, lh: 1.5, color: p.secondary, measure: 400, maxMeasure: 520)
                         .multilineTextAlignment(.center)
-                        .frame(maxWidth: 400)
                     HStack(spacing: 8) {
                         ctx.button(TemplateCopy.productPrimary, filled: true, radius: 10, horizontal: 22)
                         ctx.button(TemplateCopy.productSecondary, filled: false, soft: true, radius: 10, horizontal: 22)

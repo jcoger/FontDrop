@@ -64,6 +64,8 @@ struct FaceText: View {
     var lineAlignment: HorizontalAlignment = .leading
     /// With `wrapWidth`: the most height the text may take. The size shrinks until it fits (a hero headline on a fixed board).
     var maxHeight: CGFloat?
+    /// A headline: always set line by line, so the lines break exactly where the size was solved for them.
+    var exactLines = false
 
     /// The font, smaller when a word is wider than `wrapWidth` or the lines are taller than `maxHeight`.
     /// A word is never broken: the size comes down first (to a floor), then the text wraps between words.
@@ -78,9 +80,9 @@ struct FaceText: View {
 
     /// Space added between lines. A template's own line height may tighten below the font's natural spacing;
     /// the playground's may not (as before).
-    private func extraLeading(size: CGFloat, natural: CGFloat) -> CGFloat {
-        let wanted = CGFloat(leading ?? face.settings.lineHeight) * size - natural
-        return max(0, wanted)
+    private func extraLeading(size: CGFloat, natural: CGFloat, wanted: CGFloat?) -> CGFloat {
+        let pitch = wanted ?? CGFloat(face.settings.lineHeight) * size
+        return max(0, pitch - natural)
     }
 
     var body: some View {
@@ -89,16 +91,26 @@ struct FaceText: View {
             let size = CTFontGetSize(font)
             let natural = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
             let tracking = CGFloat(face.settings.tracking + trackBias) * size
-            if let leading, let wrapWidth, CGFloat(leading) * size < natural {
-                // Tighter than the font's own spacing: lay the lines out one by one.
+            // A template's line height is a target. It is raised until the ink of the real lines clears.
+            let wanted = leading.map { CGFloat($0) * size }
+            if let wrapWidth, let wanted, wanted < natural || exactLines {
+                // Tighter than the font's own spacing, or a headline: lay the lines out one by one.
+                let lines = TightLines.lines(text, font: font, tracking: tracking, width: wrapWidth)
+                let pitch = TypeFit.pitch(lines: lines, font: font, tracking: tracking, wanted: wanted)
                 TightLines(text: text, font: font, tracking: tracking, width: wrapWidth,
-                           pitch: CGFloat(leading) * size, natural: natural, alignment: lineAlignment)
+                           pitch: pitch, natural: natural, alignment: lineAlignment)
             } else {
+                // Lines wrap wherever the container says, so the check uses the tallest letters of the whole text.
+                // Only a tight line height on text long enough to wrap can need it.
+                let safe = wanted.map { w -> CGFloat in
+                    guard w < size * 1.3, text.count > 28 else { return w }
+                    return max(w, TypeFit.pitchNeed(wrapped: text, font: font, tracking: tracking))
+                }
                 Text(text)
                     .font(Font(font))
                     .tracking(tracking)
-                    .exactLineHeight(leading.map { CGFloat($0) * size }, natural: natural,
-                                     fallbackSpacing: useLineHeight ? extraLeading(size: size, natural: natural) : 0)
+                    .exactLineHeight(safe, natural: natural,
+                                     fallbackSpacing: useLineHeight ? extraLeading(size: size, natural: natural, wanted: safe) : 0)
             }
         } else {
             let size = CGFloat(face.settings.size) * ratio
@@ -178,7 +190,7 @@ struct TightLines: View {
 
     var body: some View {
         let list = Self.lines(text, font: font, tracking: tracking, width: width)
-        VStack(alignment: alignment, spacing: pitch - natural) {
+        LinePitchStack(pitch: pitch, alignment: alignment) {
             ForEach(Array(list.enumerated()), id: \.offset) { _, line in
                 Text(line).font(Font(font)).tracking(tracking).lineLimit(1).fixedSize()
             }
@@ -186,6 +198,34 @@ struct TightLines: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
         .frame(width: width, alignment: Alignment(horizontal: alignment, vertical: .top))
+    }
+}
+
+/// Stacks single-line texts exactly `pitch` apart, top to top, whatever height SwiftUI gives each line.
+/// A `VStack` with a negative gap relies on every line's box being as tall as Core Text says; when SwiftUI's box
+/// is shorter (a font whose OS/2 and hhea metrics differ), the lines land closer than asked and touch.
+struct LinePitchStack: Layout {
+    var pitch: CGFloat
+    var alignment: HorizontalAlignment
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let width = sizes.map(\.width).max() ?? 0
+        let height = CGFloat(max(subviews.count - 1, 0)) * pitch + (sizes.last?.height ?? 0)
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (i, view) in subviews.enumerated() {
+            let size = view.sizeThatFits(.unspecified)
+            let x: CGFloat
+            switch alignment {
+            case .center: x = bounds.minX + (bounds.width - size.width) / 2
+            case .trailing: x = bounds.maxX - size.width
+            default: x = bounds.minX
+            }
+            view.place(at: CGPoint(x: x, y: bounds.minY + CGFloat(i) * pitch), anchor: .topLeading, proposal: .unspecified)
+        }
     }
 }
 

@@ -35,6 +35,6 @@ extension PairContext {
         display(text, px, track: track, italic: italic, color: color)
             .lineLimit(1).minimumScaleFactor(0.08)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: points(px, display: true) * lh)
+            .frame(height: points(px, display: true, italic: italic) * lh)
     }
 }

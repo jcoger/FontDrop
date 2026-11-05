@@ -230,6 +230,51 @@ pub fn covers_latin(upper: usize, lower: usize, _digits: usize) -> bool {
     upper == 26 || lower == 26
 }
 
+/// A Microsoft symbol cmap (platform 3, encoding 0) and no Unicode one: Webdings, Wingdings and other
+/// pictorial fonts built the old way. Their letters map to pictures, so they are not Latin faces
+/// whatever the outlines say.
+pub fn has_symbol_cmap(font: &skrifa::FontRef) -> bool {
+    use skrifa::raw::TableProvider;
+    use skrifa::raw::tables::cmap::PlatformId;
+    let Ok(cmap) = font.cmap() else { return false };
+    let mut symbol = false;
+    for r in cmap.encoding_records() {
+        match (r.platform_id(), r.encoding_id()) {
+            (PlatformId::Windows, 0) => symbol = true,
+            (PlatformId::Windows, 1) | (PlatformId::Windows, 10) | (PlatformId::Unicode, _) => return false,
+            _ => {}
+        }
+    }
+    symbol
+}
+
+#[cfg(test)]
+mod symbol_tests {
+    use super::*;
+
+    #[test]
+    fn symbol_cmap_fonts_are_not_latin() {
+        let dir = std::path::Path::new("/System/Library/Fonts/Supplemental");
+        for file in ["Webdings.ttf", "Wingdings.ttf", "Wingdings 2.ttf", "Wingdings 3.ttf"] {
+            let Ok(data) = std::fs::read(dir.join(file)) else { continue };
+            let font = skrifa::FontRef::new(&data).expect("readable font");
+            assert!(has_symbol_cmap(&font), "{file} has a symbol cmap");
+        }
+        // A text face is not affected.
+        if let Ok(data) = std::fs::read(dir.join("Arial.ttf")) {
+            let font = skrifa::FontRef::new(&data).expect("readable font");
+            assert!(!has_symbol_cmap(&font));
+        }
+    }
+
+    #[test]
+    fn the_junk_list_names_the_picture_fonts() {
+        for f in ["Apple Symbols", "Bodoni Ornaments", "Webdings", "Wingdings", "Wingdings 2", "Wingdings 3"] {
+            assert!(crate::finder::is_junk_family(f), "{f}");
+        }
+    }
+}
+
 /// Does any of these strings (name-table entries, the file name) read as a trial build?
 /// The family names (IDs 1, 16) and the licence text (13) are not enough. "GT Flexa Var Trial.ttf"
 /// has no trial word in any of its name-table entries (family, full name, PostScript name,
@@ -278,7 +323,7 @@ pub fn read_name_meta(path: &std::path::Path) -> Option<NameMeta> {
     let tag = |t: &str| axes.iter().find(|a| a.tag().to_string() == t);
     let wght_axis_max = tag("wght").map_or(0, |a| a.max_value().round() as i64);
     let ital_axis = tag("ital").is_some() || tag("slnt").is_some();
-    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: axes.len() > 0, wght_axis_max, ital_axis, covers_latin: covers_latin(u, l, d), style_name })
+    Some(NameMeta { vendor, manufacturer: text(StringId::MANUFACTURER), designer: text(StringId::DESIGNER), trial, foundry_url, variable: axes.len() > 0, wght_axis_max, ital_axis, covers_latin: covers_latin(u, l, d) && !has_symbol_cmap(&font), style_name })
 }
 
 pub struct FontMeta {

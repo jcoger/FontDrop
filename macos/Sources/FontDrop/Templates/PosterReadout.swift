@@ -4,10 +4,13 @@ import SwiftUI
 /// shows (weight, italic, size, and tracking for the Reading band) as a small bar on that value's range.
 struct PosterReadout: View {
     let ctx: PairContext
+
+    /// The word fills 90% of the sheet's inner width (600 less two 24 margins), as big as the height allows.
+    static let wordFill = FillSpec(width: 552, words: [TemplateCopy.readoutWord])
     private var p: TemplatePalette { ctx.palette }
 
-    // The ranges the playground's sliders use (Playground.swift). Bars map a value onto its range.
-    static let displaySize: ClosedRange<Double> = 14...120
+    // The ranges the bars map a size onto: a poster word is far bigger than a headline. Reading matches the 9 to 40 pt body range.
+    static let displaySize: ClosedRange<Double> = 14...360
     static let readingSize: ClosedRange<Double> = 9...40
     static let tracking: ClosedRange<Double> = -0.08...0.3
 
@@ -19,7 +22,7 @@ struct PosterReadout: View {
 
     /// The fit rule (PosterFit.swift): the big word and the italic line shrink until the three bands fit.
     init(ctx base: PairContext) {
-        let items = [FitItem(text: TemplateCopy.readoutWord, px: 320, lh: 0.82, tracking: -0.05),
+        let items = [FitItem(text: TemplateCopy.readoutWord, px: 320, lh: 0.82, tracking: -0.05, fill: Self.wordFill),
                      FitItem(text: TemplateCopy.readoutLine, px: 72, lh: 1.0, width: 552, tracking: -0.02)]
         let r = base.readingScale
         // Padding 48, three bars rows, and the Reading band's two paragraphs (about four lines).
@@ -31,19 +34,19 @@ struct PosterReadout: View {
         let displayItalic = ctx.display.italic() ?? ctx.display
         Board(background: p.field.color, height: 750) {
             VStack(alignment: .leading, spacing: 0) {
-                band(face: ctx.display, size: ctx.display.settings.size, sizeRange: Self.displaySize, tracking: nil,
+                band(face: ctx.display, size: Double(ctx.fillSize(Self.wordFill, px: 320, track: -0.05, italic: false) * ctx.fillFit * ctx.fit), sizeRange: Self.displaySize, tracking: nil,
                      name: Lexicon.Readout.display) {
-                    ctx.posterLine(TemplateCopy.readoutWord, 320, track: -0.05, lh: 0.82)
+                    ctx.posterWord(TemplateCopy.readoutWord, 320, track: -0.05, lh: 0.82, fill: Self.wordFill)
                 }
                 Spacer(minLength: 0)
-                band(face: displayItalic, size: displayItalic.settings.size, sizeRange: Self.displaySize, tracking: nil,
+                band(face: displayItalic, size: Double(ctx.points(72, display: true, italic: true)), sizeRange: Self.displaySize, tracking: nil,
                      name: Lexicon.Readout.displayItalic) {
                     ctx.display(TemplateCopy.readoutLine, 72, track: -0.02, lh: 1.0, italic: true, width: 552)
                         .lineLimit(2).minimumScaleFactor(0.15)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer(minLength: 0)
-                band(face: ctx.body, size: ctx.body.settings.size, sizeRange: Self.readingSize,
+                band(face: ctx.body, size: Double(ctx.points(15, display: false)), sizeRange: Self.readingSize,
                      tracking: ctx.body.settings.tracking, name: Lexicon.Readout.reading) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(TemplateCopy.readoutBody, id: \.self) {

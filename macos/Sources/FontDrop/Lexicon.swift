@@ -347,6 +347,33 @@ enum Lexicon {
         static func size(_ pt: Int) -> String { "\(pt) pt" }
     }
 
+    /// The Scale section of the Reading inspector, and the Trim slider in each face's playground (docs/copy section 14).
+    enum Scale {
+        static let title = "Scale"
+        static let lock = "Lock"
+        static let lockHelp = "Lock sizes to the ratio"
+        static let body = "Body"
+        static let ratio = "Ratio"
+        static let fitNote = "Sizes fit each font"
+        static let fitHelp = "Each face is sized to match the board's letter height, and headlines fill their column. Lock to set the sizes by hand."
+        static let lockedHelp = "Every size is the body size times the ratio, once for each step up. Headlines still wrap and never split a word."
+        static let controlsOffHelp = "Lock sizes to set the body size and ratio"
+        static func bodyReadout(_ pt: Double) -> String { "\(Int(pt.rounded())) pt" }
+        static func headlineReadout(_ pt: Double, times: Double) -> String {
+            "Headline \(Int(pt.rounded())) pt \u{00B7} " + String(format: "%.1f", times) + "\u{00D7} body"
+        }
+        static func bodyLine(_ pt: Double) -> String { "Body \(Int(pt.rounded())) pt" }
+
+        static let sectionFace = "Scale and spacing"
+        static let trim = "Trim"
+        static let trimHelp = "Nudges every size this face gets in the templates"
+        /// "+8%", "0%", "-12%".
+        static func trimReadout(_ trim: Double) -> String {
+            let percent = Int(((trim - 1) * 100).rounded())
+            return percent > 0 ? "+\(percent)%" : "\(percent)%"
+        }
+    }
+
     enum Colors {
         static let button = "Colors"
         static let buttonHelp = "Set the colors the templates use"

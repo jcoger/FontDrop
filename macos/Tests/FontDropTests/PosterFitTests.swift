@@ -1,8 +1,8 @@
 import XCTest
 @testable import FontDrop
 
-/// The fit rule for fixed-size boards: at any playground Display size from 14 to 120, the display type shrinks
-/// instead of running off the sheet.
+/// The fit rule for fixed-size boards: however big the type gets (a locked scale with a big body and ratio, or Trim
+/// at its top), the display type shrinks instead of running off the sheet.
 final class PosterFitTests: XCTestCase {
     func testScaleNeverGrowsAndNeverVanishes() {
         XCTAssertEqual(PosterFit.scale(height: 800, fixed: 100, display: 300), 1)          // already fits
@@ -12,44 +12,48 @@ final class PosterFitTests: XCTestCase {
         XCTAssertEqual(PosterFit.scale(height: 800, fixed: 100, display: 0), 1)
     }
 
-    private func context(size: Double) -> PairContext {
+    /// A locked scale: `body` and `ratio` set every size. Trim is the Display face's.
+    private func context(body: Double = 15, ratio: Double = 1.333, trim: Double = 1) -> PairContext {
         var display = TypeSettings.defaults(job: "display")
-        display.size = size
+        display.trim = trim
         let path = "/System/Library/Fonts/SFNS.ttf"
         FontLoader.shared.load(path: path)
         return PairContext(brand: "Acme", display: FaceSpec(path: path, settings: display),
-                           body: FaceSpec(path: path, settings: TypeSettings.defaults(job: "reading")), tick: 0)
+                           body: FaceSpec(path: path, settings: TypeSettings.defaults(job: "reading")), tick: 0,
+                           scale: TypeScale(body: body, ratio: ratio, locked: true))
     }
 
     func testEventShrinksAtLargeSizesAndOnlyThen() {
-        let sizes: [Double] = [14, 30, 40, 63, 90, 120]
-        let fits = sizes.map { PosterEvent(ctx: context(size: $0)).ctx.fit }
-        XCTAssertEqual(fits[0], 1); XCTAssertEqual(fits[1], 1); XCTAssertEqual(fits[2], 1)
-        XCTAssertLessThan(fits[3], 1, "63 pt is where the Event poster used to clip")
-        for i in 1..<fits.count { XCTAssertLessThanOrEqual(fits[i], fits[i - 1], "a bigger size never shrinks less") }
-        XCTAssertGreaterThan(fits[5], PosterFit.floor)
+        // Small to large locked scales: the event poster's display type is 232 / 30 / 64 px on the board.
+        let scales: [(Double, Double)] = [(9, 1.2), (12, 1.25), (15, 1.333), (20, 1.5), (24, 1.618)]
+        let fits = scales.map { PosterEvent(ctx: context(body: $0.0, ratio: $0.1)).ctx.fit }
+        XCTAssertEqual(fits[0], 1, "a small scale is left alone")
+        XCTAssertLessThan(fits[4], 1, "the biggest scale used to run off the sheet")
+        for i in 1..<fits.count { XCTAssertLessThanOrEqual(fits[i], fits[i - 1], "a bigger scale never shrinks less") }
+        XCTAssertGreaterThan(fits[4], PosterFit.floor)
     }
 
-    /// The type that remains, in board px, must fit the sheet: size x fit x the stacked line heights.
+    /// The type that remains, in board px, must fit the sheet: its drawn size x fit x the stacked line heights.
     func testEventDisplayHeightFitsTheSheet() {
-        for size in [63.0, 90, 120] {
-            let c = PosterEvent(ctx: context(size: size)).ctx
-            let k = c.displayScale * c.fit
-            let stacked = (2 * 232 * 0.82 + 30 * 1.13 + 64 * 0.88) * k      // title lines, one line of the standfirst, date
-            XCTAssertLessThanOrEqual(stacked, 800 - 68, "size \(size)")
+        for (body, ratio) in [(20.0, 1.5), (24, 1.618)] {
+            let c = PosterEvent(ctx: context(body: body, ratio: ratio)).ctx
+            let title = 2 * 232 * 0.82 * c.displayScale(232)
+            let line = 30 * 1.13 * c.displayScale(30)
+            let date = 64 * 0.88 * c.displayScale(64)
+            let stacked = (title + line + date) * c.fit
+            XCTAssertLessThanOrEqual(stacked, 800 - 68, "body \(body) ratio \(ratio)")
         }
     }
 
     func testEveryPosterFitsAtTheLimits() {
-        for size in [14.0, 63, 120] {
-            let c = context(size: size)
+        for (body, ratio, trim) in [(9.0, 1.2, 0.75), (15, 1.333, 1.0), (24, 1.618, 1.35)] {
+            let c = context(body: body, ratio: ratio, trim: trim)
             let fits = [PosterEvent(ctx: c).ctx.fit, PosterSpecimen(ctx: c).ctx.fit, PosterReadout(ctx: c).ctx.fit,
                         PosterBlocks(ctx: c).ctx.fit, PosterLayered(ctx: c).ctx.fit]
             for f in fits {
                 XCTAssertLessThanOrEqual(f, 1); XCTAssertGreaterThanOrEqual(f, PosterFit.floor)
             }
-            if size <= 14 { XCTAssertTrue(fits.allSatisfy { $0 == 1 }, "a small size is left alone") }
-            if size >= 120 { XCTAssertTrue(fits.allSatisfy { $0 < 1 }, "every poster shrinks at 120") }
+            if body >= 24 { XCTAssertTrue(fits.allSatisfy { $0 < 1 }, "every poster shrinks at the biggest scale") }
         }
     }
 }

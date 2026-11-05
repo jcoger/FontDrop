@@ -3,6 +3,9 @@ import SwiftUI
 /// Article B, Feature. Tests: a reversed opener, a drop cap, two narrow columns, and a timetable in tabular figures.
 struct ArticleFeature: View {
     let ctx: PairContext
+
+    /// 76px on the board, 2 lines in a 520 column (as drawn for PP Museum).
+    static let headline = HeadlineSpec(text: TemplateCopy.featureHeadline, px: 76, track: -0.035, lh: 0.92, width: 520, lines: 2...2)
     private var p: TemplatePalette { ctx.palette }
     /// Deck text on the dark opener: the background pulled a quarter of the way back toward the text color.
     private var deckColor: HexColor { p.text.mixed(with: p.background, amount: 0.73) }
@@ -25,9 +28,8 @@ struct ArticleFeature: View {
                 Spacer()
                 ctx.label(TemplateCopy.featureIssue, color: p.accent, weight: 400)
             }
-            ctx.display(TemplateCopy.featureHeadline, 76, track: -0.035, lh: 0.92, color: p.background, width: 520)
-            ctx.reading(TemplateCopy.featureDeck, 15, lh: 1.47, color: deckColor)
-                .frame(maxWidth: 380, alignment: .leading)
+            ctx.headline(Self.headline, color: p.background)
+            ctx.reading(TemplateCopy.featureDeck, 15, lh: 1.47, color: deckColor, measure: 380, maxMeasure: 520)
         }
         .padding(.horizontal, 40).padding(.top, 40).padding(.bottom, 32)
         .frame(maxWidth: .infinity, alignment: .leading)

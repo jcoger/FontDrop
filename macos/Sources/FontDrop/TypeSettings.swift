@@ -16,7 +16,9 @@ struct TypeSettings: Codable, Hashable, Sendable {
     var stylePath: String?
     /// Variable axis values by 4-letter tag (wght, wdth, opsz, STYL ...).
     var axes: [String: Double] = [:]
-    /// Base size in points. Templates scale their other sizes from it.
+    /// The size previews outside the templates draw at (list rows, the playground specimen, Set), in points.
+    /// Not saved and not a setting: it is the job's base size. Templates solve their own sizes (TypeFit.swift)
+    /// and the designer's lever is `trim`.
     var size: Double
     /// Letter spacing in em (0.02 = 2% of the font size).
     var tracking: Double = 0
@@ -24,11 +26,37 @@ struct TypeSettings: Codable, Hashable, Sendable {
     var lineHeight: Double
     /// Feature choices. Toggle: key "type.selector" -> 1 on, 0 off. Choice: key "type" -> selector.
     var features: [String: Int] = [:]
+    /// A multiplier on every size a template solves for this face (1.08 = 8% bigger). The designer's nudge
+    /// on top of Fit or the locked scale, 0.75 to 1.35.
+    var trim: Double = 1
+
+    static let trimRange: ClosedRange<Double> = 0.75...1.35
+
+    /// Everything but `size` is saved. An older file may hold a `size` (a point size that meant something else
+    /// before sizes were solved from the font); it is ignored.
+    private enum CodingKeys: String, CodingKey {
+        case stylePath, axes, tracking, lineHeight, features, trim
+    }
 
     static func defaults(job: String) -> TypeSettings {
         job == "display"
             ? TypeSettings(size: 40, lineHeight: 1.1)
             : TypeSettings(size: 15, lineHeight: 1.5)
+    }
+}
+
+extension TypeSettings {
+    /// Forgiving on purpose: a missing or odd field takes its default, so an older settings file never fails to load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let trim = (try? c.decodeIfPresent(Double.self, forKey: .trim)) ?? 1
+        self.init(stylePath: (try? c.decodeIfPresent(String.self, forKey: .stylePath)) ?? nil,
+                  axes: (try? c.decodeIfPresent([String: Double].self, forKey: .axes)) ?? [:],
+                  size: Self.defaults(job: "reading").size,         // the store sets the job's own base size after loading
+                  tracking: (try? c.decodeIfPresent(Double.self, forKey: .tracking)) ?? 0,
+                  lineHeight: (try? c.decodeIfPresent(Double.self, forKey: .lineHeight)) ?? 1.3,
+                  features: (try? c.decodeIfPresent([String: Int].self, forKey: .features)) ?? [:],
+                  trim: min(max(trim, Self.trimRange.lowerBound), Self.trimRange.upperBound))
     }
 }
 
@@ -197,7 +225,13 @@ final class TypeSettingsStore {
         self.persist = persist
         if let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode([String: TypeSettings].self, from: data) {
-            map = decoded
+            // The key is "brand/job/family". `size` is not saved, so give each face its job's base size.
+            map = decoded.reduce(into: [:]) { out, entry in
+                var s = entry.value
+                let parts = entry.key.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+                s.size = TypeSettings.defaults(job: parts.count == 3 ? String(parts[1]) : "reading").size
+                out[entry.key] = s
+            }
         }
     }
 

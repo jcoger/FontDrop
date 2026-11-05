@@ -240,6 +240,8 @@ final class AppModel {
 
     /// Playground settings per brand + job + family.
     let typeSettings: TypeSettingsStore
+    /// The brand's type scale (body size, ratio, locked or not), shared by the Display and Reading faces.
+    let scaleStore: ScaleStore
     /// Template colors per brand, the variant showing per template, recent colors.
     let brandStyle: BrandStyleStore
 
@@ -272,6 +274,7 @@ final class AppModel {
         let store = defaults ?? (isolated ? Self.throwawayDefaults() : .standard)
         self.defaults = store
         typeSettings = TypeSettingsStore(dbPath: options.dbPath, persist: !isolated)
+        scaleStore = ScaleStore(dbPath: options.dbPath, persist: !isolated)
         brandStyle = BrandStyleStore(dbPath: options.dbPath, persist: !isolated, defaults: store)
         templateID = store.string(forKey: "readingTemplate") ?? "article"
         if let t = options.template { templateID = t }
@@ -810,7 +813,45 @@ final class AppModel {
         if let display = displayFamily { headline = face("display", display) }
         else if let family = familyByName[name] { headline = face("display", family) }
         else { headline = FaceSpec(path: body.path, settings: .defaults(job: "display")) }
-        return PairContext(brand: brand?.name ?? "Brand Name", display: headline, body: body, tick: fontTick)
+        return PairContext(brand: brand?.name ?? "Brand Name", display: headline, body: body, tick: fontTick,
+                           scale: scaleStore.scale(brand: brandID))
+    }
+
+    // MARK: type scale
+
+    /// The brand's scale as it stands.
+    var scale: TypeScale { scaleStore.scale(brand: brandID) }
+
+    func updateScale(_ change: (inout TypeScale) -> Void) { scaleStore.update(brand: brandID, change) }
+
+    /// The solved sizes of the template on stage for one Reading family: the main headline and the body text, in points.
+    /// Nil when the template has no anchor or the face is not loaded yet.
+    func solvedSizes(reading name: String, fallbackPath: String? = nil) -> (headline: Double, body: Double, headlineStep: Int)? {
+        guard let ctx = pairContext(reading: name, fallbackPath: fallbackPath) else { return nil }
+        let template = Templates.descriptor(templateID)
+        guard let anchor = TemplateAnchors.anchor(template: template.id, variant: brandStyle.variant(template)) else { return nil }
+        return ctx.solvedSizes(anchor)
+    }
+
+    /// Turns the lock on, starting from what Fit gives the template on stage so nothing jumps: the body size Fit
+    /// produced, and the standard ratio closest to headline / body over the headline's steps.
+    func lockScale(reading name: String, fallbackPath: String? = nil) {
+        var unlocked = scale
+        unlocked.locked = false
+        if var ctx = pairContext(reading: name, fallbackPath: fallbackPath) {
+            ctx.scale = unlocked
+            let template = Templates.descriptor(templateID)
+            if let anchor = TemplateAnchors.anchor(template: template.id, variant: brandStyle.variant(template)) {
+                let s = ctx.solvedSizes(anchor)
+                if s.body > 0, s.headline > 0, s.headlineStep > 0 {
+                    let body = min(max(s.body.rounded(), TypeScale.bodyRange.lowerBound), TypeScale.bodyRange.upperBound)
+                    let ratio = TypeScale.nearestRatio(pow(s.headline / body, 1 / Double(s.headlineStep)))
+                    updateScale { $0.body = body; $0.ratio = ratio; $0.locked = true }
+                    return
+                }
+            }
+        }
+        updateScale { $0.locked = true }
     }
 
     /// Loads every style file of these families, so a face set to a non-regular style draws at once.

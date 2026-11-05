@@ -8,7 +8,7 @@ import QuartzCore
 //       [--sources yours,google,system] [--show-hidden] [--saved] [--search <text>] [--sort less-common] [--demo-save <family,family>  (stars them in the DB copy)] [--demo-choose <family>  (no brand: shows the Name this brand sheet)]
 //       Renders the window in-process (no screen-recording permission), writes a PNG, quits.
 //       FD_WINDOW=WxH sets the capture window size (default 1360x860). --inspector / --no-inspector force the inspector.
-//       Reading flags: --demo-shortlist, --compare, --zoom, --display-size, --reading-size, --pick-reading (see applyReadingFlags).
+//       Reading flags: --demo-shortlist, --compare, --zoom, --trim-display, --trim-reading, --body-size, --ratio, FD_LOCK=1, --pick-reading (see applyReadingFlags).
 //   --bench
 //       Measures load time and scroll frame times on the Display grid and Reading, prints "BENCH ..." lines, quits.
 
@@ -115,8 +115,11 @@ func captureSize() -> NSSize {
 ///   --demo-shortlist <a,b,c>   shortlist these families (in the DB copy)
 ///   --compare                  turn Compare on
 ///   --zoom <factor>            stage zoom, 0.5 to 4
-///   --display-size <pt>        the Display playground size, in memory only
-///   --reading-size <pt>        the Reading playground size of the selected candidate, in memory only
+///   --trim-display <x>         the Display face's Trim as a multiplier, 0.75 to 1.35, in memory only
+///   --trim-reading <x>         the same for the selected Reading candidate
+///   --body-size <pt>           the brand scale's body size, 9 to 24, in memory only
+///   --ratio <r>                the brand scale's ratio (1.2, 1.25, 1.333, 1.5, 1.618)
+///   FD_LOCK=1 (environment)    lock the scale: every size is body x ratio^step instead of fitted to the font. Not an argument: `--lock` stalls the app at launch
 ///   --pick-reading <family>    choose this family for Reading (in the DB copy)
 ///   --clear <job>              clear the Display or Reading face (in the DB copy)
 @MainActor
@@ -131,11 +134,29 @@ func applyReadingFlags(_ model: AppModel) async {
     }
     if let f = value("--pick-reading") { await model.choose("reading", family: f) }
     if let job = value("--clear") { await model.clear(job) }          // "Clear Display face", for the screenshot of the result
-    if let size = value("--display-size").flatMap(Double.init), let d = model.displayFamily {
-        model.typeSettings.update(model.settingsKey("display", d.name), job: "display") { $0.size = size }
+    if let trim = value("--trim-display").flatMap(Double.init), let d = model.displayFamily {
+        model.typeSettings.update(model.settingsKey("display", d.name), job: "display") {
+            $0.trim = min(max(trim, TypeSettings.trimRange.lowerBound), TypeSettings.trimRange.upperBound)
+        }
     }
-    if let size = value("--reading-size").flatMap(Double.init), let c = model.candidate(model.selectedCandidate) {
-        model.typeSettings.update(model.settingsKey("reading", c.family), job: "reading") { $0.size = size }
+    if let trim = value("--trim-reading").flatMap(Double.init), let c = model.candidate(model.selectedCandidate) {
+        model.typeSettings.update(model.settingsKey("reading", c.family), job: "reading") {
+            $0.trim = min(max(trim, TypeSettings.trimRange.lowerBound), TypeSettings.trimRange.upperBound)
+        }
+    }
+    let body = value("--body-size").flatMap(Double.init)
+    let ratio = value("--ratio").flatMap(Double.init)
+    // Environment only: an argument spelled --lock stalls the app at launch (before any of our code runs).
+    let lock = ProcessInfo.processInfo.environment["FD_LOCK"] != nil
+    if body != nil || ratio != nil || lock {
+        if lock, body == nil, ratio == nil, let c = model.candidate(model.selectedCandidate) {
+            model.lockScale(reading: c.family, fallbackPath: c.filePath)      // starts from what Fit gives, as the switch does
+        }
+        model.updateScale {
+            if let body { $0.body = body }
+            if let ratio { $0.ratio = TypeScale.nearestRatio(ratio) }
+            if lock { $0.locked = true }
+        }
     }
     if let z = value("--zoom").flatMap(Double.init) { while model.stageZoom.factor < z - 0.01 && model.stageZoom.canZoomIn { model.stageZoom.zoomIn() } }
     if args.contains("--compare") || value("--compare") != nil { model.compareMode = true }

@@ -21,6 +21,17 @@ struct FitItem {
     var tracking: Double = 0
     /// For a single line that is never wrapped: the width it must stay within, so the word is never cut off.
     var fitWidth: CGFloat?
+    /// A poster word set to fill the width (see `FillSpec`). Its size is solved from the font, then shrunk, alone, to the
+    /// height the rest of the board leaves it.
+    var fill: FillSpec?
+}
+
+/// A poster word, or a stack of them, that should fill the board's width: `width` is the inner width, `words` the
+/// words that set the size (the widest one fills `share` of it).
+struct FillSpec {
+    let width: CGFloat
+    let words: [String]
+    var share: CGFloat = 0.9
 }
 
 /// A limit that is not about the whole board: "this text must fit in a box of this height".
@@ -45,43 +56,62 @@ enum PosterFit {
 }
 
 extension PairContext {
-    /// Playground Display size as a multiple of the size the boards were drawn at (40).
-    var displayScale: CGFloat { CGFloat(display.settings.size) / Self.displayBaseSize }
-    /// Playground Reading size as a multiple of the size the boards were drawn at (15).
-    var readingScale: CGFloat { CGFloat(body.settings.size) / Self.readingBaseSize }
+    /// What a Display role at `px` really draws at, as a multiple of its board size (Fit or the scale, and Trim).
+    func displayScale(_ px: CGFloat) -> CGFloat { displayFactor(px) }
+
+    /// What `item` draws at as a multiple of its board size, before the board's shrink: a fill item (a poster word set
+    /// to fill its width) by its own solve and the board's `fillFit`, anything else by Fit or the scale.
+    func drawFactor(_ item: FitItem) -> CGFloat {
+        if let fill = item.fill, !scale.locked {
+            return fillSize(fill, px: item.px, track: item.tracking, italic: false) / item.px * fillFit
+        }
+        return displayScale(item.px)
+    }
+    /// The same for Reading text. Poster boxes are sized with the 13px small text.
+    var readingScale: CGFloat { readingFactor(13) }
 
     /// Height of `item` on the board at the current playground size, shrunk by `s`, with its wrapped line count.
     private func height(of item: FitItem, at s: CGFloat) -> CGFloat {
         var lines = 1
-        if let width = item.width, let font = FontLoader.shared.styledFont(display, ratio: item.px * s / Self.displayBaseSize) {
+        if let width = item.width, let font = FontLoader.shared.styledFont(display, ratio: item.px * s * drawFactor(item) / CGFloat(display.settings.size)) {
             lines = TightLines.lines(item.text, font: font,
                                      tracking: CGFloat(display.settings.tracking + item.tracking) * CTFontGetSize(font),
                                      width: width).count
         }
         if let cap = item.maxLines { lines = min(lines, cap) }
-        return item.px * CGFloat(item.lh) * CGFloat(lines) * displayScale * s
+        return item.px * CGFloat(item.lh) * CGFloat(lines) * drawFactor(item) * s
     }
 
     /// This context with `fit` set so a fixed-height board holds its content.
     /// `items` is the display text in the flow, `fixed` the height of everything that does not scale (padding,
     /// gaps, Reading text), `boxes` any text that must fit its own box (a sign, a block).
     func fitted(height boardHeight: CGFloat, fixed: CGFloat, items: [FitItem], boxes: [FitBox] = []) -> PairContext {
+        // Fill words come first: each group's size is the one that fills its width, shrunk (alone) by the height
+        // the rest of the board leaves. Everything else is counted at its own size. Past the floor the whole board shrinks.
         var c = self
         c.fit = 1
+        c.fillFit = 1
+        let fillItems = items.filter { $0.fill != nil }
+        if !fillItems.isEmpty, !scale.locked {
+            let other = items.filter { $0.fill == nil }.reduce(0) { $0 + height(of: $1, at: 1) }
+            let filled = fillItems.reduce(0) { $0 + height(of: $1, at: 1) }
+            let room = boardHeight - fixed - other
+            c.fillFit = filled > 0 ? min(1, max(0.35, room / filled * PosterFit.margin)) : 1
+        }
         // Line counts change as the type shrinks, so settle on the factor over a few passes.
         var s: CGFloat = 1
         for _ in 0..<4 {
-            let flow = items.reduce(0) { $0 + height(of: $1, at: s) } / max(s, 0.0001)
+            let flow = items.reduce(0) { $0 + c.height(of: $1, at: s) } / max(s, 0.0001)
             var next = PosterFit.scale(height: boardHeight, fixed: fixed, display: flow)
             for item in items {
                 // The width rule: a line that cannot wrap shrinks until its widest word fits.
                 guard let limit = item.fitWidth,
-                      let font = FontLoader.shared.styledFont(display, ratio: item.px / Self.displayBaseSize) else { continue }
+                      let font = FontLoader.shared.styledFont(display, ratio: item.px * c.drawFactor(item) / CGFloat(display.settings.size)) else { continue }
                 let w = FitWords.widestWord(item.text, font: font, trackingEm: display.settings.tracking + item.tracking)
                 if w > 0 { next = min(next, max(PosterFit.floor, limit / w * PosterFit.margin)) }
             }
             for box in boxes {
-                let h = box.items.reduce(0) { $0 + height(of: $1, at: s) } / max(s, 0.0001)
+                let h = box.items.reduce(0) { $0 + c.height(of: $1, at: s) } / max(s, 0.0001)
                 next = min(next, PosterFit.scale(height: box.height, fixed: 0, display: h))
             }
             if abs(next - s) < 0.005 { s = next; break }
