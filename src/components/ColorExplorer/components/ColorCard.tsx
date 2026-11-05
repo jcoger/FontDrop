@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { fontFamily } from "../../../lib/fontFace";
-import type { FontInfo } from "../../../hooks/useFonts";
+import type { FontInfo } from "../../../types/font";
 import type { OklchColor } from "../../../utils/oklch";
 import { oklchToCss, contrastRatio } from "../../../utils/oklch";
 import type { ContrastLevel } from "../types";
@@ -49,6 +49,8 @@ function useFitText(deps: unknown[]) {
 interface ColorCardProps {
   /** Font assigned to this card (null for logo cards) */
   font: FontInfo | null;
+  /** Unstars this card's font (removes it from Brand Colors). Absent = not removable. */
+  onRemoveFont?: () => void;
   bgColor: OklchColor;
   fgColor: string;
   fgOklch: OklchColor;
@@ -173,6 +175,7 @@ function FontPicker({
 // ── Main component ───────────────────────────────────────────────────
 
 export function ColorCard({
+  onRemoveFont,
   font,
   bgColor,
   fgColor,
@@ -346,6 +349,21 @@ export function ColorCard({
             {isLogoCard ? "Brand Mark" : renderFont ? `${renderFont.weight} · ${contrastLabel}` : ""}
           </div>
         </div>
+
+        {/* Remove (unstar) — on hover */}
+        {onRemoveFont && !isLogoCard && (
+          <button
+            className="w-6 h-6 -m-1 flex items-center justify-center rounded-md flex-shrink-0 cursor-pointer pointer-events-auto opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+            onClick={(e) => { e.stopPropagation(); onRemoveFont(); }}
+            title="Remove from Brand Colors (unstar)"
+            aria-label="Remove from Brand Colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
 
         {/* Pinned font dot */}
         {pinnedFont && !isLogoCard && (

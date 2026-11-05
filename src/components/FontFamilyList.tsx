@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { List, RowComponentProps } from "react-window";
 import { fontFamily } from "../lib/fontFace";
 import { weightLabel } from "../lib/fontFamilies";
 import type { FontFamily } from "../lib/fontFamilies";
-import type { FontInfo } from "../hooks/useFonts";
+import type { FontInfo } from "../types/font";
 import type { Controls } from "../types/controls";
 
 type FamilyRow =
@@ -90,6 +90,9 @@ function FamilyRowItem({
 
   const logoH = Math.max(Math.round(fontSize * logoScale), 16);
 
+  // One-style families render as a plain row: nothing to expand
+  const canExpand = family.fonts.length > 1;
+
   return (
     <div
       className="relative group flex items-center gap-3 px-4 h-full border-b border-border-default/60 cursor-pointer
@@ -102,7 +105,7 @@ function FamilyRowItem({
         onSelect?.(rep, e.currentTarget.getBoundingClientRect());
       }}
     >
-      {/* X (exclude) button */}
+      {/* X (hide) button */}
       <button
         className="opacity-0 group-hover:opacity-100 text-fg-3 hover:text-red-400
                    transition-all cursor-pointer flex-shrink-0"
@@ -145,22 +148,28 @@ function FamilyRowItem({
         <span className="text-[11px] font-mono" style={{ color: fgColor, opacity: 0.5 }}>
           {family.name}
         </span>
-        <button
-          className="text-[length:var(--text-label)] text-fg-3 hover:text-fg-2 cursor-pointer transition-colors font-mono"
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        >
-          {family.fonts.length} variants
-        </button>
+        {canExpand && (
+          <button
+            className="text-[length:var(--text-label)] text-fg-3 hover:text-fg-2 cursor-pointer transition-colors font-mono"
+            onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          >
+            {family.fonts.length} variants
+          </button>
+        )}
       </div>
 
-      {/* Expand chevron */}
-      <button
-        className="flex-shrink-0 text-fg-4 hover:text-fg-2 cursor-pointer transition-colors"
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        aria-label={isExpanded ? "Collapse variants" : "Expand variants"}
-      >
-        <ChevronIcon open={isExpanded} />
-      </button>
+      {/* Expand chevron — one-style families get a same-width spacer so rows stay aligned */}
+      {canExpand ? (
+        <button
+          className="flex-shrink-0 w-7 h-7 -mx-1.5 flex items-center justify-center rounded-md text-fg-4 hover:text-fg-2 hover:bg-white/5 cursor-pointer transition-colors"
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          aria-label={isExpanded ? "Collapse variants" : "Expand variants"}
+        >
+          <ChevronIcon open={isExpanded} />
+        </button>
+      ) : (
+        <span className="flex-shrink-0 w-7 h-7 -mx-1.5 invisible" aria-hidden />
+      )}
 
       {/* Star button */}
       <button
@@ -237,7 +246,7 @@ function VariantRowItem({
         className="opacity-0 group-hover:opacity-100 text-fg-3 hover:text-red-400
                    transition-all cursor-pointer flex-shrink-0"
         onClick={(e) => { e.stopPropagation(); onExclude(); }}
-        aria-label="Hide variant"
+        aria-label="Hide font"
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -374,15 +383,18 @@ export function FontFamilyList({
   expandedFamilies,
   onToggleFamily,
 }: Props) {
-  const rows: FamilyRow[] = [];
-  for (const family of families) {
-    rows.push({ type: "family", family });
-    if (expandedFamilies.has(family.name)) {
-      for (const font of family.fonts) {
-        rows.push({ type: "variant", font, familyName: family.name });
+  const rows: FamilyRow[] = useMemo(() => {
+    const out: FamilyRow[] = [];
+    for (const family of families) {
+      out.push({ type: "family", family });
+      if (expandedFamilies.has(family.name)) {
+        for (const font of family.fonts) {
+          out.push({ type: "variant", font, familyName: family.name });
+        }
       }
     }
-  }
+    return out;
+  }, [families, expandedFamilies]);
 
   return (
     <div className="flex-1 min-h-0">

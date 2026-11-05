@@ -6,11 +6,11 @@ interface Shortcut {
 }
 
 const SHORTCUTS: Shortcut[] = [
-  { keys: ["Tab"], description: "Switch between Logo Grid / Type Explorer" },
+  { keys: ["Tab"], description: "Next mode" },
   { keys: ["S"], description: "Star / unstar hovered font" },
   { keys: ["F"], description: "Focus search" },
-  { keys: ["⌘", "E"], description: "Export PNG (Type Explorer starred view)" },
-  { keys: ["⌘", "⇧", "C"], description: "Copy Figma prompt" },
+  { keys: ["⌘", "E"], description: "Save PNG (Logo Grid, Type Explorer)" },
+  { keys: ["⌘", "⇧", "C"], description: "Copy Figma prompt (Type Explorer)" },
   { keys: ["Esc"], description: "Clear search" },
   { keys: ["?"], description: "Show / hide this overlay" },
 ];

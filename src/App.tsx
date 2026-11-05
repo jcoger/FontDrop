@@ -5,14 +5,16 @@ import { motion } from "framer-motion";
 import { springSnap, easeOut, dur } from "./lib/motion";
 import { Menu } from "bloom-menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useFonts, type FontInfo } from "./hooks/useFonts";
+import { type FontInfo } from "./types/font";
+import { useFontDB } from "./hooks/useFontDB";
 import { useStarred } from "./hooks/useStarred";
 import { useExclusions } from "./hooks/useExclusions";
 import { injectAllFontFaces } from "./lib/fontFace";
 import { groupIntoFamilies } from "./lib/fontFamilies";
 import { FontGrid } from "./components/FontGrid";
 import { FontFamilyList } from "./components/FontFamilyList";
-import { LogoDrop } from "./components/LogoDrop";
+import { BrandSlot } from "./components/BrandSlot";
+import { useBrand } from "./hooks/useBrand";
 import {
   TypeExplorer,
   DEFAULT_HEADERS,
@@ -26,11 +28,12 @@ import { Toast } from "./components/Toast";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { QuickView } from "./components/QuickView";
 import { ColorExplorer } from "./components/ColorExplorer";
+import { PairMode } from "./components/PairMode";
 import { DEFAULT_CONTROLS, type Controls } from "./types/controls";
 
 const appWindow = getCurrentWindow();
 
-type Mode = "grid" | "explorer" | "color";
+type Mode = "grid" | "explorer" | "color" | "pair";
 type SourceFilter = "all" | "user" | "system";
 
 const CATEGORIES = ["sans-serif", "serif", "script", "decorative", "monospace", "other"] as const;
@@ -93,7 +96,8 @@ function SegmentedControl<T extends string | number>({
   );
 }
 
-// ── Star filter toggle (animated) ─────────────────────────────────────────
+// ── Star filter toggle ────────────────────────────────────────────────────
+// One toggle: on shows only starred fonts. No "All" option (the bar already has two).
 
 function StarFilterToggle({
   count,
@@ -104,44 +108,59 @@ function StarFilterToggle({
   showStarred: boolean;
   onChange: (v: boolean) => void;
 }) {
-  const id = useId();
+  return (
+    <button
+      className="relative px-2.5 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap flex-shrink-0"
+      style={{ color: showStarred ? "var(--c-star)" : "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-out)" }}
+      onMouseEnter={(e) => {
+        if (!showStarred) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
+      }}
+      onMouseLeave={(e) => {
+        if (!showStarred) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-3)";
+      }}
+      onClick={() => onChange(!showStarred)}
+      aria-pressed={showStarred}
+    >
+      {showStarred && (
+        <motion.div
+          layoutId="star-filter"
+          initial={false}
+          className="absolute inset-0 bg-surface-active rounded-md"
+          transition={springSnap}
+        />
+      )}
+      <span className="relative flex items-center gap-1.5">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill={showStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+        </svg>
+        {count > 0 ? `Starred (${count})` : "Starred"}
+      </span>
+    </button>
+  );
+}
+
+// ── Clear starred (two-step: click, then confirm within 3s) ─────────────────
+
+function ClearStarredButton({ count, onClear }: { count: number; onClear: () => void }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [armed]);
 
   return (
-    <div className="flex items-center flex-shrink-0">
-      {([false, true] as const).map((opt) => (
-        <button
-          key={String(opt)}
-          className="relative px-2.5 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap"
-          style={{ color: showStarred === opt ? (opt ? "var(--c-star)" : "var(--c-text)") : "var(--c-text-3)", transition: "color var(--dur-fast) var(--ease-out)" }}
-          onMouseEnter={(e) => {
-            if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text)";
-          }}
-          onMouseLeave={(e) => {
-            if (showStarred !== opt) (e.currentTarget as HTMLButtonElement).style.color = "var(--c-text-3)";
-          }}
-          onClick={() => onChange(opt)}
-        >
-          {showStarred === opt && (
-            <motion.div
-              layoutId={`star-${id}`}
-              initial={false}
-              className="absolute inset-0 bg-surface-active rounded-md"
-              transition={springSnap}
-            />
-          )}
-          <span className="relative flex items-center gap-1.5">
-            {opt ? (
-              <>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill={showStarred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
-                  <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-                </svg>
-                {count > 0 ? `Starred (${count})` : "Starred"}
-              </>
-            ) : "All"}
-          </span>
-        </button>
-      ))}
-    </div>
+    <button
+      className={`px-2 py-1.5 text-xs font-medium cursor-pointer whitespace-nowrap flex-shrink-0 transition-colors ${
+        armed ? "text-red-400" : "text-fg-4 hover:text-fg-2"
+      }`}
+      onClick={() => {
+        if (armed) { onClear(); setArmed(false); }
+        else setArmed(true);
+      }}
+    >
+      {armed ? `Clear ${count}?` : "Clear"}
+    </button>
   );
 }
 
@@ -175,7 +194,7 @@ function ExclusionManagerContent({
       {userFonts.length > 0 && (
         <div>
           <div className="px-3 pt-2.5 pb-1 text-[length:var(--text-label)] text-fg-3 font-mono uppercase tracking-widest sticky top-0 bg-surface-1">
-            Your exclusions
+            Hidden by you
           </div>
           {userFonts.map((f) => (
             <div key={f.file_path} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5">
@@ -193,7 +212,7 @@ function ExclusionManagerContent({
       {builtinFonts.length > 0 && (
         <div>
           <div className="px-3 pt-2.5 pb-1 text-[length:var(--text-label)] text-fg-3 font-mono uppercase tracking-widest sticky top-0 bg-surface-1">
-            Built-in exclusions
+            Hidden by default
           </div>
           {builtinFonts.map((f) => (
             <div key={f.font_family} className="flex items-center justify-between px-3 py-1.5 hover:bg-white/5">
@@ -213,7 +232,7 @@ function ExclusionManagerContent({
           className="w-full text-[length:var(--text-body)] text-fg-3 hover:text-red-400 cursor-pointer transition-colors text-left"
           onClick={onResetAll}
         >
-          Reset all exclusions
+          Unhide all
         </button>
       </div>
     </div>
@@ -223,24 +242,13 @@ function ExclusionManagerContent({
 // ── Main App ──────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { fonts, loading, error } = useFonts();
+  const { fonts, loading, error, refreshGoogleFonts, updateClassification } = useFontDB();
   const [mode, setMode] = useState<Mode>("grid");
-  const [wordmark, setWordmark] = useState("Fontdrop");
-  const [logoSvg, setLogoSvg] = useState<string | null>(null);
-
-  // Brand Colors tab state (lifted so top bar can render controls)
-  const [ceBrandName, setCeBrandName] = useState(
-    () => localStorage.getItem("fontdrop-brand-name") || "",
-  );
+  const brand = useBrand();
 
   const ceExportRef = useRef<(() => void) | null>(null);
+  const [ceExportLabel, setCeExportLabel] = useState<string | null>("Copy Palette");
 
-  function handleCeBrandNameChange(v: string) {
-    const clamped = v.slice(0, 30);
-    setCeBrandName(clamped);
-    localStorage.setItem("fontdrop-brand-name", clamped);
-  }
-  const [logoScale, setLogoScale] = useState(1.0);
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
 
   // Grid settings
@@ -283,6 +291,9 @@ export default function App() {
   const explorerContainerRef = useRef<HTMLDivElement>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
+  // Pair Primary — lifted here so it survives mode switches and Quick View can set it
+  const [pairPrimaryId, setPairPrimaryId] = useState<string | null>(null);
+
   // Unified starred state across all modes
   const starred = useStarred();
 
@@ -295,7 +306,7 @@ export default function App() {
   useEffect(() => {
     const count = exclusions.firstLaunchCount;
     if (count !== null) {
-      setToast(`Hidden ${count} system fonts. Manage in Excluded.`);
+      setToast(`Hid ${count} system fonts. Find them under Hidden.`);
       exclusions.clearFirstLaunch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -323,6 +334,7 @@ export default function App() {
         setMode((m) => {
           if (m === "grid") return "explorer";
           if (m === "explorer") return "color";
+          if (m === "color") return "pair";
           return "grid";
         });
         return;
@@ -339,11 +351,13 @@ export default function App() {
         return;
       }
       if (e.metaKey && !e.shiftKey && (e.key === "e" || e.key === "E")) {
+        if (mode !== "grid" && mode !== "explorer") return;
         e.preventDefault();
         handleSavePng();
         return;
       }
       if (e.metaKey && e.shiftKey && (e.key === "c" || e.key === "C")) {
+        if (mode !== "explorer") return;
         e.preventDefault();
         handleCopyFigmaPrompt();
         return;
@@ -385,10 +399,29 @@ export default function App() {
     setQuickViewState((prev) => prev ? { font, rect: prev.rect } : null);
   }, []);
 
+  const handleFindPairs = useCallback((font: FontInfo) => {
+    const row = fonts.find((f) => f.file_path === font.file_path);
+    if (!row) return;
+    setPairPrimaryId(row.font_id);
+    setQuickViewState(null);
+    setMode("pair");
+  }, [fonts]);
+
   // ── Filter pipeline ──────────────────────────────────────────────────────
 
   const baseFonts = useMemo(
     () => fonts.filter((f) => !exclusions.isExcluded(f)),
+    [fonts, exclusions.isExcluded]
+  );
+
+  const pairPrimaryPath = useMemo(
+    () => (pairPrimaryId ? fonts.find((f) => f.font_id === pairPrimaryId)?.file_path ?? null : null),
+    [fonts, pairPrimaryId]
+  );
+
+  // Hidden font ids, for the pairing engine (hidden fonts never take a match slot)
+  const excludedIds = useMemo(
+    () => fonts.filter((f) => exclusions.isExcluded(f)).map((f) => f.font_id),
     [fonts, exclusions.isExcluded]
   );
 
@@ -406,20 +439,8 @@ export default function App() {
     );
   }, [sourceFiltered, searchLower]);
 
-  // Logo Grid filters
-  const gridFonts = useMemo(() => {
-    let result = starred.showStarred
-      ? searchedFonts.filter((f) => starred.starred.has(f.file_path))
-      : searchedFonts;
-    if (categoryFilter) result = result.filter((f) => f.classification.category === categoryFilter);
-    if (styleFilters.has("italic")) result = result.filter((f) => f.classification.style === "italic");
-    if (styleFilters.has("condensed")) result = result.filter((f) => f.classification.width === "condensed");
-    if (styleFilters.has("extended")) result = result.filter((f) => f.classification.width === "extended");
-    return result;
-  }, [searchedFonts, starred.showStarred, starred.starred, categoryFilter, styleFilters]);
-
-  // Type Explorer filter — same category/style filters as grid
-  const explorerFonts = useMemo(() => {
+  // Category/style filters — shared by Logo Grid, Type Explorer, and Pair modes.
+  const filteredFonts = useMemo(() => {
     let result = starred.showStarred
       ? searchedFonts.filter((f) => starred.starred.has(f.file_path))
       : searchedFonts;
@@ -444,10 +465,11 @@ export default function App() {
     [searchedFonts]
   );
 
-  // Family grouping — filter out single-variant families (orphan rows)
+  // Family grouping. One-style families stay in (as plain rows with no expander);
+  // filtering them out hid ~32% of user fonts from Families view.
   const gridFamilies = useMemo(
-    () => groupIntoFamilies(gridFonts, 700).filter((fam) => fam.fonts.length >= 2),
-    [gridFonts]
+    () => groupIntoFamilies(filteredFonts, 700),
+    [filteredFonts]
   );
 
   const hasGridFilters =
@@ -474,7 +496,7 @@ export default function App() {
   }, [mode]);
 
   const handleCopyFigmaPrompt = useCallback(() => {
-    const fontNames = explorerFonts.map((f) => f.font_family).join(", ");
+    const fontNames = filteredFonts.map((f) => f.font_family).join(", ");
     const colDefs = explorerHeaders.map((h, i) => `${h}: ${explorerColumns[i]}`).join(" | ");
     const sizeDefs = explorerHeaders.map((h, i) => `${h}: ${explorerColSizes[i]}px`).join(" | ");
     const track =
@@ -491,11 +513,11 @@ Letter spacing: ${track}`;
 
     navigator.clipboard.writeText(prompt);
     setToast("Copied to clipboard");
-  }, [explorerFonts, explorerHeaders, explorerColumns, explorerColSizes, controls]);
+  }, [filteredFonts, explorerHeaders, explorerColumns, explorerColSizes, controls]);
 
   // ── Quick View font list (context-aware) ──────────────────────────────────
 
-  const quickViewFonts = mode === "explorer" ? explorerFonts : gridFonts;
+  const quickViewFonts = filteredFonts;
 
   // Chrome: traffic-light zone (28) + Row1 content (56) + Row2 (40)
   const quickViewTopOffset = 28 + 56 + 40;
@@ -537,7 +559,7 @@ Letter spacing: ${track}`;
               onMouseDown={(e) => { if (e.button === 0) { e.preventDefault(); appWindow.startDragging(); } }}
             />
             <SegmentedControl
-              options={["grid", "explorer", "color"] as const}
+              options={["grid", "explorer", "color", "pair"] as const}
               value={mode}
               onChange={setMode}
               getLabel={(m) =>
@@ -545,39 +567,19 @@ Letter spacing: ${track}`;
                   ? "Logo Grid"
                   : m === "explorer"
                     ? "Type Explorer"
-                    : "Brand Colors"
+                    : m === "color"
+                      ? "Brand Colors"
+                      : "Pair"
               }
             />
           </div>
 
-          {/* Center: Search + SVG drop + Wordmark/Brand name */}
-          {mode === "color" ? (
-            <div
-              className="flex items-center justify-center gap-2 px-6 min-w-0 overflow-hidden"
-              onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
-            >
-              <LogoDrop
-                svg={logoSvg}
-                onLoad={setLogoSvg}
-                onClear={() => setLogoSvg(null)}
-                onScaleChange={setLogoScale}
-                logoScale={logoScale}
-              />
-              <input
-                className="flex-shrink-0 w-40 bg-surface-4 text-fg text-sm rounded-md px-3 h-9 outline-none
-                           placeholder:text-fg-3 focus:ring-1 focus:ring-border-default select-text"
-                value={ceBrandName}
-                onChange={(e) => handleCeBrandNameChange(e.target.value)}
-                placeholder="Brand name…"
-                maxLength={30}
-                spellCheck={false}
-              />
-            </div>
-          ) : (
-            <div
-              className="flex items-center justify-center gap-2 px-6 min-w-0 overflow-hidden"
-              onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
-            >
+          {/* Center: Search (font modes) + the Brand slot (every mode) */}
+          <div
+            className="flex items-center justify-center gap-2 px-6 min-w-0 overflow-hidden"
+            onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
+          >
+            {mode !== "color" && (
               <div className="relative flex-shrink-0 w-44">
                 <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3 pointer-events-none"
                   width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -593,27 +595,9 @@ Letter spacing: ${track}`;
                   spellCheck={false}
                 />
               </div>
-              {mode === "grid" && (
-                <>
-                  <LogoDrop
-                    svg={logoSvg}
-                    onLoad={setLogoSvg}
-                    onClear={() => setLogoSvg(null)}
-                    onScaleChange={setLogoScale}
-                    logoScale={logoScale}
-                  />
-                  <input
-                    className="flex-shrink-0 w-40 bg-surface-4 text-fg text-sm rounded-md px-3 h-9 outline-none
-                               placeholder:text-fg-3 focus:ring-1 focus:ring-border-default select-text"
-                    value={wordmark}
-                    onChange={(e) => setWordmark(e.target.value)}
-                    placeholder="Type a word…"
-                    spellCheck={false}
-                  />
-                </>
-              )}
-            </div>
-          )}
+            )}
+            <BrandSlot brand={brand} />
+          </div>
 
           {/* Right: Col count + Export */}
           {mode === "color" ? (
@@ -621,6 +605,7 @@ Letter spacing: ${track}`;
             className="flex items-center gap-2 flex-shrink-0"
             onMouseDown={(e) => { if (e.button === 0 && e.target === e.currentTarget) { e.preventDefault(); appWindow.startDragging(); } }}
           >
+            {ceExportLabel && (
             <Menu.Root direction="bottom" anchor="end">
               <Menu.Container
                 buttonSize={{ width: 78, height: 30 }}
@@ -648,11 +633,12 @@ Letter spacing: ${track}`;
                       <rect x="9" y="9" width="13" height="13" rx="2" />
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
-                    Copy Palette
+                    {ceExportLabel}
                   </Menu.Item>
                 </Menu.Content>
               </Menu.Container>
             </Menu.Root>
+            )}
           </div>
           ) : (
           <div
@@ -670,8 +656,8 @@ Letter spacing: ${track}`;
                       disabled={familiesMode}
                     />
                     <SegmentedControl
-                      options={["Families", "Individual"] as const}
-                      value={familiesMode ? "Families" : "Individual"}
+                      options={["Families", "Fonts"] as const}
+                      value={familiesMode ? "Families" : "Fonts"}
                       onChange={(v) => setFamiliesMode(v === "Families")}
                     />
                     <div
@@ -680,6 +666,7 @@ Letter spacing: ${track}`;
                     />
                   </>
                 )}
+                {(mode === "grid" || mode === "explorer") && (
                 <Menu.Root direction="bottom" anchor="end">
                   <Menu.Container
                     buttonSize={{ width: 78, height: 30 }}
@@ -725,6 +712,7 @@ Letter spacing: ${track}`;
                     </Menu.Content>
                   </Menu.Container>
                 </Menu.Root>
+                )}
               </>
             )}
           </div>
@@ -741,7 +729,7 @@ Letter spacing: ${track}`;
               options={["all", "user", "system"] as const}
               value={sourceFilter}
               onChange={setSourceFilter}
-              getLabel={(v) => v.charAt(0).toUpperCase() + v.slice(1)}
+              getLabel={(v) => (v === "all" ? "All sources" : v.charAt(0).toUpperCase() + v.slice(1))}
             />
             <div className="w-px h-4 bg-border-default mx-0.5 flex-shrink-0" />
             <CategoryFilterBar
@@ -792,6 +780,16 @@ Letter spacing: ${track}`;
               showStarred={starred.showStarred}
               onChange={starred.setShowStarred}
             />
+            {starred.starred.size > 0 && (
+              <ClearStarredButton
+                count={starred.starred.size}
+                onClear={() => {
+                  starred.clear();
+                  starred.setShowStarred(false);
+                  setToast("Cleared starred fonts");
+                }}
+              />
+            )}
             <Menu.Root direction="bottom" anchor="end">
               <Menu.Container
                 buttonSize={{ width: 108, height: 28 }}
@@ -803,7 +801,7 @@ Letter spacing: ${track}`;
                 <Menu.Trigger>
                   <div className="flex items-center justify-center gap-1.5 w-full h-full px-2.5">
                     <span className="text-[length:var(--text-body)] text-fg-4 font-medium leading-none">
-                      Excluded{exclusions.excludedCount > 0 ? ` (${exclusions.excludedCount})` : ""}
+                      Hidden{exclusions.excludedCount > 0 ? ` (${exclusions.excludedCount})` : ""}
                     </span>
                   </div>
                 </Menu.Trigger>
@@ -818,12 +816,29 @@ Letter spacing: ${track}`;
                 </Menu.Content>
               </Menu.Container>
             </Menu.Root>
+            <button
+              className="w-7 h-7 flex items-center justify-center text-fg-4 hover:text-fg-2 transition-colors cursor-pointer flex-shrink-0 rounded-md hover:bg-white/5"
+              title="Refresh Google Fonts metadata"
+              onClick={async () => {
+                try {
+                  const n = await refreshGoogleFonts();
+                  setToast(n > 0 ? `Enriched ${n} fonts from Google Fonts` : "Google Fonts data is current");
+                } catch {
+                  setToast("Could not reach Google Fonts API");
+                }
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 1v5h5" /><path d="M15 15v-5h-5" />
+                <path d="M2.34 10a6 6 0 0 0 10.3 2.1l2.36-2.1" /><path d="M13.66 6a6 6 0 0 0-10.3-2.1L1 6" />
+              </svg>
+            </button>
             <span className="text-fg-3 text-xs font-mono tabular-nums whitespace-nowrap flex-shrink-0 text-right" style={{ minWidth: "6.5rem" }}>
               {mode === "grid"
                 ? familiesMode
                   ? `${gridFamilies.length.toLocaleString()} families`
-                  : `${gridFonts.length.toLocaleString()} fonts`
-                : `${explorerFonts.length.toLocaleString()} fonts`}
+                  : `${filteredFonts.length.toLocaleString()} fonts`
+                : `${filteredFonts.length.toLocaleString()} fonts`}
             </span>
           </div>
         )}
@@ -837,12 +852,40 @@ Letter spacing: ${track}`;
         <ColorExplorer
           fonts={baseFonts}
           starred={starred.starred}
-          logoSvg={logoSvg}
-          brandName={ceBrandName}
+          logoSvg={brand.logoSvg}
+          brandName={brand.name}
 
           exportRef={ceExportRef}
+          onExportLabelChange={setCeExportLabel}
+          primaryFontPath={pairPrimaryPath}
+          onUnstar={starred.toggle}
           onSwitchToGrid={() => setMode("grid")}
         />
+      ) : mode === "pair" ? (
+        !loading && !error ? (
+          <PairMode
+            fonts={filteredFonts}
+            libraryFonts={baseFonts}
+            excludedIds={excludedIds}
+            selectedId={pairPrimaryId}
+            onSelectPrimary={setPairPrimaryId}
+            wordmark={brand.displayName}
+            logoSvg={brand.logoSvg}
+            logoScale={brand.logoScale}
+            controls={controls}
+            starred={starred.starred}
+            onToggleStar={starred.toggle}
+            onExclude={exclusions.excludeFont}
+            onHover={setHoveredFont}
+            onUpdateClassification={updateClassification}
+            onToast={setToast}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            {loading && <span className="text-fg-3 text-sm animate-pulse">Scanning fonts…</span>}
+            {error && <span className="text-red-500 text-sm">{error}</span>}
+          </div>
+        )
       ) : (
       <motion.div
         ref={gridContainerRef}
@@ -865,7 +908,7 @@ Letter spacing: ${track}`;
             <span className="text-red-500 text-sm">{error}</span>
           </div>
         )}
-        {!loading && !error && mode === "grid" && (hasGridFilters || searchLower) && gridFonts.length === 0 && (
+        {!loading && !error && mode === "grid" && (hasGridFilters || searchLower) && filteredFonts.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-fg-3">
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
@@ -879,7 +922,7 @@ Letter spacing: ${track}`;
             </span>
           </div>
         )}
-        {!loading && !error && mode === "explorer" && starred.showStarred && explorerFonts.length === 0 && (
+        {!loading && !error && mode === "explorer" && starred.showStarred && filteredFonts.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-fg-3">
               <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
@@ -894,9 +937,9 @@ Letter spacing: ${track}`;
             {familiesMode && gridFamilies.length > 0 && (
               <FontFamilyList
                 families={gridFamilies}
-                wordmark={wordmark || "Fontdrop"}
-                logoSvg={logoSvg}
-                logoScale={logoScale}
+                wordmark={brand.displayName}
+                logoSvg={brand.logoSvg}
+                logoScale={brand.logoScale}
                 controls={controls}
                 starred={starred.starred}
                 onToggleStar={starred.toggle}
@@ -908,12 +951,12 @@ Letter spacing: ${track}`;
                 onToggleFamily={toggleExpandedFamily}
               />
             )}
-            {!familiesMode && gridFonts.length > 0 && (
+            {!familiesMode && filteredFonts.length > 0 && (
               <FontGrid
-                fonts={gridFonts}
-                wordmark={wordmark || "Fontdrop"}
-                logoSvg={logoSvg}
-                logoScale={logoScale}
+                fonts={filteredFonts}
+                wordmark={brand.displayName}
+                logoSvg={brand.logoSvg}
+                logoScale={brand.logoScale}
                 controls={controls}
                 starred={starred.starred}
                 onToggleStar={starred.toggle}
@@ -924,16 +967,16 @@ Letter spacing: ${track}`;
                 colCount={colCount}
               />
             )}
-            {familiesMode && gridFamilies.length === 0 && gridFonts.length > 0 && (
+            {familiesMode && gridFamilies.length === 0 && filteredFonts.length > 0 && (
               <div className="flex-1 flex items-center justify-center">
-                <span className="text-fg-3 text-sm">No families with multiple variants. Switch to Individual view.</span>
+                <span className="text-fg-3 text-sm">No families match. Switch to Fonts view.</span>
               </div>
             )}
           </>
         )}
-        {!loading && !error && mode === "explorer" && explorerFonts.length > 0 && (
+        {!loading && !error && mode === "explorer" && filteredFonts.length > 0 && (
           <TypeExplorer
-            fonts={explorerFonts}
+            fonts={filteredFonts}
             controls={controls}
             starred={starred.starred}
             onToggleStar={starred.toggle}
@@ -967,15 +1010,16 @@ Letter spacing: ${track}`;
         font={quickViewState?.font ?? null}
         sourceRect={quickViewState?.rect ?? null}
         allFonts={quickViewFonts}
-        wordmark={wordmark || "Fontdrop"}
-        logoSvg={logoSvg}
-        logoScale={logoScale}
+        wordmark={brand.displayName}
+        logoSvg={brand.logoSvg}
+        logoScale={brand.logoScale}
         controls={controls}
         starred={starred.starred}
         onToggleStar={starred.toggle}
         onExclude={exclusions.excludeFont}
         onClose={() => setQuickViewState(null)}
         onNavigate={handleQuickViewNavigate}
+        onFindPairs={handleFindPairs}
         topOffset={quickViewTopOffset}
       />
 

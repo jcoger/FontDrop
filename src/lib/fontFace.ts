@@ -1,5 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import type { FontInfo } from "../hooks/useFonts";
+import type { FontInfo } from "../types/font";
 
 let styleEl: HTMLStyleElement | null = null;
 

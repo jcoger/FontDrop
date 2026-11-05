@@ -4,7 +4,7 @@ import { HexColorPicker } from "react-colorful";
 import { oklchToCss, oklchToSrgbHex, hexToOklch, contrastRatio } from "../../../utils/oklch";
 import type { OklchColor } from "../../../utils/oklch";
 import { fontFamily } from "../../../lib/fontFace";
-import type { FontInfo } from "../../../hooks/useFonts";
+import type { FontInfo } from "../../../types/font";
 import type { BrandKitSlot, BrandKitColors, BrandKitFont } from "../types";
 import { deriveBrandKit, deriveBody, deriveSurface, deriveAccent } from "../methods/brandKitLogic";
 import {

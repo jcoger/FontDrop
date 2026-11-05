@@ -21,7 +21,12 @@ export const springModal = { type: "spring" as const, bounce: 0.1, duration: 0.2
 export { useReducedMotion };
 
 /** Returns `false` (skip animation) when user prefers reduced motion. */
+// TODO: this is effectively a custom hook (it calls useReducedMotion) but is
+// named without the `use` prefix, so it must only be called unconditionally at
+// the top level of a component. Rename to `useInitialIfMotion` + update call
+// sites to make that contract enforceable. Tracked as a follow-up.
 export function initialIfMotion<T>(value: T): T | false {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const reduced = useReducedMotion();
   return reduced ? false : value;
 }

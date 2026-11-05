@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { dur, easeOut } from "../../lib/motion";
-import type { FontInfo } from "../../hooks/useFonts";
+import type { FontInfo } from "../../types/font";
 import { oklchToCss, oklchToHex, contrastRatio, hexToOklch } from "../../utils/oklch";
 import type { OklchColor } from "../../utils/oklch";
 
@@ -50,6 +50,12 @@ interface ColorExplorerProps {
   logoSvg?: string | null;
   brandName?: string;
   exportRef?: React.MutableRefObject<(() => void) | null>;
+  /** Unstar a font from inside Brand Colors. */
+  onUnstar?: (filePath: string) => void;
+  /** Pair's Primary font. Always gets a card, starred or not. */
+  primaryFontPath?: string | null;
+  /** Tells the top bar what Export does in the current view; null = nothing to export. */
+  onExportLabelChange?: (label: string | null) => void;
   onSwitchToGrid?: () => void;
 }
 
@@ -61,6 +67,9 @@ export function ColorExplorer({
   logoSvg,
   brandName = "",
   exportRef,
+  primaryFontPath = null,
+  onUnstar,
+  onExportLabelChange,
   onSwitchToGrid,
 }: ColorExplorerProps) {
   const s = useColorExplorerState();
@@ -165,8 +174,18 @@ export function ColorExplorer({
 
   // ── Starred fonts (passed from App as live prop) ────────────────
   const starredFonts = useMemo(() => fonts.filter((f) => starredPaths.has(f.file_path)), [fonts, starredPaths]);
-  const displayFonts = starredFonts.length > 0 ? starredFonts : fonts.slice(0, 12);
-  const hasStarred = starredFonts.length > 0;
+  // Pair's Primary leads, then starred fonts. Nothing chosen yet: first 12 as a placeholder.
+  const primaryFont = useMemo(
+    () => (primaryFontPath ? fonts.find((f) => f.file_path === primaryFontPath) ?? null : null),
+    [fonts, primaryFontPath],
+  );
+  const displayFonts = useMemo(() => {
+    const chosen = primaryFont
+      ? [primaryFont, ...starredFonts.filter((f) => f.file_path !== primaryFont.file_path)]
+      : starredFonts;
+    return chosen.length > 0 ? chosen : fonts.slice(0, 12);
+  }, [primaryFont, starredFonts, fonts]);
+  const hasStarred = starredFonts.length > 0 || primaryFont !== null;
 
   // ── Active font count: ground truth for card grid size ─────────
   // Cards = displayFonts.length + (logoSvg ? 1 : 0).
@@ -353,6 +372,11 @@ export function ColorExplorer({
     return () => { if (!brandKitOpen && exportRef) exportRef.current = null; };
   }, [exportRef, handleExport, brandKitOpen]);
 
+  // Export label follows the view: Collection has nothing on screen to export
+  useEffect(() => {
+    onExportLabelChange?.(brandKitOpen ? "Copy Brand Kit Prompt" : hubOpen ? null : "Copy Palette");
+  }, [onExportLabelChange, brandKitOpen, hubOpen]);
+
   // ── Arrow-key hue nudge ──────────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -533,7 +557,7 @@ export function ColorExplorer({
                   <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
                 </svg>
                 <span className="max-w-xs" style={{ fontSize: "var(--text-ui)", color: "var(--c-text-3)" }}>
-                  Star some fonts in Logo Grid or Type Explorer to see them here
+                  Star fonts in any mode to see them here
                 </span>
                 {onSwitchToGrid && (
                   <button className="font-mono cursor-pointer mt-1" style={{ fontSize: "var(--text-body)", color: "var(--c-accent)", transition: "color var(--dur-fast) var(--ease-hover)" }}
@@ -581,6 +605,11 @@ export function ColorExplorer({
                       >
                         <ColorCard
                           font={card.font}
+                          onRemoveFont={
+                            onUnstar && card.font && starredPaths.has(card.font.file_path)
+                              ? () => onUnstar(card.font!.file_path)
+                              : undefined
+                          }
                           bgColor={renderBg}
                           fgColor={renderFgColor}
                           fgOklch={renderFgOklch}

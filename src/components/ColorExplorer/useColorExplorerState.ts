@@ -98,6 +98,9 @@ export function useColorExplorerState() {
   const [exImage, setExImage] = useState<HTMLImageElement | null>(null);
   const [exThumbnail, setExThumbnail] = useState<string | null>(null);
   const exPrevBlobUrl = useRef<string | null>(null);
+  // True when the next extraction should run immediately (new image) rather
+  // than debounced (cluster-count change). See the extraction effect below.
+  const exExtractFirstRun = useRef(true);
   const [exClusterCount, setExClusterCount] = usePersisted(LS_KEYS.extract.clusterCount, 5);
   const [exRemapEnabled, setExRemapEnabled] = usePersisted(LS_KEYS.extract.remap, false);
   const [exLightnessLock, setExLightnessLock] = usePersisted(LS_KEYS.extract.lightnessLock, false);
@@ -108,6 +111,8 @@ export function useColorExplorerState() {
     // Revoke previous blob URL to prevent memory leak
     if (exPrevBlobUrl.current) { try { URL.revokeObjectURL(exPrevBlobUrl.current); } catch {} }
     exPrevBlobUrl.current = thumb.startsWith("blob:") ? thumb : null;
+    // A freshly loaded image should extract immediately (not debounced).
+    exExtractFirstRun.current = true;
     setExImage(img);
     setExThumbnail(thumb);
   }
@@ -121,14 +126,29 @@ export function useColorExplorerState() {
     lsSet(LS_KEYS.extract.cachedThumb, null);
   }
 
-  // Run extraction + persist cache
+  // Run extraction + persist cache.
+  // A new image extracts immediately (feels instant). Cluster-count changes
+  // are debounced so dragging the slider doesn't re-run the synchronous
+  // ~100ms k-means pass on every tick.
   useEffect(() => {
     if (!exImage) { setExRawClusters([]); return; }
-    const clusters = extractFromImage(exImage, exClusterCount);
-    setExRawClusters(clusters);
-    // Persist for session restore
-    lsSet(LS_KEYS.extract.cachedClusters, clusters);
-    if (exThumbnail) lsSet(LS_KEYS.extract.cachedThumb, exThumbnail);
+
+    const run = () => {
+      const clusters = extractFromImage(exImage, exClusterCount);
+      setExRawClusters(clusters);
+      // Persist for session restore
+      lsSet(LS_KEYS.extract.cachedClusters, clusters);
+      if (exThumbnail) lsSet(LS_KEYS.extract.cachedThumb, exThumbnail);
+    };
+
+    if (exExtractFirstRun.current) {
+      exExtractFirstRun.current = false;
+      run();
+      return;
+    }
+
+    const t = setTimeout(run, 200);
+    return () => clearTimeout(t);
   }, [exImage, exClusterCount]);
 
   // Session restore: check for cached clusters on mount
