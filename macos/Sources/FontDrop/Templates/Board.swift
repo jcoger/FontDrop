@@ -38,7 +38,8 @@ struct Board<Content: View>: View {
     }
 }
 
-private struct BoardHeightKey: PreferenceKey {
+/// The board's design height (at 600 wide), for a stage that scales it to fit.
+struct BoardHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }

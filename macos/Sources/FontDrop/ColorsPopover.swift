@@ -12,24 +12,6 @@ extension AppModel {
     }
 }
 
-/// The layout menu beside the template picker: Essay or Feature, Statement or Product, and so on.
-/// The choice is remembered per template.
-struct TemplateVariantPicker: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let template = Templates.descriptor(model.templateID)
-        Picker(Lexicon.Colors.layoutLabel, selection: Binding(
-            get: { model.brandStyle.variant(template) },
-            set: { model.brandStyle.setVariant($0, template: template) })) {
-            ForEach(template.variants) { Text($0.title).tag($0.id) }
-        }
-        .pickerStyle(.menu).fixedSize()
-        .help(Lexicon.Colors.layoutHelp)
-        .accessibilityLabel(Lexicon.Colors.layoutLabel)
-    }
-}
-
 /// "Colors" with three overlapping dots: the brand's background, text and accent. Opens the popover.
 struct ColorsButton: View {
     @Environment(AppModel.self) private var model

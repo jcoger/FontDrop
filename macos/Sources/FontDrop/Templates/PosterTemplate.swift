@@ -33,7 +33,7 @@ extension PairContext {
     func posterLine(_ text: String, _ px: CGFloat, track: Double, lh: Double, italic: Bool = false,
                     color: HexColor? = nil) -> some View {
         display(text, px, track: track, italic: italic, color: color)
-            .lineLimit(1).minimumScaleFactor(0.2)
+            .lineLimit(1).minimumScaleFactor(0.08)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: points(px, display: true) * lh)
     }

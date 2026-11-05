@@ -35,6 +35,10 @@ struct SetView: View {
             }
             .padding(24)
         }
+        // The saved style (a heavy cut, say) may not be loaded yet. Without its file the text draws invisibly.
+        .task(id: "\(model.displayFamily?.name ?? "")/\(model.readingFamily?.name ?? "")") {
+            await model.preloadStyles(of: [model.displayFamily?.name, model.readingFamily?.name].compactMap { $0 })
+        }
     }
 
     private func pairing(_ job: String, _ family: String?) -> some View {

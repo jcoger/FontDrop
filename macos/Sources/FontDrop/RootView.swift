@@ -24,12 +24,19 @@ struct RootView: View {
                 Button {} label: { Label("Export", systemImage: "square.and.arrow.up") }
                     .disabled(true)
                     .help("Export arrives in a later wave")
-                Button { model.showInspector.toggle() } label: {
+                Button { model.inspectorTouched = true; model.showInspector.toggle() } label: {
                     Label("Inspector", systemImage: "sidebar.trailing")
                 }
                 .help("Show or hide the inspector")
             }
         }
+        .background(GeometryReader { geo in
+            Color.clear
+                .onAppear { model.windowWidth = geo.size.width }
+                .onChange(of: geo.size.width) { _, w in model.windowWidth = w }
+        })
+        .onChange(of: model.screen) { _, _ in model.applyInspectorRule() }
+        .onChange(of: model.windowWidth) { _, _ in model.applyInspectorRule() }
         .overlay { phaseOverlay }
         .sheet(isPresented: Binding(get: { model.pending != nil }, set: { if !$0 { model.pending = nil } })) {
             NameBrandSheet().environment(model)
@@ -46,7 +53,7 @@ struct RootView: View {
     private var subtitle: String {
         switch model.screen {
         case .display, .ui, .mono: "\(model.screen.title) \u{00B7} \(model.visibleFamilies.count) families"
-        case .reading: "Reading \u{00B7} \(model.shortlist("reading").count) saved"
+        case .reading: Lexicon.Reading.subtitle(model.shortlist("reading").count)
         case .set: "Set"
         case .colors: "Colors"
         }

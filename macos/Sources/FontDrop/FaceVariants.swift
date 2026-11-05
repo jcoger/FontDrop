@@ -106,10 +106,15 @@ extension FaceSpec {
             return copy
         }
         let wantItalic = isItalic
-        let best = siblings.compactMap { p -> (String, Double)? in
+        let candidates = siblings.compactMap { p -> (String, Double)? in
             guard let t = StyleTraits.of(path: p), t.italic == wantItalic else { return nil }
             return (p, abs((fileWeight(p) ?? t.weight) - weight))
-        }.min { $0.1 < $1.1 }
+        }
+        // A family can ship the same weight in several widths ("Compact", "Wide", "Tall"). Stay in the width the
+        // face is drawn in, so a label in semibold is not suddenly a different shape from the text around it.
+        let key = StyleVariant.key(path: resolvedPath, family: familyName)
+        let sameWidth = candidates.filter { StyleVariant.key(path: $0.0, family: familyName) == key }
+        let best = (sameWidth.isEmpty ? candidates : sameWidth).min { ($0.1, $0.0) < ($1.1, $1.0) }
         if let best { copy.settings.stylePath = best.0 == path ? nil : best.0 }
         return copy
     }
@@ -129,6 +134,28 @@ extension FaceSpec {
         guard let best else { return nil }
         copy.settings.stylePath = best.0 == path ? nil : best.0
         return copy
+    }
+}
+
+/// What a style file name says beyond weight and slant: "PP Right Serif - Compact Dark" -> "compact".
+enum StyleVariant {
+    private static let plain: Set<String> = [
+        "thin", "hairline", "fine", "extralight", "ultralight", "light", "book", "regular", "normal", "roman", "medium",
+        "semibold", "demibold", "bold", "extrabold", "ultrabold", "heavy", "dark", "black", "extra", "ultra", "semi", "demi",
+        "italic", "oblique", "kursiv", "it",
+    ]
+
+    static func key(path: String, family: String) -> String {
+        let stem = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        let compactFamily = family.lowercased().filter { $0.isLetter || $0.isNumber }
+        var words = StyleNames.spaced(stem).lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+        // Drop the family name from the front, however the file name spaces it ("PPRightSerif" or "PP Right Serif").
+        var joined = ""
+        while let first = words.first, joined.count < compactFamily.count, compactFamily.hasPrefix(joined + first) {
+            joined += first
+            words.removeFirst()
+        }
+        return words.filter { !plain.contains($0) }.joined(separator: " ")
     }
 }
 

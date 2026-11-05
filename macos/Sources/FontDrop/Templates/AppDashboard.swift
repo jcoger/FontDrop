@@ -18,7 +18,7 @@ struct AppDashboard: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ctx.display(ctx.brand, 18, lh: 1.22).lineLimit(1)
+            ctx.display(ctx.brand, 18, lh: 1.22).lineLimit(1).minimumScaleFactor(0.15)
                 .padding(.horizontal, 8).padding(.bottom, 16)
             ForEach(Array(TemplateCopy.sidebarItems.enumerated()), id: \.offset) { i, item in
                 let active = i == 0
@@ -57,7 +57,7 @@ struct AppDashboard: View {
                 ctx.reading(TemplateCopy.dashboardLabel, 13, lh: 1.23, color: p.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     ctx.display(TemplateCopy.dashboardRevenue, 48, track: -0.03, lh: 1.04, figures: .proportional)
-                        .lineLimit(1).minimumScaleFactor(0.5)
+                        .lineLimit(1).minimumScaleFactor(0.12)
                     ctx.reading(TemplateCopy.dashboardDelta, 13, lh: 1.23, weight: 500, figures: .tabular)
                 }
             }

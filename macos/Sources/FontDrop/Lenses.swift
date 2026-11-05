@@ -7,11 +7,11 @@ import Foundation
 // in `Candidate.order`) is only a tie-break.
 
 /// How different the pair is. Three ordered steps plus Any. `steps` is the order a slider
-/// would use (Close to Strong), so the menu can become a slider without new copy.
+/// would use (Close to Strong). "Distinct", not "Clear": Clear reads as a command next to "Clear filters", so the menu can become a slider without new copy.
 enum ContrastLens: String, CaseIterable, Identifiable {
-    case close = "Close", clear = "Clear", strong = "Strong", any = "Any"
+    case close = "Close", distinct = "Distinct", strong = "Strong", any = "Any"
     var id: String { rawValue }
-    static let steps: [ContrastLens] = [.close, .clear, .strong]
+    static let steps: [ContrastLens] = [.close, .distinct, .strong]
     /// 0, 1, 2 for the three steps; nil for Any.
     var stepIndex: Int? { Self.steps.firstIndex(of: self) }
 }
@@ -32,10 +32,12 @@ enum FoundryLens: String, CaseIterable, Identifiable {
 enum ReadingSort: String, CaseIterable, Identifiable {
     case bestMatch = "Best match", xHeight = "Same x-height first", name = "Name", lessCommon = "Less common first"
     var id: String { rawValue }
+    /// What the Sort menu offers before a Display face exists: nothing to rank against, so no "Best match".
+    static let withoutDisplay: [ReadingSort] = [.name, .lessCommon]
 }
 
 struct Lenses: Equatable {
-    var contrast: ContrastLens = .clear
+    var contrast: ContrastLens = .distinct
     var structure: StructureLens = .any
     var foundry: FoundryLens = .any
     var sort: ReadingSort = .bestMatch
@@ -122,7 +124,7 @@ enum LensEngine {
         switch l.contrast {
         case .any: break
         case .close: if c.pairType != "uniform" { return false }
-        case .clear: if c.pairType != "contrast" { return false }
+        case .distinct: if c.pairType != "contrast" { return false }
         case .strong:
             // Contrast pairs that also differ in texture or cross hands: the far end.
             if c.pairType != "contrast" || !(c.has("Texture") || c.isCrossedHands) { return false }

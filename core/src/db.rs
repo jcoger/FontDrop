@@ -154,6 +154,9 @@ const MIGRATIONS: &[&str] = &[
     // Does the file's cmap cover basic Latin (A-Z, a-z, 0-9)? NULL = not read yet, so every existing
     // row is read once on the next scan. To change the rule later, add a migration that sets it to NULL.
     "ALTER TABLE fonts ADD COLUMN covers_latin INTEGER;",
+    // The font's own style name (name ID 17, else 2). NULL = not read yet, so every existing row is
+    // read once on the next scan. '' = read, the file has none.
+    "ALTER TABLE fonts ADD COLUMN style_name TEXT;",
 ];
 
 /// Apply any migrations with index >= the DB's current user_version, then
@@ -295,7 +298,7 @@ fn scan_dir_for_db(dir: &PathBuf, source: &str, results: &mut Vec<ScannedFont>) 
 /// font (vendor_id NULL = not read yet; '' = read, no real vendor code). Foundry
 /// and designer only fill gaps; existing values (Google enrichment, edits) stay.
 pub fn enrich_from_name_tables(conn: &Connection) {
-    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL") {
+    let rows: Vec<(String, String)> = match conn.prepare("SELECT font_id, file_path FROM fonts WHERE vendor_id IS NULL OR is_trial IS NULL OR foundry_url IS NULL OR is_variable IS NULL OR covers_latin IS NULL OR style_name IS NULL") {
         Ok(mut st) => st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
             .map(|it| it.filter_map(|r| r.ok()).collect())
@@ -305,15 +308,15 @@ pub fn enrich_from_name_tables(conn: &Connection) {
     for (font_id, path) in rows {
         let meta = read_name_meta(Path::new(&path));
         // A file we cannot open counts as covering Latin: never hide what we could not check.
-        let (vendor, manufacturer, designer, trial, url, variable, latin) = match meta {
-            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin),
-            None => (String::new(), None, None, false, None, false, true),
+        let (vendor, manufacturer, designer, trial, url, variable, latin, style) = match meta {
+            Some(m) => (m.vendor.unwrap_or_default(), m.manufacturer, m.designer, m.trial, m.foundry_url, m.variable, m.covers_latin, m.style_name.unwrap_or_default()),
+            None => (String::new(), None, None, false, None, false, true, String::new()),
         };
         conn.execute(
             "UPDATE fonts SET vendor_id = ?1, \
              foundry = COALESCE(NULLIF(foundry, ''), ?2), \
-             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8 WHERE font_id = ?6",
-            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32], // '' = read, none
+             designer = COALESCE(NULLIF(designer, ''), ?3), is_trial = ?4, foundry_url = ?5, is_variable = ?7, covers_latin = ?8, style_name = ?9 WHERE font_id = ?6",
+            params![vendor, manufacturer, designer, trial as i32, url.unwrap_or_default(), font_id, variable as i32, latin as i32, style], // '' = read, none
         )
         .ok();
     }
@@ -944,6 +947,7 @@ mod tests {
         let conn = try_open_db_at(&path).unwrap();
         let trial: Option<i64> = conn.query_row("SELECT is_trial FROM fonts WHERE font_id = 'v'", [], |r| r.get(0)).unwrap();
         assert_eq!(trial, None, "NULL means 'read the file again'");
+        conn.execute_batch("SELECT style_name FROM fonts;").unwrap();
         conn.execute_batch("SELECT is_variable FROM fonts; SELECT * FROM google_families; SELECT * FROM hidden; SELECT * FROM favorites;").unwrap();
         drop(conn);
         let _ = std::fs::remove_dir_all(&dir);

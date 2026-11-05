@@ -1,199 +1,243 @@
 import FontDropCore
 import SwiftUI
 
+/// Reading: a candidate list on the left, the stage on the right. The list is for choosing what to look at
+/// (the faces themselves, two lines each). The stage is for judging it (the pair in a real layout).
+///
+/// React: a master-detail split. A virtual list with a roving selection, and a canvas that renders the selected item.
 struct ReadingView: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = [GridItem(.adaptive(minimum: 330, maximum: 460), spacing: 16, alignment: .top)]
+    var body: some View {
+        GeometryReader { geo in
+            HStack(spacing: 0) {
+                ReadingList()
+                    .frame(width: ReadingLayout.listWidth(for: geo.size.width))
+                Divider()
+                ReadingStage()
+                    .frame(minWidth: 0, maxWidth: .infinity)
+            }
+        }
+        .task(id: "\(model.brandID ?? 0)/\(model.displayFamily?.fontId ?? "none")/\(model.sourcesKey)") { await model.loadCandidates() }
+    }
+}
+
+// MARK: - The list
+
+struct ReadingList: View {
+    @Environment(AppModel.self) private var model
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let result = model.readingResult
+        let rows = ReadingRows.rows(current: model.currentReadingCandidate, shown: result.shown, search: model.search)
+        VStack(spacing: 0) {
+            ReadingListHead(count: result.shown.count)
+            Divider()
+            listBody(rows: rows, result: result)
+            Divider()
+            ReadingListFoot(hidden: result.hidden)
+        }
+        .background(.background)
+        .onAppear { focused = true }
+    }
+
+    @ViewBuilder
+    private func listBody(rows: [Candidate], result: (shown: [Candidate], hidden: Int)) -> some View {
+        if model.candidatesLoading && model.candidates.isEmpty {
+            ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? "").frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error = model.candidatesError {
+            ContentUnavailableView("Could not load candidates", systemImage: "exclamationmark.triangle", description: Text(error))
+        } else if rows.isEmpty {
+            ContentUnavailableView {
+                Label(model.candidates.isEmpty ? Lexicon.Reading.findingNone : Lexicon.readingNone,
+                      systemImage: "line.3.horizontal.decrease.circle")
+            } description: {
+                if result.hidden > 0 { Text(Lexicon.Reading.hiddenByFilters(result.hidden)) }
+            } actions: {
+                if !model.lenses.isNeutral { Button(Lexicon.clearFilters) { model.resetLenses() } }
+            }
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows) { c in row(c) }
+                    }
+                }
+                .focusable()
+                .focused($focused)
+                .focusEffectDisabled()
+                .onKeyPress(.upArrow) { move(-1, rows) }
+                .onKeyPress(.downArrow) { move(1, rows) }
+                .onChange(of: model.selectedCandidate) { _, id in
+                    if let id { proxy.scrollTo(id) }         // no animation: flipping candidates is a hard cut
+                }
+            }
+        }
+    }
+
+    private func row(_ c: Candidate) -> some View {
+        let family = model.familyByName[c.family]
+        let onShortlist = model.shortlist("reading").contains(c.family)
+        let isCurrent = model.chosen(.reading) == c.family
+        return VStack(spacing: 0) {
+            CandidateRow(candidate: c, family: family,
+                         face: family.map { model.face("reading", $0) } ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading")),
+                         tick: model.fontTick,
+                         reasons: reasons(for: c, family: family),
+                         isSelected: model.selectedCandidate == c.id, isCurrent: isCurrent, onShortlist: onShortlist)
+            Divider()
+        }
+        .id(c.id)
+        .contentShape(Rectangle())
+        .onTapGesture { model.selectedCandidate = c.id; focused = true }
+        .contextMenu {
+            Button(onShortlist ? Lexicon.Reading.removeFromShortlist : Lexicon.Reading.addToShortlist) {
+                Task { await model.setShortlist("reading", family: c.family, on: !onShortlist) }
+            }
+            Button(Lexicon.useFor("reading")) { Task { await model.choose("reading", family: c.family) } }
+        }
+    }
+
+    /// The row's quiet reasons: at most two, no reasons at all before there is a Display face to pair with.
+    private func reasons(for c: Candidate, family: FamilySummary?) -> [String] {
+        guard model.displayFamily != nil else { return [] }
+        if c.isSameFamily { return [Lexicon.Reading.sameFamilyRow(c.bodyStyle?.label)] }
+        return ReadingRows.reasons(c, xHeightNote: xHeightNote(c))
+    }
+
+    private func xHeightNote(_ c: Candidate) -> String? {
+        guard let display = model.displayFamily else { return nil }
+        let body = model.familyByName[c.family].map { model.face("reading", $0).resolvedPath } ?? c.filePath
+        return measuredXHeightNote(display: model.face("display", display).resolvedPath, candidate: body)
+    }
+
+    private func move(_ step: Int, _ rows: [Candidate]) -> KeyPress.Result {
+        guard model.comparedFamilies.isEmpty else { return .ignored }       // compare shows several; arrows do nothing
+        if let id = ListNav.move(rows.map(\.id), from: model.selectedCandidate, by: step) { model.selectedCandidate = id }
+        return .handled
+    }
+}
+
+// MARK: - Row
+
+/// One candidate: its name, two lines set in its own face at reading size, and at most two quiet reasons.
+/// More reasons live in the inspector's Why list and in the hover help.
+struct CandidateRow: View {
+    let candidate: Candidate
+    let family: FamilySummary?
+    let face: FaceSpec
+    let tick: Int
+    let reasons: [String]
+    let isSelected: Bool
+    let isCurrent: Bool
+    let onShortlist: Bool
+
+    /// Rows set text at 15 to 16pt, whatever the playground size is, so rows compare fairly.
+    private var ratio: CGFloat {
+        let size = max(face.settings.size, 1)
+        return CGFloat(min(max(size, 15), 16) / size)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(candidate.family).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: 4)
+                if isCurrent { Text(Lexicon.Reading.current).font(.caption2.weight(.semibold)).foregroundStyle(Color.accentColor) }
+                else if onShortlist { Text(Lexicon.Reading.onShortlistTag).font(.caption2.weight(.semibold)).foregroundStyle(Color.accentColor) }
+                if family?.isTrial == true { TagPill(text: Lexicon.Reading.trialTag) }
+            }
+            FaceText(face: face, text: SampleCopy.rowText, ratio: ratio, tick: tick)
+                .lineLimit(2, reservesSpace: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !reasons.isEmpty {
+                Text(reasons.joined(separator: " \u{00B7} ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isSelected ? Color.accentColor.opacity(0.12) : .clear)
+        .overlay(alignment: .leading) { if isSelected { Rectangle().fill(Color.accentColor).frame(width: 3) } }
+        .help(hoverHelp)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var hoverHelp: String {
+        let all = ReadingRows.dedupedEvidence(candidate.evidence).map { Lexicon.chip($0) }
+        return all.isEmpty ? candidate.family : all.joined(separator: "\n")
+    }
+}
+
+// MARK: - Head and foot
+
+/// The list's head: what it is for, and the questions that filter it. Search stays in the window toolbar.
+struct ReadingListHead: View {
+    @Environment(AppModel.self) private var model
+    let count: Int
 
     var body: some View {
         @Bindable var model = model
-        Group {
-            if let display = model.displayFamily {
-                content(display)
-            } else {
-                ContentUnavailableView {
-                    Label(Lexicon.needsDisplayTitle, systemImage: "textformat.size")
-                } description: {
-                    Text(Lexicon.needsDisplayBody)
-                } actions: {
-                    Button(Lexicon.needsDisplayCTA) { model.screen = .display }
-                        .buttonStyle(.borderedProminent)
-                }
+        let hasDisplay = model.displayFamily != nil
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(model.displayFamily.map { Lexicon.Reading.title($0.name) } ?? Screen.reading.title)
+                    .font(.headline).lineLimit(1)
+                Spacer(minLength: 4)
+                Text(countLine).font(.caption).foregroundStyle(.secondary).lineLimit(1).monospacedDigit()
             }
-        }
-        .task(id: "\(model.brandID ?? 0)/\(model.displayFamily?.fontId ?? "")/\(model.sourcesKey)") { await model.loadCandidates() }
-        .toolbar { LensToolbar(lenses: $model.lenses) }
-    }
-
-    @ViewBuilder
-    private func content(_ display: FamilySummary) -> some View {
-        @Bindable var model = model
-        let result = model.readingResult
-        let tick = model.fontTick
-        let chosen = model.chosen(.reading)
-        let saved = Set(model.shortlist("reading"))
-        let displayFace = model.face("display", display)
-        let template = model.activeTemplate
-
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(model.brand?.name ?? "Your brand") pair \u{00B7} \(display.name) with each candidate")
-                            .font(.callout.weight(.semibold))
-                        Text("Headlines are set in your Display face. Body and interface text are the candidate.")
-                            .font(.caption).foregroundStyle(.secondary)
+            FlowLayout(spacing: 6) {
+                HeadMenu(title: Lexicon.Reading.sourceLabel, value: SourceScope(model.filter.sources).label) {
+                    Picker(Lexicon.Reading.sourceLabel, selection: Binding(
+                        get: { SourceScope(model.filter.sources) },
+                        set: { if let s = $0.sources { model.filter.sources = s } })) {
+                        ForEach(SourceScope.allCases.filter { $0 != .custom }) { Text($0.label).tag($0) }
                     }
-                    Spacer()
-                    Picker("Template", selection: $model.templateID) {
-                        ForEach(Templates.all) { Text($0.title).tag($0.id) }
-                    }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    .help("Show the pair in a different layout")
-                    TemplateVariantPicker()
-                    ColorsButton()
                 }
-                statusRow(shown: result.shown.count, hidden: result.hidden)
-
-                if model.candidatesLoading && model.candidates.isEmpty {
-                    ProgressView("Finding partners for \(display.name)").frame(maxWidth: .infinity).padding(.top, 40)
-                } else if let error = model.candidatesError {
-                    ContentUnavailableView("Could not load candidates", systemImage: "exclamationmark.triangle",
-                                           description: Text(error))
-                } else if result.shown.isEmpty {
-                    ContentUnavailableView {
-                        Label(model.candidates.isEmpty ? "No candidates" : Lexicon.readingNone,
-                              systemImage: "line.3.horizontal.decrease.circle")
-                    } description: {
-                        Text(model.candidates.isEmpty
-                             ? "The engine found no Reading partners for \(display.name)."
-                             : "\(result.hidden) hidden by your filters.")
-                    } actions: {
-                        if !model.lenses.isNeutral { Button(Lexicon.clearFilters) { resetLenses() } }
-                    }
-                } else {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(result.shown) { c in
-                            let family = model.familyByName[c.family]
-                            let bodyFace = family.map { model.face("reading", $0) }
-                                ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading"))
-                            CandidateCard(candidate: c, family: family, tick: tick,
-                                          isSelected: model.selectedCandidate == c.id,
-                                          isSaved: saved.contains(c.family),
-                                          isChosen: chosen == c.family,
-                                          xHeightNote: measuredXHeightNote(display: displayFace.resolvedPath, candidate: bodyFace.resolvedPath),
-                                          context: PairContext(brand: model.brand?.name ?? "Brand Name",
-                                                               display: displayFace, body: bodyFace, tick: tick),
-                                          template: template) {
-                                model.selectedCandidate = c.id
-                            } showWhy: {
-                                model.selectedCandidate = c.id
-                                model.showInspector = true
-                            }
+                if hasDisplay {
+                    HeadMenu(title: Lexicon.contrastLabel, value: model.lenses.contrast.rawValue) {
+                        Picker(Lexicon.contrastLabel, selection: $model.lenses.contrast) {
+                            ForEach(ContrastLens.allCases) { Text($0.rawValue).tag($0) }
                         }
                     }
-                    footer(result: result)
+                    HeadMenu(title: Lexicon.structureLabel, value: model.lenses.structure.rawValue) {
+                        Picker(Lexicon.structureLabel, selection: $model.lenses.structure) {
+                            ForEach(StructureLens.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                    }
+                    HeadMenu(title: Lexicon.foundryLabel, value: model.lenses.foundry.rawValue) {
+                        Picker(Lexicon.foundryLabel, selection: $model.lenses.foundry) {
+                            ForEach(FoundryLens.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                    }
                 }
-            }
-            .padding(20)
-        }
-    }
-
-    private func statusRow(shown: Int, hidden: Int) -> some View {
-        HStack(spacing: 10) {
-            Label(longTextStatus, systemImage: "line.3.horizontal.decrease")
-                .font(.caption).foregroundStyle(.secondary)
-                .help(Lexicon.readingFixedWhy)
-            if model.includeUnfitFaces || model.notForLongText > 0 {
-                Button(model.includeUnfitFaces ? Lexicon.onlyTextFaces : Lexicon.showThem) {
-                    Task { await model.setIncludeUnfit(!model.includeUnfitFaces) }
-                }
-                .buttonStyle(.link).font(.caption)
-            }
-            Text("\(shown) shown").font(.caption).foregroundStyle(.secondary)
-            if hidden > 0 {
-                Text("\u{00B7} \(hidden) hidden by your filters").font(.caption).foregroundStyle(.secondary)
-                Button(Lexicon.clearFilters) { resetLenses() }.buttonStyle(.link).font(.caption)
-            }
-            if model.lenses.sort == .lessCommon {
-                Text("\u{00B7} \(Lexicon.Finder.lessCommonHelp)").font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            GlossaryButton()
-        }
-    }
-
-    /// 7.20: "42 not made for long text" with a "Show them" link beside it. Nothing removed: the plain statement.
-    private var longTextStatus: String {
-        if model.includeUnfitFaces { return Lexicon.showingEvery }
-        return model.notForLongText > 0 ? Lexicon.Finder.notForLongText(model.notForLongText) + " \u{00B7}" : Lexicon.readingFixed
-    }
-
-    /// Under the grid: how many the filters hide (with a way out) and a way to ask for more.
-    @ViewBuilder
-    private func footer(result: (shown: [Candidate], hidden: Int)) -> some View {
-        VStack(spacing: 10) {
-            if result.hidden > 0 {
-                HStack(spacing: 6) {
-                    Text("Your filters hide \(result.hidden) more of the \(model.candidates.count) loaded.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    Button(Lexicon.clearFilters) { resetLenses() }.buttonStyle(.link)
-                }
-            }
-            if model.candidatesHasMore {
-                Button(Lexicon.showMore) { Task { await model.showMoreCandidates() } }
-                    .controlSize(.large)
-                    .disabled(model.candidatesLoading)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 6)
-    }
-
-    private func resetLenses() {
-        model.lenses.contrast = .any; model.lenses.structure = .any; model.lenses.foundry = .any
-    }
-
-}
-
-// MARK: - Toolbar lenses
-
-/// The four questions. Each is a menu with an "any" state. Nothing is a slider yet:
-/// `ContrastLens.steps` is the order a Similar-to-Bold slider would use.
-struct LensToolbar: ToolbarContent {
-    @Binding var lenses: Lenses
-
-    var body: some ToolbarContent {
-        ToolbarItemGroup {
-            LensMenu(title: Lexicon.contrastLabel, value: lenses.contrast.rawValue) {
-                Picker(Lexicon.contrastLabel, selection: $lenses.contrast) {
-                    ForEach(ContrastLens.allCases) { Text($0.rawValue).tag($0) }
-                }
-            }
-            LensMenu(title: Lexicon.structureLabel, value: lenses.structure.rawValue) {
-                Picker(Lexicon.structureLabel, selection: $lenses.structure) {
-                    ForEach(StructureLens.allCases) { Text($0.rawValue).tag($0) }
-                }
-            }
-            LensMenu(title: Lexicon.foundryLabel, value: lenses.foundry.rawValue) {
-                Picker(Lexicon.foundryLabel, selection: $lenses.foundry) {
-                    ForEach(FoundryLens.allCases) { Text($0.rawValue).tag($0) }
-                }
-            }
-            LensMenu(title: Lexicon.sortLabel, value: lenses.sort.rawValue) {
-                Picker(Lexicon.sortLabel, selection: $lenses.sort) {
-                    ForEach(ReadingSort.allCases) { sort in
-                        Text(sort.rawValue).tag(sort)
-                            .help(sort == .lessCommon ? Lexicon.Finder.lessCommonHelp : "")
+                HeadMenu(title: Lexicon.sortLabel, value: model.effectiveLenses.sort.rawValue) {
+                    Picker(Lexicon.sortLabel, selection: Binding(
+                        get: { model.effectiveLenses.sort },
+                        set: { model.lenses.sort = $0 })) {
+                        ForEach(hasDisplay ? ReadingSort.allCases : ReadingSort.withoutDisplay) { sort in
+                            Text(sort.rawValue).tag(sort)
+                        }
                     }
                 }
             }
+            if !hasDisplay {
+                Button(Lexicon.Reading.pickHeadline) { model.screen = .display }
+                    .buttonStyle(.link).font(.caption)
+            }
         }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+    }
+
+    private var countLine: String {
+        let n = model.shortlist("reading").count
+        return n > 0 ? "\(count) \u{00B7} \(Lexicon.Reading.onShortlist(n))" : "\(count)"
     }
 }
 
-struct LensMenu<Options: View>: View {
+/// A small menu chip: "Difference: Distinct".
+struct HeadMenu<Options: View>: View {
     let title: String
     let value: String
     @ViewBuilder var options: Options
@@ -202,246 +246,63 @@ struct LensMenu<Options: View>: View {
         Menu {
             options.pickerStyle(.inline).labelsHidden()
         } label: {
-            Text(title).foregroundStyle(.secondary) + Text("  ") + Text(value).fontWeight(.semibold)
+            (Text(title + ": ").foregroundStyle(.secondary) + Text(value).fontWeight(.medium))
+                .font(.caption)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(.quaternary.opacity(0.7)))
         }
-        .menuIndicator(.visible)
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+        .accessibilityLabel(title).accessibilityValue(value)
     }
 }
 
-// MARK: - Candidate card
-
-/// One candidate: the pair drawn in the chosen template, the reasons as chips, and a footer.
-struct CandidateCard: View {
-    let candidate: Candidate
-    let family: FamilySummary?
-    let tick: Int
-    let isSelected: Bool
-    let isSaved: Bool
-    let isChosen: Bool
-    let xHeightNote: String?
-    let context: PairContext
-    let template: TemplateDescriptor
-    let select: () -> Void
-    let showWhy: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(candidate.family).font(.callout.weight(.semibold)).lineLimit(1)
-                if candidate.isSameFamily {
-                    Text(Lexicon.sameFamilyGroup).font(.caption).foregroundStyle(.secondary)
-                        .help(Lexicon.sameFamilyHelp)
-                }
-                Spacer()
-                if let style = bodyStyleNote {
-                    Text(style).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                if isChosen {
-                    Text("Chosen").font(.caption.weight(.medium)).foregroundStyle(Color.accentColor)
-                } else if isSaved {
-                    Text("Saved").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            Divider()
-
-            template.make(context)
-
-            FlowLayout(spacing: 6) {
-                ForEach(chips, id: \.text) { chip in
-                    EvidenceChip(text: chip.text, effect: chip.effect, help: chip.help, warning: chip.warning)
-                }
-            }
-            .padding(.horizontal, 14)
-
-            HStack {
-                Text(footer).font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Why", action: showWhy).buttonStyle(.link).font(.caption)
-            }
-            .padding(14)
-        }
-        .background(RoundedRectangle(cornerRadius: 12).fill(.background.secondary))
-        .overlay(RoundedRectangle(cornerRadius: 12)
-            .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.25),
-                          lineWidth: isSelected ? 2 : 1))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture(perform: select)
-    }
-
-    /// "Body in Regular" on a Same family card, while the body is still in the suggested style.
-    private var bodyStyleNote: String? {
-        guard candidate.isSameFamily, let body = candidate.bodyStyle, context.body.resolvedPath == body.filePath else { return nil }
-        return Lexicon.bodyIn(body.label)
-    }
-
-    private struct Chip { let text: String; let effect: Int8; let help: String; var warning = false }
-
-    /// Engine evidence in designer words, plus "Mixed feel" when the two faces cross traditions.
-    private var chips: [Chip] {
-        var out = candidate.evidence.map { e in
-            Chip(text: Lexicon.chip(e, xHeightNote: e.lens == "x-height" ? xHeightNote : nil),
-                 effect: e.effect, help: Lexicon.sources(e.source), warning: e.lens == "Near-duplicate" || e.lens == "Long text")
-        }
-        if candidate.isCrossedHands { out.append(Chip(text: "Mixed structure", effect: 0, help: Lexicon.Term.sameStructure.help)) }
-        var seen = Set<String>()
-        return out.filter { seen.insert($0.text).inserted }
-    }
-
-    private var footer: String {
-        guard let family else { return "" }
-        let styles = "\(family.styleCount) \(family.styleCount == 1 ? "style" : "styles")"
-        return family.isTrial ? "\(styles) \u{00B7} Trial" : styles
-    }
-}
-
-// MARK: - Inspector
-
-struct ReadingInspector: View {
+/// Under the list: the long-text rule's count with its way out, what the filters hide, and Show more.
+struct ReadingListFoot: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let hidden: Int
 
     var body: some View {
-        let selected = model.candidate(model.selectedCandidate)
-        let isChosen = selected.map { model.chosen(.reading) == $0.family } ?? false
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if let c = selected {
-                    header(c)
-                    why(c)
-                    playgrounds(c)
-                } else {
-                    Text("Select a candidate to see why it pairs.")
-                        .font(.callout).foregroundStyle(.secondary)
+        let showUnfitRow = model.includeUnfitFaces || model.notForLongText > 0
+        if showUnfitRow || hidden > 0 || model.candidatesHasMore {
+            VStack(alignment: .leading, spacing: 4) {
+                if showUnfitRow {
+                    HStack(spacing: 6) {
+                        Text(model.includeUnfitFaces ? Lexicon.Reading.showingAll : Lexicon.Finder.notForLongText(model.notForLongText))
+                            .foregroundStyle(.secondary)
+                            .help(Lexicon.readingFixedWhy)
+                        Button(model.includeUnfitFaces ? Lexicon.Reading.onlyFit : Lexicon.showThem) {
+                            Task { await model.setIncludeUnfit(!model.includeUnfitFaces) }
+                        }
+                        .buttonStyle(.link)
+                    }
                 }
-                shortlist(selected)
-            }
-            .padding(16)
-        }
-        .safeAreaInset(edge: .bottom) { action(selected, isChosen: isChosen) }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isChosen)
-    }
-
-    private func header(_ c: Candidate) -> some View {
-        let isSaved = model.shortlist("reading").contains(c.family)
-        return VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(c.family).font(.title3.weight(.semibold))
-                Text("Reading candidate").font(.caption).foregroundStyle(.secondary)
-            }
-            Button {
-                Task { await model.setShortlist("reading", family: c.family, on: !isSaved) }
-            } label: {
-                Label(isSaved ? "On the shortlist" : "Add to shortlist",
-                      systemImage: isSaved ? "checkmark.circle.fill" : "plus.circle")
-            }
-            .buttonStyle(.bordered)
-            FamilyActions(name: c.family)
-        }
-    }
-
-    private func inspectorXHeightNote(_ c: Candidate) -> String? {
-        guard let display = model.displayFamily else { return nil }
-        let body = model.familyByName[c.family].map { model.face("reading", $0) }
-            ?? FaceSpec(path: c.filePath, settings: .defaults(job: "reading"))
-        return measuredXHeightNote(display: model.face("display", display).resolvedPath, candidate: body.resolvedPath)
-    }
-
-    private func why(_ c: Candidate) -> some View {
-        InspectorSection(title: Lexicon.whyItPairs) {
-            if c.evidence.isEmpty {
-                Text("The engine measured nothing notable.").font(.callout).foregroundStyle(.secondary)
-            }
-            ForEach(Array(c.evidence.enumerated()), id: \.offset) { i, e in
-                if i > 0 { Divider().padding(.vertical, 6) }
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Image(systemName: symbol(e)).font(.caption).foregroundStyle(tint(e))
-                        Text(Lexicon.whyTitle(e)).font(.caption).foregroundStyle(.secondary)
-                        if let term = Lexicon.term(forLens: e.lens) { HelpButton(term: term) }
-                        Spacer()
+                if hidden > 0 {
+                    HStack(spacing: 6) {
+                        Text(Lexicon.Reading.hiddenByFilters(hidden)).foregroundStyle(.secondary)
+                        Button(Lexicon.clearFilters) { model.resetLenses() }.buttonStyle(.link)
                     }
-                    let detail = e.lens == "x-height" ? (inspectorXHeightNote(c) ?? Lexicon.whyDetail(e)) : Lexicon.whyDetail(e)
-                    if !detail.isEmpty { Text(detail).font(.callout) }
-                    if e.effect == 0 {
-                        Text(Lexicon.notScored).font(.caption2).foregroundStyle(.secondary)
-                    } else {
-                        let word = Lexicon.strength(e.strength)
-                        Text([word, Lexicon.strengthHelp[word]].compactMap { $0 }.joined(separator: " \u{00B7} "))
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    let sources = Lexicon.sources(e.source)
-                    if !sources.isEmpty { Text(sources).font(.caption2).foregroundStyle(.tertiary) }
+                }
+                if model.candidatesHasMore {
+                    Button(Lexicon.showMore) { Task { await model.showMoreCandidates() } }
+                        .buttonStyle(.link).disabled(model.candidatesLoading)
                 }
             }
+            .font(.caption)
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(1)
         }
     }
+}
 
-    private func symbol(_ e: Evidence) -> String {
-        e.effect > 0 ? "plus.circle" : e.effect < 0 ? "minus.circle" : "circle.dashed"
-    }
-
-    private func tint(_ e: Evidence) -> Color {
-        e.effect > 0 ? .accentColor : e.effect < 0 ? .orange : .secondary
-    }
-
-    /// Two collapsible groups: the Display face and the selected candidate. Both feed the cards live.
-    @ViewBuilder
-    private func playgrounds(_ c: Candidate) -> some View {
-        let open = model.options.openPlayground
-        if let display = model.displayFamily {
-            PlaygroundGroup(job: "display", family: display, title: "Display \u{00B7} \(display.name)",
-                            preview: SampleCopy.displayHeadline, startOpen: open)
-        }
-        if let family = model.familyByName[c.family] {
-            PlaygroundGroup(job: "reading", family: family, title: "Reading \u{00B7} \(family.name)",
-                            preview: SampleCopy.paragraphs[0], startOpen: open)
-        }
-    }
-
-    private func shortlist(_ selected: Candidate?) -> some View {
-        let list = model.shortlist("reading")
-        return InspectorSection(title: Lexicon.shortlistTitle, trailing: "\(list.count)") {
-            if list.isEmpty {
-                Text(Lexicon.shortlistEmpty).font(.callout).foregroundStyle(.secondary)
-            }
-            ForEach(Array(list.enumerated()), id: \.element) { i, name in
-                if i > 0 { Divider().padding(.vertical, 5) }
-                HStack {
-                    Button(name) {
-                        if let c = model.candidates.first(where: { $0.family == name }) { model.selectedCandidate = c.id }
-                    }
-                    .buttonStyle(.plain).lineLimit(1)
-                    Spacer()
-                    if model.chosen(.reading) == name {
-                        Text("Chosen").font(.caption).foregroundStyle(Color.accentColor)
-                    }
-                    Button { Task { await model.setShortlist("reading", family: name, on: false) } } label: {
-                        Image(systemName: "minus.circle")
-                    }
-                    .buttonStyle(.borderless).foregroundStyle(.secondary)
-                    .help("Remove from shortlist")
-                    .accessibilityLabel("Remove \(name) from shortlist")
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func action(_ selected: Candidate?, isChosen: Bool) -> some View {
-        if isChosen {
-            ChosenPanel(job: "reading", nextTitle: Lexicon.setTheType) { model.screen = .set }
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-        } else {
-            DecisionButton(title: Lexicon.useFor("reading"), disabled: selected == nil) {
-                if let c = selected { Task { await model.choose("reading", family: c.family) } }
-            }
-        }
+extension AppModel {
+    func resetLenses() {
+        lenses.contrast = .any; lenses.structure = .any; lenses.foundry = .any
     }
 }
 
 /// "x-height 9% smaller than Display", measured from the two loaded fonts so it has a direction.
-/// Shared by the card chip and the inspector's Why list so both say the same number.
+/// Shared by the list rows and the inspector's Why list so both say the same number.
 func measuredXHeightNote(display: String, candidate: String) -> String? {
     guard case .success(let d)? = FontLoader.shared.cached(display),
           case .success(let c)? = FontLoader.shared.cached(candidate), d.xHeightRatio > 0 else { return nil }

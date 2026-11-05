@@ -29,7 +29,7 @@ struct PosterReadout: View {
                 band(face: displayItalic, size: displayItalic.settings.size, sizeRange: Self.displaySize, tracking: nil,
                      name: Lexicon.Readout.displayItalic) {
                     ctx.display(TemplateCopy.readoutLine, 72, track: -0.02, lh: 1.0, italic: true, width: 552)
-                        .lineLimit(2).minimumScaleFactor(0.5)
+                        .lineLimit(2).minimumScaleFactor(0.15)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer(minLength: 0)

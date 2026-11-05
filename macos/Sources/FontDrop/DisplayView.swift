@@ -231,10 +231,8 @@ struct FamilyInspector: View {
         }
     }
 
-    /// File name without extension. It tells italics and widths apart; the `name` column does not.
-    private func styleLabel(_ style: FontFile) -> String {
-        URL(fileURLWithPath: style.filePath).deletingPathExtension().lastPathComponent
-    }
+    /// The font's own style name ("Grand Heavy"), else a cleaned file name.
+    private func styleLabel(_ style: FontFile) -> String { StyleNames.label(style, family: style.family) }
 
     private func fact(_ label: String, _ value: String) -> some View {
         HStack {

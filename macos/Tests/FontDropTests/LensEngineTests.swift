@@ -66,7 +66,7 @@ final class LensEngineTests: XCTestCase {
     }
 
     func testContrastStepsAreOrderedForAFutureSlider() {
-        XCTAssertEqual(ContrastLens.steps, [.close, .clear, .strong])
+        XCTAssertEqual(ContrastLens.steps, [.close, .distinct, .strong])
         XCTAssertNil(ContrastLens.any.stepIndex)
     }
 

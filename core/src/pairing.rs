@@ -480,6 +480,31 @@ pub fn unfit_family_count(
     Ok(without_rule.difference(&kept).count() as u32)
 }
 
+/// Reading before a Display face exists: one entry per family, (font_id, family), in library order.
+/// With `only_fit` the long-text rule (`unfit_for_reading`) applies, as it does for pairs. The second value
+/// is how many families that rule removes ("N not made for long text"), whatever `only_fit` is.
+/// Hidden families and `excluded_ids` stay out.
+pub fn reading_families(
+    conn: &Connection,
+    excluded_ids: Vec<String>,
+    only_fit: bool,
+) -> Result<(Vec<(String, String)>, u32), String> {
+    let all = load_all_fonts(conn)?;
+    let mut base: HashSet<String> = excluded_ids.into_iter().collect();
+    base.extend(crate::finder::hidden_font_ids(conn));
+    let unfit = unfit_for_reading(&all);
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut unfit_families: HashSet<&str> = HashSet::new();
+    let mut out: Vec<(String, String)> = Vec::new();
+    for f in all.iter().filter(|f| !base.contains(&f.font_id)) {
+        let is_unfit = unfit.contains(&f.font_id);
+        if is_unfit { unfit_families.insert(f.font_family.as_str()); }
+        if (is_unfit && only_fit) || !seen.insert(f.font_family.as_str()) { continue; }
+        out.push((f.font_id.clone(), f.font_family.clone()));
+    }
+    Ok((out, unfit_families.len() as u32))
+}
+
 /// Score every non-hidden candidate against `primary` and fill the three buckets.
 pub fn bucket_pairs(
     primary: &FontData,

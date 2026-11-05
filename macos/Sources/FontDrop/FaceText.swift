@@ -62,6 +62,19 @@ struct FaceText: View {
     /// The width the text will be laid out in, in points. Lets tight display type break its own lines (see `TightLines`).
     var wrapWidth: CGFloat?
     var lineAlignment: HorizontalAlignment = .leading
+    /// With `wrapWidth`: the most height the text may take. The size shrinks until it fits (a hero headline on a fixed board).
+    var maxHeight: CGFloat?
+
+    /// The font, smaller when a word is wider than `wrapWidth` or the lines are taller than `maxHeight`.
+    /// A word is never broken: the size comes down first (to a floor), then the text wraps between words.
+    private func fitted(_ font: CTFont) -> CTFont {
+        guard let wrapWidth else { return font }
+        let size = CTFontGetSize(font)
+        let scale = FitWords.scale(text: text, font: font, trackingEm: face.settings.tracking + trackBias, width: wrapWidth,
+                                   leading: leading ?? face.settings.lineHeight, maxHeight: maxHeight)
+        guard scale < 0.999 else { return font }
+        return CTFontCreateCopyWithAttributes(font, size * scale, nil, nil)
+    }
 
     /// Space added between lines. A template's own line height may tighten below the font's natural spacing;
     /// the playground's may not (as before).
@@ -71,7 +84,8 @@ struct FaceText: View {
     }
 
     var body: some View {
-        if let font = FontLoader.shared.styledFont(face, ratio: ratio) {
+        if let base = FontLoader.shared.styledFont(face, ratio: ratio) {
+            let font = fitted(base)
             let size = CTFontGetSize(font)
             let natural = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
             let tracking = CGFloat(face.settings.tracking + trackBias) * size
@@ -89,6 +103,40 @@ struct FaceText: View {
         } else {
             Text(text).font(.system(size: CGFloat(face.settings.size) * ratio)).opacity(0)   // reserve the space
         }
+    }
+}
+
+/// Keeps words whole. Display type that is too big for its column comes down in size until its longest
+/// word fits (and, with a height limit, until the lines fit), down to a floor. Past the floor it wraps
+/// between words and lets the longest one run wide rather than split it.
+enum FitWords {
+    static let floor: CGFloat = 0.1
+
+    /// Width of the widest run between spaces at this font, with tracking.
+    static func widestWord(_ text: String, font: CTFont, trackingEm: Double) -> CGFloat {
+        let kern = CGFloat(trackingEm) * CTFontGetSize(font)
+        var widest: CGFloat = 0
+        for word in text.split(whereSeparator: { $0 == " " || $0 == "\n" }) {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(word), attributes: [.font: font, .kern: kern]))
+            widest = max(widest, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)))
+        }
+        return widest
+    }
+
+    /// 1 when the text fits as it is; else the factor to scale the size by.
+    static func scale(text: String, font: CTFont, trackingEm: Double, width: CGFloat, leading: Double, maxHeight: CGFloat?) -> CGFloat {
+        var s: CGFloat = 1
+        let widest = widestWord(text, font: font, trackingEm: trackingEm)
+        if widest > width, widest > 0 { s = max(floor, width / widest * 0.995) }
+        guard let maxHeight else { return s }
+        let size = CTFontGetSize(font)
+        while s > floor {
+            let f = s < 0.999 ? CTFontCreateCopyWithAttributes(font, size * s, nil, nil) : font
+            let lines = TightLines.lines(text, font: f, tracking: CGFloat(trackingEm) * size * s, width: width).count
+            if CGFloat(lines) * CGFloat(leading) * size * s <= maxHeight { break }
+            s = max(floor, s * 0.96)
+        }
+        return s
     }
 }
 
