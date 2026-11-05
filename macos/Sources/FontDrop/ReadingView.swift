@@ -26,6 +26,7 @@ struct ReadingView: View {
 struct ReadingList: View {
     @Environment(AppModel.self) private var model
     @FocusState private var focused: Bool
+    @Namespace private var glide
     @State private var keyboardNav = false       // the focus ring shows once the arrow keys are used, not after a click
 
     var body: some View {
@@ -65,6 +66,7 @@ struct ReadingList: View {
                         ForEach(rows) { c in row(c) }
                     }
                     .padding(8)
+                    .environment(\.glide, glide)
                 }
                 .focusable()
                 .focused($focused)

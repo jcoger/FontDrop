@@ -74,20 +74,20 @@ struct ExportMenuItems: View {
     var shortcuts = false
 
     var body: some View {
-        item(Lexicon.Export.copyCSS, "c") { model.copyExport(.css) }
-        item(Lexicon.Export.copyTailwind, "t") { model.copyExport(.tailwind) }
-        item(Lexicon.Export.copyPaper, "p") { model.copyExport(.paper) }
+        item(Lexicon.Export.copyCSS, "doc.on.doc", "c") { model.copyExport(.css) }
+        item(Lexicon.Export.copyTailwind, "doc.on.doc", "t") { model.copyExport(.tailwind) }
+        item(Lexicon.Export.copyPaper, "doc.on.doc", "p") { model.copyExport(.paper) }
         Divider()
-        item(Lexicon.Export.specPage, "s") { model.saveSpecPage() }
-        item(Lexicon.Export.copyLicenses, "l") { model.copyExport(.licenses) }
+        item(Lexicon.Export.specPage, "doc.richtext", "s") { model.saveSpecPage() }
+        item(Lexicon.Export.copyLicenses, "checklist", "l") { model.copyExport(.licenses) }
     }
 
     @ViewBuilder
-    private func item(_ title: String, _ key: KeyEquivalent, action: @escaping () -> Void) -> some View {
+    private func item(_ title: String, _ symbol: String, _ key: KeyEquivalent, action: @escaping () -> Void) -> some View {
         if shortcuts {
-            Button(title, action: action).keyboardShortcut(key, modifiers: [.command, .shift]).disabled(!model.canExport)
+            Button(title, systemImage: symbol, action: action).keyboardShortcut(key, modifiers: [.command, .shift]).disabled(!model.canExport)
         } else {
-            Button(title, action: action).disabled(!model.canExport)
+            Button(title, systemImage: symbol, action: action).disabled(!model.canExport)
         }
     }
 }

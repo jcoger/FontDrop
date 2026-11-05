@@ -9,6 +9,7 @@ struct FamilyPickerView: View {
     @FocusState private var focused: Bool
     @State private var keyboardNav = false       // the focus ring shows once a key is used, not after a click
     @State private var gridWidth: CGFloat = 800
+    @Namespace private var glide
 
     private static let cellMin: CGFloat = 220, cellSpacing: CGFloat = 14
     private let columns = [GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 14)]
@@ -50,6 +51,7 @@ struct FamilyPickerView: View {
                                 .onTapGesture { keyboardNav = false; model.selectedFamily = family.name; focused = true }
                         }
                     }
+                    .environment(\.glide, glide)
                 }
             }
             .padding(20)
@@ -190,9 +192,8 @@ struct FamilyCard: View {
             Button(isHidden ? Lexicon.Finder.unhide : Lexicon.Finder.hide, systemImage: isHidden ? "eye" : "eye.slash", action: toggleHidden)
         }
         .background(RoundedRectangle(cornerRadius: 12).fill(theme.controlGround.color))
-        .overlay { if isSelected {      // board 16 option B: a 1.5 pt ring, grids only
-            RoundedRectangle(cornerRadius: 12).strokeBorder(theme.textPrimary.color, lineWidth: 1.5)
-        } }
+        // board 16 option B: a 1.5 pt ring, grids only. One ring glides from tile to tile.
+        .overlay { SelectionMark(on: isSelected, shape: RoundedRectangle(cornerRadius: 12), fill: theme.textPrimary.color, ring: 1.5) }
         .overlay { if showFocus {
             RoundedRectangle(cornerRadius: 14, style: .continuous).inset(by: -3)
                 .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
