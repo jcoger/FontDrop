@@ -116,10 +116,27 @@ struct SidebarView: View {
                         .padding(.leading, 24)
                 } else if let chosen {
                     Text(chosen).font(.system(size: 11)).foregroundStyle(.secondary).padding(.leading, 24)
+                } else if let job = screen.job, model.canUndo(job) {
+                    // Just cleared: say so, with the way back.
+                    HStack(spacing: 6) {
+                        Text(Lexicon.cleared(job)).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Button(Lexicon.undo) { Task { await model.undo(job) } }
+                            .buttonStyle(.link).font(.system(size: 11))
+                    }
+                    .padding(.leading, 24)
                 }
             }
             Spacer()
             trailing(screen, chosen: chosen)
+        }
+        .contextMenu {
+            if let job = screen.job {
+                Button(Lexicon.clearFace(job)) { Task { await model.clear(job) } }
+                    .disabled(!model.canClear(job))
+                if chosen == nil, model.canUndo(job) {
+                    Button(Lexicon.undo) { Task { await model.undo(job) } }
+                }
+            }
         }
     }
 

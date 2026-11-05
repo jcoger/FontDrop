@@ -6,8 +6,21 @@ struct PosterSpecimen: View {
     let ctx: PairContext
     private var p: TemplatePalette { ctx.palette }
 
+    /// The fit rule (PosterFit.swift): the glyphs and the weight rows shrink together until the sheet holds them.
+    init(ctx base: PairContext) {
+        let rows = Self.ramp(base).count
+        var items = [FitItem(text: TemplateCopy.specimenGlyphs, px: 320, lh: 0.78, tracking: -0.04)]
+        items += (0..<rows).map { _ in FitItem(text: TemplateCopy.specimenLine, px: 30, lh: 1.2) }
+        let r = base.readingScale
+        // Padding 64, header, row gaps, footer (about three lines) and its rule, and a little air.
+        let fixed = 64 + (13 * 1.23 * r + 12) + 4 * CGFloat(max(rows - 1, 0)) + (3 * 13 * 1.46 * r + 14) + 24
+        ctx = base.fitted(height: 800, fixed: fixed, items: items)
+    }
+
+    private var ramp: [(label: String, face: FaceSpec)] { Self.ramp(ctx) }
+
     /// Light to heavy, one row per distinct weight the family offers. A family with two weights shows two rows.
-    private var ramp: [(label: String, face: FaceSpec)] {
+    private static func ramp(_ ctx: PairContext) -> [(label: String, face: FaceSpec)] {
         var seen = Set<Int>()
         var out: [(String, FaceSpec)] = []
         for (_, w) in TemplateCopy.specimenRamp {

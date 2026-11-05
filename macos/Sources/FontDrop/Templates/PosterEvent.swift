@@ -6,6 +6,16 @@ struct PosterEvent: View {
     let ctx: PairContext
     private var p: TemplatePalette { ctx.palette }
 
+    /// The fit rule (PosterFit.swift): at a large Display size the whole board's display type shrinks until it fits.
+    init(ctx base: PairContext) {
+        var items = TemplateCopy.eventTitle.map { FitItem(text: $0, px: 232, lh: 0.82, tracking: -0.05) }
+        items.append(FitItem(text: TemplateCopy.eventLine, px: 30, lh: 1.13, width: 420))
+        items.append(FitItem(text: TemplateCopy.eventDate, px: 64, lh: 0.88, tracking: -0.03))
+        // Padding 68, the two top lines, the gap above the date row, its rule, and a little air between the groups.
+        let fixed = 68 + 36.4 * base.readingScale + 18 + 18 + 24
+        ctx = base.fitted(height: 800, fixed: fixed, items: items)
+    }
+
     var body: some View {
         Board(background: p.background.color, height: 800) {
             VStack(alignment: .leading, spacing: 0) {

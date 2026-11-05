@@ -101,7 +101,12 @@ struct FaceText: View {
                                      fallbackSpacing: useLineHeight ? extraLeading(size: size, natural: natural) : 0)
             }
         } else {
-            Text(text).font(.system(size: CGFloat(face.settings.size) * ratio)).opacity(0)   // reserve the space
+            let size = CGFloat(face.settings.size) * ratio
+            if case .failure? = FontLoader.shared.cached(face.resolvedPath) {
+                Text(text).font(.system(size: size)).foregroundStyle(.tertiary)   // a face that would not load stays visible
+            } else {
+                Text(text).font(.system(size: size)).opacity(0)                   // not loaded yet: reserve the space
+            }
         }
     }
 }

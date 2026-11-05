@@ -17,6 +17,16 @@ struct PosterReadout: View {
         return min(max((value - range.lowerBound) / (range.upperBound - range.lowerBound), 0), 1)
     }
 
+    /// The fit rule (PosterFit.swift): the big word and the italic line shrink until the three bands fit.
+    init(ctx base: PairContext) {
+        let items = [FitItem(text: TemplateCopy.readoutWord, px: 320, lh: 0.82, tracking: -0.05),
+                     FitItem(text: TemplateCopy.readoutLine, px: 72, lh: 1.0, width: 552, tracking: -0.02)]
+        let r = base.readingScale
+        // Padding 48, three bars rows, and the Reading band's two paragraphs (about four lines).
+        let fixed = 48 + 3 * (12 * r + 16) + 4 * 15 * 1.4 * r + 24
+        ctx = base.fitted(height: 750, fixed: fixed, items: items)
+    }
+
     var body: some View {
         let displayItalic = ctx.display.italic() ?? ctx.display
         Board(background: p.field.color, height: 750) {

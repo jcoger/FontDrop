@@ -347,3 +347,22 @@ Cut: the pair title and its explainer, the **Pick a Display face first** empty s
 ### Gates for section 11
 
 A pass · B pass · C pass (no em dashes) · D pass · E n/a · F pass · G n/a · H pending cold read · K pass (Current and On shortlist are words, not color alone) · N pass · Q pass · R pass (no engine words in labels; sources stay in hover help)
+
+## 12. Clearing a face and the loading state (2026-10-23)
+
+A chosen face can be taken off its job at any time. Reading then works on its own, with no pairing questions and no reasons.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 12.1 | clear.display | **Clear Display face** | Sidebar Type row menu, the chosen state under the Display inspector, the Type menu |
+| 12.2 | clear.reading | **Clear Reading face** | Sidebar Type row menu, the bar under the Reading stage, the Type menu |
+| 12.3 | clear.done | **Display face cleared** | One quiet line under the Type row after clearing, next to **Undo**. Same for Reading |
+| 12.4 | clear.undo | **Undo** | Puts the cleared face back. Also in the Type menu |
+| 12.5 | menu.type | **Type** | Menu bar title. Holds both Clear commands and Undo |
+| 12.6 | reading.loading | **Finding Reading faces** | Spinner label while Reading has no answer and no Display face. With one: **Finding partners for PP Museum** |
+
+Reading always shows a spinner, an error or its list. It is never blank.
+
+### Gates for section 12
+
+A pass · B pass · C pass (no em dashes) · D pass · F pass · N pass · Q pass · R pass

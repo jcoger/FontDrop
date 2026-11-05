@@ -118,6 +118,7 @@ func captureSize() -> NSSize {
 ///   --display-size <pt>        the Display playground size, in memory only
 ///   --reading-size <pt>        the Reading playground size of the selected candidate, in memory only
 ///   --pick-reading <family>    choose this family for Reading (in the DB copy)
+///   --clear <job>              clear the Display or Reading face (in the DB copy)
 @MainActor
 func applyReadingFlags(_ model: AppModel) async {
     let args = CommandLine.arguments
@@ -129,6 +130,7 @@ func applyReadingFlags(_ model: AppModel) async {
         for name in list.split(separator: ",") { await model.setShortlist("reading", family: String(name), on: true) }
     }
     if let f = value("--pick-reading") { await model.choose("reading", family: f) }
+    if let job = value("--clear") { await model.clear(job) }          // "Clear Display face", for the screenshot of the result
     if let size = value("--display-size").flatMap(Double.init), let d = model.displayFamily {
         model.typeSettings.update(model.settingsKey("display", d.name), job: "display") { $0.size = size }
     }
@@ -170,6 +172,17 @@ enum ScreenshotRunner {
             await applyReadingFlags(model)
         } else {
             model.selectedFamily = model.options.select ?? model.chosen(model.screen) ?? model.visibleFamilies.first?.name
+        }
+        if model.options.bgRefresh {
+            // FD_BG_REFRESH=1 runs the real background rescan. FD_BG_REFRESH_AT=<s> captures that many seconds
+            // after the window is ready (mid-rescan); otherwise the capture waits for the rescan to finish.
+            if let at = env["FD_BG_REFRESH_AT"].flatMap(Double.init) {
+                try? await Task.sleep(for: .seconds(max(0, at - 5)))
+            } else {
+                var waited = 0
+                while !model.rescanDone && waited < 6000 { try? await Task.sleep(for: .milliseconds(100)); waited += 1 }
+                try? await Task.sleep(for: .seconds(2))
+            }
         }
         if let family = model.options.demoChoose {
             // The "Name this brand" sheet: with --no-brand, pressing "Use for Display" opens it.

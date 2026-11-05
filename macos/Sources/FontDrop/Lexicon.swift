@@ -198,6 +198,10 @@ enum Lexicon {
     static func setDone(_ job: String) -> String { "\(job.capitalized) face set" }
     static func current(_ job: String) -> String { "Current \(job.capitalized) face" }
     static let undo = "Undo"
+    /// "Clear Display face". Takes the face off the job. Undo puts it back.
+    static func clearFace(_ job: String) -> String { "Clear \(job.capitalized) face" }
+    static func cleared(_ job: String) -> String { "\(job.capitalized) face cleared" }
+    static let typeMenu = "Type"
     static let findReading = "Find a Reading face"
     static let setTheType = "Next: sizes and spacing"
 
@@ -305,6 +309,7 @@ enum Lexicon {
         static let foot = "Not made for long text"
         static func footCount(_ n: Int) -> String { "\(n) not made for long text" }
         static let findingNone = "No Reading partners found."
+        static let findingFaces = "Finding Reading faces"
         static func finding(_ display: String) -> String { "Finding partners for \(display)" }
         static func onItsOwn(_ family: String) -> String { "\(family) on its own" }
         static let pickHeadline = "Pick a headline face to see pairs"

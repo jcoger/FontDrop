@@ -6,6 +6,14 @@ struct PosterLayered: View {
     let ctx: PairContext
     private var p: TemplatePalette { ctx.palette }
 
+    /// The fit rule (PosterFit.swift): the ghost words and the footer line shrink until the three words clear the footer.
+    init(ctx base: PairContext) {
+        var items = TemplateCopy.layeredWord.map { FitItem(text: $0, px: 212, lh: 0.86, tracking: -0.05, fitWidth: 600 - 8 - 16) }
+        items.append(FitItem(text: TemplateCopy.layeredFoot, px: 30, lh: 1.07, width: 330))
+        // The ghost starts 40 down. The footer has a gap, a rule and a bottom margin.
+        ctx = base.fitted(height: 750, fixed: 40 + 12 + 24 + 8, items: items)
+    }
+
     var body: some View {
         Board(background: p.background.color, height: 750) {
             ZStack(alignment: .topLeading) {
