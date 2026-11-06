@@ -346,8 +346,8 @@ struct SelectionPill: View {
     var radius: CGFloat = 10
 
     var body: some View {
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-            .fill(on ? (sidebar ? theme.selectSidebar : theme.selectList).color : .clear)
+        SelectionMark(on: on, shape: RoundedRectangle(cornerRadius: radius, style: .continuous),
+                      fill: (sidebar ? theme.selectSidebar : theme.selectList).color)
     }
 }
 

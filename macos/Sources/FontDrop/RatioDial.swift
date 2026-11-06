@@ -265,7 +265,7 @@ struct RatioDial: View {
             .modifier(Glow(layers: glow, color: theme.signal.color))
             .position(x: Self.pivot.x, y: Self.pivot.y - length / 2)
             .rotationEffect(.degrees(shownAngle), anchor: UnitPoint(x: Self.pivot.x / Self.board.width, y: Self.pivot.y / Self.board.height))
-            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.7), value: restingAngle)
+            .animation(Motion.ok(Motion.spring), value: restingAngle)
     }
 
     private var pivot: some View {

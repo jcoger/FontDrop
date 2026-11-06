@@ -46,10 +46,10 @@ struct ReadingStage: View {
         if !compared.isEmpty {
             compare(size: size, families: compared)
         } else if let c = selected, let ctx = model.pairContext(reading: c.family, fallbackPath: c.filePath) {
-            StageCanvas(context: ctx, template: model.activeTemplate, zoom: model.stageZoom.factor, size: size)
+            StageCanvas(context: ctx, template: model.activeTemplate, zoom: model.stageZoom.factor, size: size,
+                        changeKey: model.templateID + "/" + model.brandStyle.variant(model.activeTemplate))
         } else {
-            Text(Lexicon.Reading.pickOne).font(.callout).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            EmptyScreen(label: Lexicon.R9.nothingSelected, line: Lexicon.Reading.pickOne)
         }
     }
 
@@ -99,6 +99,7 @@ struct StageCanvas: View {
     let size: CGSize
     var padding: CGFloat = 24
     var topAligned = false
+    var changeKey = ""                // changes with the template or its layout: the board fades in again
     @State private var designHeight: CGFloat = 640
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.theme) private var theme
@@ -109,6 +110,7 @@ struct StageCanvas: View {
         let width = Board<EmptyView>.designWidth * fit * CGFloat(zoom)
         ScrollView([.horizontal, .vertical]) {
             template.make(context)
+                .selectionFade(changeKey)
                 .frame(width: width)
                 .onPreferenceChange(BoardHeightKey.self) { if $0 > 0 { designHeight = $0 } }
                 .shadow(color: theme.templateCardShadow.first?.color.color ?? .clear,
@@ -117,7 +119,7 @@ struct StageCanvas: View {
                 .frame(minWidth: size.width, minHeight: size.height, alignment: topAligned ? .top : .center)
         }
         .scrollIndicators(zoom > 1.001 ? .automatic : .hidden)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: zoom)
+        .animation(Motion.ok(Motion.standard), value: zoom)      // the board is laid out at 600 pt and scaled, so type never re-wraps mid-animation
     }
 }
 
@@ -170,15 +172,15 @@ struct LayoutMenu: View {
         Menu {
             ForEach(Templates.all) { template in
                 Section(template.title) {
-                    ForEach(template.variants) { v in
-                        Button {
-                            model.templateID = template.id
-                            model.brandStyle.setVariant(v.id, template: template)
-                        } label: {
-                            if template.id == current.id && v.id == variant { Label(v.title, systemImage: "checkmark") }
-                            else { Text(v.title) }
-                        }
+                    // One inline picker per template, all on the same selection: the system checks the current layout.
+                    Picker(template.title, selection: Binding(get: { "\(current.id)/\(variant)" }, set: { pick in
+                        guard let v = template.variants.first(where: { "\(template.id)/\($0.id)" == pick }) else { return }
+                        model.templateID = template.id
+                        model.brandStyle.setVariant(v.id, template: template)
+                    })) {
+                        ForEach(template.variants) { Text($0.title).tag("\(template.id)/\($0.id)") }
                     }
+                    .pickerStyle(.inline).labelsHidden()
                 }
             }
         } label: {
@@ -241,7 +243,7 @@ struct DecideBar: View {
         .glass(\.glassBar, in: Capsule(), bar: true)
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 16)
         .frame(minWidth: 0, maxWidth: .infinity)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isChosen)
+        .animation(Motion.ok(Motion.quick), value: isChosen)
     }
 
     private var shortlistCount: Int { model.shortlist("reading").count }

@@ -9,6 +9,7 @@ struct FamilyPickerView: View {
     @FocusState private var focused: Bool
     @State private var keyboardNav = false       // the focus ring shows once a key is used, not after a click
     @State private var gridWidth: CGFloat = 800
+    @Namespace private var glide
 
     private static let cellMin: CGFloat = 220, cellSpacing: CGFloat = 14
     private let columns = [GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 14)]
@@ -28,8 +29,17 @@ struct FamilyPickerView: View {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Choose the \(screen.title) face").font(.title2.weight(.semibold))
-                    Text(subtitle(count: families.count))
-                        .font(.callout).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(subtitle(count: families.count))
+                            .font(.callout).foregroundStyle(.secondary)
+                        // A filter you cannot see in the bar (a style trait, Show hidden, a narrower source) is named here,
+                        // with the way out. The counts in the menus are what this grid shows, so nothing hides silently.
+                        if !model.filter.isStandard || !model.search.isEmpty {
+                            Text(Lexicon.R9.filtersOn).moduleLabel()
+                            Button(Lexicon.clearFilters) { model.filter = .standard; model.search = "" }
+                                .buttonStyle(.themeLink).font(.system(size: 12))
+                        }
+                    }
                 }
                 if families.isEmpty {
                     emptyState
@@ -50,10 +60,13 @@ struct FamilyPickerView: View {
                                 .onTapGesture { keyboardNav = false; model.selectedFamily = family.name; focused = true }
                         }
                     }
+                    .environment(\.glide, glide)
                 }
             }
             .padding(20)
             .background(GeometryReader { geo in Color.clear.onChange(of: geo.size.width, initial: true) { _, w in gridWidth = w - 40 } })
+            .background(Color.clear.contentShape(Rectangle())            // behind the cards: a click on empty ground gives the grid the keys back
+                .onTapGesture { keyboardNav = false; focused = true })
         }
         .focusable()
         .focused($focused)
@@ -61,7 +74,7 @@ struct FamilyPickerView: View {
         .onAppear { focused = true }
         .onChange(of: model.focusListTick) { _, _ in focused = true }
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, .space]) { press in
-            guard press.modifiers.isEmpty else { return .ignored }
+            guard press.isPlain else { return .ignored }
             switch press.key {
             case .return:
                 guard model.canUseSelected else { return .ignored }
@@ -100,17 +113,13 @@ struct FamilyPickerView: View {
             ProgressView(Lexicon.Scan.scanningFonts)
                 .frame(maxWidth: .infinity, minHeight: 240)
         } else if model.filter.savedOnly && model.search.isEmpty && model.filter.kinds.isEmpty && model.filter.traits.isEmpty {
-            ContentUnavailableView {
-                Label(Lexicon.Finder.savedEmpty, systemImage: "star")
-            } actions: {
-                Button(Lexicon.Finder.showAllFonts) { model.showAllFonts() }
-            }
+            EmptyScreen(label: Lexicon.R9.nothingSavedLabel, line: Lexicon.Finder.savedEmpty,
+                        actionTitle: Lexicon.Finder.showAllFonts, action: { model.showAllFonts() })
+                .frame(minHeight: 260)
         } else {
-            ContentUnavailableView {
-                Label(Lexicon.Finder.noMatches, systemImage: "line.3.horizontal.decrease.circle")
-            } actions: {
-                Button(Lexicon.clearFilters) { model.filter = .standard; model.search = "" }
-            }
+            EmptyScreen(label: Lexicon.R9.noMatchesLabel, line: Lexicon.Finder.noMatches,
+                        actionTitle: Lexicon.clearFilters, action: { model.filter = .standard; model.search = "" })
+                .frame(minHeight: 260)
         }
     }
 
@@ -190,16 +199,15 @@ struct FamilyCard: View {
             Button(isHidden ? Lexicon.Finder.unhide : Lexicon.Finder.hide, systemImage: isHidden ? "eye" : "eye.slash", action: toggleHidden)
         }
         .background(RoundedRectangle(cornerRadius: 12).fill(theme.controlGround.color))
-        .overlay { if isSelected {      // board 16 option B: a 1.5 pt ring, grids only
-            RoundedRectangle(cornerRadius: 12).strokeBorder(theme.textPrimary.color, lineWidth: 1.5)
-        } }
+        // board 16 option B: a 1.5 pt ring, grids only. One ring glides from tile to tile.
+        .overlay { SelectionMark(on: isSelected, shape: RoundedRectangle(cornerRadius: 12), fill: theme.textPrimary.color, ring: 1.5) }
         .overlay { if showFocus {
             RoundedRectangle(cornerRadius: 14, style: .continuous).inset(by: -3)
                 .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2)
         } }
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction(named: isSaved ? Lexicon.Finder.removeSaved : Lexicon.Finder.save, toggleSaved)
     }
 }

@@ -67,7 +67,8 @@ struct SourceMenu: View {
                 Toggle(isOn: Binding(get: { model.filter.sources.contains(source) }, set: { on in
                     if on { model.filter.sources.insert(source) } else { model.filter.sources.remove(source) }
                 })) {
-                    Text(label(Lexicon.Finder.sourceLabel(source), counts?.sources.first { $0.source == source }.map { Int($0.count) }))
+                    Label(label(Lexicon.Finder.sourceLabel(source), counts?.sources.first { $0.source == source }.map { Int($0.count) }),
+                          systemImage: Self.symbol(source))
                 }
             }
             Divider()
@@ -90,6 +91,10 @@ struct SourceMenu: View {
     }
 
     private func label(_ title: String, _ count: Int?) -> String { count.map { "\(title)  \($0.formatted())" } ?? title }
+
+    private static func symbol(_ source: Source) -> String {
+        switch source { case .yours: "folder"; case .google: "globe"; case .system: "desktopcomputer" }
+    }
 }
 
 /// One kind at a time, or All. A segmented control on the control ground (the selected segment is the one filled
@@ -152,11 +157,11 @@ struct MoreMenu: View {
             }
             Divider()
             Toggle(isOn: $model.filter.showHidden) {
-                Text(label(Lexicon.Finder.showHidden, counts?.hidden))
+                Label(label(Lexicon.Finder.showHidden, counts?.hidden), systemImage: "eye")
             }
             if !model.filter.isStandard {
                 Divider()
-                Button(Lexicon.clearFilters) { model.filter = .standard }
+                Button(Lexicon.clearFilters, systemImage: "xmark.circle") { model.filter = .standard }
             }
         } label: {
             HStack(spacing: 4) {
@@ -170,6 +175,7 @@ struct MoreMenu: View {
         .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
         .fixedSize()
         .help(Lexicon.Finder.moreHelp)
+        .accessibilityLabel(Lexicon.Finder.more)
     }
 
     private func label(_ title: String, _ count: UInt32?) -> String {

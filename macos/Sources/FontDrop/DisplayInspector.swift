@@ -30,10 +30,9 @@ struct FamilyInspector: View {
                 .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
             }
             .safeAreaInset(edge: .bottom) { action(family).background(.ultraThinMaterial) }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.choices[screen.job ?? ""] == family.name)
+            .animation(Motion.ok(Motion.quick), value: model.choices[screen.job ?? ""] == family.name)
         } else {
-            ContentUnavailableView(Lexicon.R4.noSelection, systemImage: "textformat",
-                                   description: Text(Lexicon.R4.noSelectionHelp))
+            EmptyScreen(label: Lexicon.R4.noSelection, line: Lexicon.R4.noSelectionHelp)
         }
     }
 
@@ -75,6 +74,7 @@ struct SampleModule: View {
     @Environment(\.theme) private var theme
     let job: String
     let family: FamilySummary
+    @FocusState private var typing: Bool
 
     var body: some View {
         let face = model.face(job, family)
@@ -91,6 +91,8 @@ struct SampleModule: View {
                           axis: .vertical)
                     .textFieldStyle(.plain).font(.system(size: 13))
                     .lineLimit(1...3)
+                    .focused($typing)
+                    .onExitCommand { typing = false; model.requestListFocus() }       // Escape: the keys go back to the list
                     .accessibilityLabel(Lexicon.R4.sample)
                 if model.customSample != nil {
                     Button { model.setSample("") } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 12)) }

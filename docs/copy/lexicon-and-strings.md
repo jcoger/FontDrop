@@ -652,3 +652,27 @@ Strings moved into `Lexicon` or changed. No new wording for the designer except 
 | 25.5 | view.zoom | **Zoom in** | Command-= in the View menu. Command-+ also works (no menu item of its own) |
 | 25.6 | export.tailwind | **--font-weight-display-style** · **--font-weight-text-style** | In the Tailwind export. They make the classes `font-display-style` and `font-text-style`. The old names `--font-weight-display` and `--font-weight-text` made no class, and `font-display` is the family |
 | 25.7 | finder.showAllFonts | **Show all fonts** | R8. Button in the Saved empty state. Sets the scope back to Your fonts + Google |
+
+
+## 26. First-use blockers (R9a, 2026-11-05)
+
+Plain words. No em dashes. The empty states use a short Geist Mono label (set in caps by the label style) over one plain line.
+
+| ID | Key | String | Note |
+|---|---|---|---|
+| 26.1 | finder.sourceMenu.empty | **Your fonts + Google** | Was **No source**. An empty source set is never stored now (the model snaps back to the default), so this only covers a stray value |
+| 26.2 | empty.nothingSelected | **Nothing selected** · **Pick a face in the grid to see it here.** | Display inspector with no face picked. Was "No family selected" and "Select a family to try its styles and letters." (R4.noSelection, R4.noSelectionHelp) |
+| 26.3 | empty.textNothingSelected | **Nothing selected** · **Pick a face in the list to see why it pairs.** | Text inspector and Text stage. Was "Pick a candidate to see why it pairs." (Reading.pickOne) |
+| 26.4 | empty.noMatches | **No matches** · **No families match these filters.** · button **Clear filters** | Display grid. Label is R9.noMatchesLabel |
+| 26.5 | empty.nothingSaved | **Nothing saved** · **Nothing saved yet. Star a family to keep it here.** · button **Show all fonts** | Display grid, Saved on |
+| 26.6 | set.oneFace | **Choose a Text face** · **Go to Text** · **⌘ 2** · **Choose a Display face** · **Go to Display** · **⌘ 1** | Set rows whose face is not chosen yet. Help text: Command-2, Command-1 |
+| 26.7 | set.neither | **Nothing to set yet** · **Choose a Display face and a Text face to see the scale.** · button **Go to Display** | Set with no face |
+| 26.8 | set.titleOne | **Type scale · <face>** | Set heading with one face chosen |
+| 26.9 | appearance | **Appearance** · **System** · **Light** · **Dark** | View menu, checkmark style. The sidebar sun or moon button: **Switch to light** · **Switch to dark** (help), VoiceOver name **Appearance**, value System, Light or Dark |
+| 26.10 | scale.readout.help | **Show or hide the scale controls** | Text inspector scale line. Was "Open Set to change the scale". Value for VoiceOver: expanded or collapsed |
+| 26.11 | grid.filtered | **Filtered** · **Clear filters** | Next to the Display grid count whenever a filter, a narrower source or a search is on |
+| 26.12 | reading.couldNotLoad | **Could not load** · the error text | Text list when the candidates fail. Was "Could not load candidates" |
+
+### Gates for section 26
+
+C pass (no em dashes) · R pass

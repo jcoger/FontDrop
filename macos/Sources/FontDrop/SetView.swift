@@ -39,42 +39,78 @@ struct SetView: View {
     @ViewBuilder
     private func content(width: CGFloat) -> some View {
         let tick = model.fontTick
-        if let display = model.displayFamily, let reading = model.readingFamily {
-            let sizes = SetSizes.resolve(model: model, reading: reading)
-            let displayFace = model.face("display", display), textFace = model.face("reading", reading)
+        let display = model.displayFamily, reading = model.readingFamily
+        if display == nil && reading == nil {
+            EmptyScreen(label: Lexicon.SetScreen.neitherLabel, line: Lexicon.SetScreen.neitherLine,
+                        actionTitle: Lexicon.SetScreen.goToDisplay, actionHint: "\u{2318}1", actionHelp: Lexicon.SetScreen.goToDisplayHelp,
+                        action: { model.screen = .display })
+                .frame(minHeight: 420)
+        } else {
+            // One face is enough to start: its steps are drawn, and the other face's steps hold a quiet row that says so.
+            let sizes = reading.map { SetSizes.resolve(model: model, reading: $0) } ?? SetSizes.fromScale(model.scale)
+            let displayFace = display.map { model.face("display", $0) }, textFace = reading.map { model.face("reading", $0) }
+            let displayWho = display.flatMap { d in displayFace.map { (Lexicon.SetScreen.faceAndStyle(d.name, model.styleLabel($0, family: d.name)), $0) } }
+            let textWho = reading.flatMap { r in textFace.map { (Lexicon.SetScreen.faceAndStyle(r.name, model.styleLabel($0, family: r.name)), $0) } }
             let stacked = isStacked(width)
             let specWidth = max(width - 2 * pad - (stacked ? 0 : labelWidth + gutter), 120)
             VStack(alignment: .leading, spacing: 0) {
-                Text(Lexicon.SetScreen.stageTitle(display: display.name, text: reading.name))
+                Text(display != nil && reading != nil
+                     ? Lexicon.SetScreen.stageTitle(display: display!.name, text: reading!.name)
+                     : Lexicon.SetScreen.stageTitleOne((display ?? reading)!.name))
                     .font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.textPrimary.color)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 18)
                 ForEach(ScaleStep.stageOrder) { step in
-                    row(step, sizes: sizes, display: (Lexicon.SetScreen.faceAndStyle(display.name, model.styleLabel(displayFace, family: display.name)), displayFace),
-                        text: (Lexicon.SetScreen.faceAndStyle(reading.name, model.styleLabel(textFace, family: reading.name)), textFace),
-                        specWidth: specWidth, stacked: stacked, tick: tick)
+                    if let who = step.isDisplayFace ? displayWho : textWho {
+                        row(step, sizes: sizes, who: who, specWidth: specWidth, stacked: stacked, tick: tick)
+                    } else {
+                        missingRow(step, sizes: sizes, stacked: stacked)
+                    }
                 }
                 scaledNote(sizes: sizes, display: displayFace, text: textFace, specWidth: specWidth)
             }
             .padding(.horizontal, pad).padding(.top, 52).padding(.bottom, 32)
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                if model.displayFamily == nil { Text(Lexicon.SetScreen.needsDisplay) }
-                if model.readingFamily == nil { Text(Lexicon.SetScreen.needsText) }
-            }
-            .font(.system(size: 14)).foregroundStyle(theme.textSecondary.color)
-            .padding(.horizontal, pad).padding(.top, 64)
         }
+    }
+
+    /// The row for a step whose face is not chosen yet: the same label, and one quiet line with the way to choose it.
+    private func missingRow(_ step: ScaleStep, sizes: SetSizes, stacked: Bool) -> some View {
+        let needsDisplay = step.isDisplayFace
+        let label = VStack(alignment: .leading, spacing: 3) {
+            Text("\(step.label) \u{00B7} \(Lexicon.SetScreen.points(sizes.size(step)))").moduleLabel().lineLimit(1).minimumScaleFactor(0.7)
+        }
+        let chooser = HStack(spacing: 10) {
+            Text(needsDisplay ? Lexicon.SetScreen.chooseDisplay : Lexicon.SetScreen.chooseText)
+                .font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
+            Button(needsDisplay ? Lexicon.SetScreen.goToDisplay : Lexicon.SetScreen.goToText) {
+                model.screen = needsDisplay ? .display : .reading
+            }
+            .buttonStyle(.themeLink).font(.system(size: 13))
+            .help(needsDisplay ? Lexicon.SetScreen.goToDisplayHelp : Lexicon.SetScreen.goToTextHelp)
+            Text(needsDisplay ? "\u{2318}1" : "\u{2318}2").moduleLabel()
+        }
+        return VStack(alignment: .leading, spacing: 0) {
+            Rectangle().fill(theme.sliderTrack.color).frame(height: 1)
+            if stacked {
+                VStack(alignment: .leading, spacing: 8) { label; chooser }.padding(.vertical, 14)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: gutter) {
+                    label.frame(width: labelWidth, alignment: .leading)
+                    chooser
+                }
+                .padding(.vertical, 14)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Rows
 
     private func line(for step: ScaleStep) -> String { step.sampleLine }
 
-    private func row(_ step: ScaleStep, sizes: SetSizes, display: (name: String, face: FaceSpec), text: (name: String, face: FaceSpec),
+    private func row(_ step: ScaleStep, sizes: SetSizes, who: (name: String, face: FaceSpec),
                      specWidth: CGFloat, stacked: Bool, tick: Int) -> some View {
         let pt = sizes.size(step)
-        let who = step.isDisplayFace ? display : text
         let plan = SetRowPlan.make(step: step, pt: pt, face: who.face, text: line(for: step), specWidth: Double(specWidth), sizes: sizes)
         let specimen = FaceText(face: who.face, text: line(for: step), ratio: CGFloat(plan.drawnPt / max(who.face.settings.size, 1)),
                                 tick: tick, trackBias: 0, leading: plan.leading)
@@ -109,10 +145,11 @@ struct SetView: View {
 
     /// One quiet line when any preview was scaled to fit.
     @ViewBuilder
-    private func scaledNote(sizes: SetSizes, display: FaceSpec, text: FaceSpec, specWidth: CGFloat) -> some View {
+    private func scaledNote(sizes: SetSizes, display: FaceSpec?, text: FaceSpec?, specWidth: CGFloat) -> some View {
         let scaled = ScaleStep.stageOrder.contains { step in
-            SetRowPlan.make(step: step, pt: sizes.size(step), face: step.isDisplayFace ? display : text, text: line(for: step),
-                            specWidth: Double(specWidth), sizes: sizes).factor < 0.999
+            guard let face = step.isDisplayFace ? display : text else { return false }
+            return SetRowPlan.make(step: step, pt: sizes.size(step), face: face, text: line(for: step),
+                                   specWidth: Double(specWidth), sizes: sizes).factor < 0.999
         }
         if scaled {
             Text(Lexicon.SetScreen.previewScaled).moduleLabel().padding(.top, 12)
@@ -129,6 +166,12 @@ struct SetSizes {
     var lineHeight: Double
 
     func size(_ step: ScaleStep) -> Double { body * pow(ratio, Double(step.rawValue)) }
+
+    /// No Text face to fit against: the brand's own body and ratio, as saved.
+    @MainActor
+    static func fromScale(_ scale: TypeScale) -> SetSizes {
+        SetSizes(body: scale.body, ratio: scale.ratio, measure: TextRules.measure(scale), lineHeight: TextRules.lineHeight(scale))
+    }
 
     @MainActor
     static func resolve(model: AppModel, reading: FamilySummary) -> SetSizes {
@@ -220,6 +263,6 @@ struct SetBar: View {
             InspectorToggle()
         }
         .padding(.horizontal, 16).padding(.top, 16)
-        .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeOut(duration: 0.15), value: model.exportNotice)
+        .animation(Motion.ok(Motion.quick), value: model.exportNotice)
     }
 }

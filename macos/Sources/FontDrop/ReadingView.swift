@@ -26,6 +26,7 @@ struct ReadingView: View {
 struct ReadingList: View {
     @Environment(AppModel.self) private var model
     @FocusState private var focused: Bool
+    @Namespace private var glide
     @State private var keyboardNav = false       // the focus ring shows once the arrow keys are used, not after a click
 
     var body: some View {
@@ -48,16 +49,13 @@ struct ReadingList: View {
             ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? Lexicon.Reading.findingFaces)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = model.candidatesError {
-            ContentUnavailableView("Could not load candidates", systemImage: "exclamationmark.triangle", description: Text(error))
+            EmptyScreen(label: Lexicon.R9.couldNotLoadLabel, line: error)
         } else if rows.isEmpty {
-            ContentUnavailableView {
-                Label(model.candidates.isEmpty ? Lexicon.Reading.findingNone : Lexicon.readingNone,
-                      systemImage: "line.3.horizontal.decrease.circle")
-            } description: {
-                if result.hidden > 0 { Text(Lexicon.Reading.hiddenByFilters(result.hidden)) }
-            } actions: {
-                if !model.lenses.isNeutral { Button(Lexicon.clearFilters) { model.resetLenses() } }
-            }
+            EmptyScreen(label: Lexicon.R9.noMatchesLabel,
+                        line: ([model.candidates.isEmpty ? Lexicon.Reading.findingNone : Lexicon.readingNone]
+                               + (result.hidden > 0 ? [Lexicon.Reading.hiddenByFilters(result.hidden) + "."] : [])).joined(separator: " "),
+                        actionTitle: model.lenses.isNeutral ? nil : Lexicon.clearFilters,
+                        action: model.lenses.isNeutral ? nil : { model.resetLenses() })
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -65,19 +63,20 @@ struct ReadingList: View {
                         ForEach(rows) { c in row(c) }
                     }
                     .padding(8)
+                    .environment(\.glide, glide)
                 }
                 .focusable()
                 .focused($focused)
                 .focusEffectDisabled()      // the ring is drawn on the row (CandidateRow), distinct from the pill
-                .onKeyPress(.upArrow) { move(-1, rows) }
-                .onKeyPress(.downArrow) { move(1, rows) }
+                .onKeyPress(keys: [.upArrow]) { press in press.isPlain ? move(-1, rows) : .ignored }
+                .onKeyPress(keys: [.downArrow]) { press in press.isPlain ? move(1, rows) : .ignored }
                 .onKeyPress(keys: [.return]) { press in
-                    guard press.modifiers.isEmpty, model.canUseSelected else { return .ignored }
+                    guard press.isPlain, model.canUseSelected else { return .ignored }
                     Task { await model.useSelected() }
                     return .handled
                 }
                 .onKeyPress(keys: [.space]) { press in
-                    guard press.modifiers.isEmpty, model.selectedFaceName != nil else { return .ignored }
+                    guard press.isPlain, model.selectedFaceName != nil else { return .ignored }
                     model.togglePreview()
                     return .handled
                 }
