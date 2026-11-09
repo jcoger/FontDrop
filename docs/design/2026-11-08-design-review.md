@@ -75,7 +75,7 @@ Title block at the top line. Then sections, each with a mono-caps head, 16 above
 
 ## For the other products
 
-This is the part that travels. Tearsheet and the writing app take these rules as they are and change only their instrument.
+This is the part that travels. The other products in the suite take these rules as they are and change only their instrument.
 
 1. Two surfaces: ground for the work, panel for the tools.
 2. One instrument with a live red value. Everything else is quiet.
