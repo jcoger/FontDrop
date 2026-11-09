@@ -167,6 +167,12 @@ final class R7Tests: XCTestCase {
         model.screen = .set
         XCTAssertFalse(model.scale.locked)
         let reading = try XCTUnwrap(model.readingFamily)
+        // Touching Body while on Auto takes the scale out of Auto and sets the size.
+        model.setBody(17, reading: reading.name, fallbackPath: reading.filePath)
+        XCTAssertTrue(model.scale.locked)
+        XCTAssertEqual(model.scale.body, 17)
+        model.returnToAuto()
+        XCTAssertFalse(model.scale.locked)
         let stop = DialMath.step(from: DialMath.stopIndex(nearestToRatio: model.scale.ratio), by: 1)
         model.setRatio(DialMath.stops[stop], reading: reading.name, fallbackPath: reading.filePath)
         XCTAssertTrue(model.scale.locked)

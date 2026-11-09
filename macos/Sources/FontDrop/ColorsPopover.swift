@@ -31,6 +31,7 @@ struct ColorsButton: View {
                 Text(Lexicon.Colors.button)
             }
         }
+        .buttonStyle(.plain)
         .help(Lexicon.Colors.buttonHelp)
         .accessibilityLabel(Lexicon.Colors.button)
         .accessibilityValue(p.presetID.map { $0.capitalized } ?? "Custom")

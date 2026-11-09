@@ -143,7 +143,7 @@ struct AlternatesModule: View {
                 .lineLimit(1).minimumScaleFactor(0.5)
                 .foregroundStyle(theme.textPrimary.color)
                 .frame(maxWidth: .infinity).frame(height: 56)
-                .recessed(radius: 10)
+                .well(radius: 10)
                 .overlay {
                     if on { RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(theme.textPrimary.color, lineWidth: 1.5) }
                 }

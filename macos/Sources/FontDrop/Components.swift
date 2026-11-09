@@ -47,35 +47,6 @@ struct TagPill: View {
     }
 }
 
-/// One short reason as a chip. Effect +1 helps, -1 counts against, 0 is "not scored":
-/// drawn neutral with a dashed outline. Meaning never rests on colour alone: "against"
-/// carries a minus sign and "not scored" a dashed edge.
-struct EvidenceChip: View {
-    @Environment(\.theme) private var theme
-    let text: String
-    let effect: Int8
-    var help: String = ""
-    var warning = false      // "too close": an icon plus secondary colour, so it never reads as a plus
-
-    private var label: Text {
-        let words = Text((effect < 0 && !warning ? "\u{2212} " : "") + text)   // the icon already marks a warning
-        return warning ? Text(Image(systemName: "exclamationmark.triangle")) + Text(" ") + words : words
-    }
-
-    var body: some View {
-        label
-            .font(.system(size: 12))
-            .lineLimit(1)
-            .padding(.horizontal, 10).padding(.vertical, 4)
-            .background(Capsule().fill(effect == 0 ? .clear : theme.chipGround.color))
-            .overlay { if effect == 0 {   // "not scored" keeps its dashed edge: meaning never rests on colour alone
-                Capsule().strokeBorder(theme.textSecondary.color.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-            } }
-            .foregroundStyle(effect == 0 || warning ? theme.textSecondary.color : theme.textPrimary.color)
-            .help(help)
-    }
-}
-
 /// A small "?" that opens a one-line explanation of a term. Book words live here, not in labels.
 struct HelpButton: View {
     let term: Lexicon.Term
@@ -118,36 +89,6 @@ struct GlossaryButton: View {
     }
 }
 
-/// Chips that wrap onto new lines.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        arrange(width: proposal.width ?? .infinity, subviews: subviews).size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(width: bounds.width, subviews: subviews)
-        for (i, origin) in result.origins.enumerated() {
-            subviews[i].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
-        }
-    }
-
-    private func arrange(width: CGFloat, subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
-        var origins: [CGPoint] = []
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
-        for sub in subviews {
-            let s = sub.sizeThatFits(.unspecified)
-            if x > 0 && x + s.width > width { x = 0; y += rowHeight + spacing; rowHeight = 0 }
-            origins.append(CGPoint(x: x, y: y))
-            x += s.width + spacing
-            rowHeight = max(rowHeight, s.height)
-            maxX = max(maxX, x - spacing)
-        }
-        return (CGSize(width: maxX, height: y + rowHeight), origins)
-    }
-}
-
 /// A module in the inspector: a Geist Mono caps label over its content. No card, no rules.
 struct InspectorSection<Content: View>: View {
     @Environment(\.theme) private var theme
@@ -156,16 +97,19 @@ struct InspectorSection<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(title).moduleLabel()
-                Spacer()
-                if let trailing { Text(trailing).moduleLabel() }
+        VStack(alignment: .leading, spacing: 0) {
+            SectionRule()
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(title).moduleLabel()
+                    Spacer()
+                    if let trailing { Text(trailing).moduleLabel() }
+                }
+                VStack(alignment: .leading, spacing: 0) { content }
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            VStack(alignment: .leading, spacing: 0) { content }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 16).padding(.bottom, 20)
         }
-        .padding(.top, 22).padding(.bottom, 10)
     }
 }
 
@@ -181,7 +125,7 @@ struct DecisionButton: View {
         }
         .buttonStyle(PrimaryButtonStyle(large: true))
         .disabled(disabled)
-        .padding(14)
+        .padding(.horizontal, Metrics.lane).padding(.vertical, 14)
     }
 }
 

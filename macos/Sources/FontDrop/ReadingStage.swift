@@ -49,7 +49,7 @@ struct ReadingStage: View {
             StageCanvas(context: ctx, template: model.activeTemplate, zoom: model.stageZoom.factor, size: size,
                         changeKey: model.templateID + "/" + model.brandStyle.variant(model.activeTemplate))
         } else {
-            EmptyScreen(label: Lexicon.R9.nothingSelected, line: Lexicon.Reading.pickOne)
+            EmptyScreen(label: Lexicon.R9.stageEmptyTitle, line: Lexicon.R9.stageEmptyLine, specimen: model.displayFamily.map { model.face("display", $0) }, tick: model.fontTick)
         }
     }
 
@@ -147,14 +147,14 @@ struct StageBar: View {
             if comparing {
                 Text(title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                     .foregroundStyle(theme.textPrimary.color)
-                    .padding(.horizontal, 14).frame(height: 36)
+                    .padding(.horizontal, 14).frame(height: Metrics.control)
                     .glass(\.glassBar, in: Capsule(), bar: true)
             }
-            if layout { LayoutMenu().padding(.horizontal, 14).frame(height: 36).glass(\.glassBar, in: Capsule(), bar: true) }
-            if colors { ColorsButton().padding(.horizontal, 14).frame(height: 36).glass(\.glassBar, in: Capsule(), bar: true) }
+            if layout { LayoutMenu().padding(.horizontal, 14).frame(height: Metrics.control).glass(\.glassBar, in: Capsule(), bar: true) }
+            if colors { ColorsButton().padding(.horizontal, 14).frame(height: Metrics.control).glass(\.glassBar, in: Capsule(), bar: true) }
             Spacer(minLength: 8)
             ZoomControls().disabled(comparing)
-                .padding(.horizontal, 10).frame(height: 36).glass(\.glassBar, in: Capsule(), bar: true)
+                .padding(.horizontal, 10).frame(height: Metrics.control).glass(\.glassBar, in: Capsule(), bar: true)
             InspectorToggle()
         }
     }

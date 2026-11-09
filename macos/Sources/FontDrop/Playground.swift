@@ -287,16 +287,8 @@ struct PlaygroundGroup: View {
 
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, readout: String,
                         step: Double = 1, decimals: Int = 0, unit: String? = nil, autoText: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label).font(.callout)
-                Spacer()
-                NumberField(label: label, value: value.wrappedValue, range: range, step: step, decimals: decimals, unit: unit,
-                            autoText: autoText, onChange: { value.wrappedValue = $0 })
-            }
-            Slider(value: value, in: range).controlSize(.small)
-                .accessibilityLabel(label)
-        }
+        BodySlider(value: value.wrappedValue, range: range, step: step, label: label, valueText: { _ in readout },
+                   decimals: decimals, unit: unit, autoText: autoText) { value.wrappedValue = $0 }
     }
 
     // MARK: helpers

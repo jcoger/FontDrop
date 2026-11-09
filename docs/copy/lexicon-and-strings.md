@@ -676,3 +676,13 @@ Plain words. No em dashes. The empty states use a short Geist Mono label (set in
 ### Gates for section 26
 
 C pass (no em dashes) · R pass
+
+## 27. Design review, Nov 8
+
+| ID | Surface | String | Note |
+|---|---|---|---|
+| 27.1 | Text stage, nothing selected | **Choose a Text face** · **Pick one from the list to set it under your headline.** | Replaces "Nothing selected" on the stage |
+| 27.2 | Text inspector, nothing selected | **Why it pairs shows here.** | Quiet line, no title |
+| 27.3 | Scale footer | **Back to Auto** | Replaces "Press for Auto". "Turn to lock" is cut: Body and the dial both leave Auto |
+| 27.4 | Inspector sections | No numbers | "01 · Sample" is now "Sample" |
+| 27.5 | Why it pairs | One fact per line | Evidence is no longer chips |

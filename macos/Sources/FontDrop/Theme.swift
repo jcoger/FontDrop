@@ -54,6 +54,8 @@ struct Theme {
     // Glass: a fill plus a rim, one material.
     let glassSidebar: RGBA, glassInspector: RGBA, glassBar: RGBA
     let rimTop: RGBA, rimRing: RGBA
+    let rule: RGBA                     // the one line between inspector sections
+    let wellFill: RGBA                 // a flat ground for specimens inside a panel
     let panelShadow: [ShadowSpec], barShadow: [ShadowSpec]
 
     // Regions.
@@ -94,17 +96,18 @@ struct Theme {
 
     static let dark = Theme(
         isDark: true,
-        windowTop: RGBA(0x141416), windowBottom: RGBA(0x0D0D0E),
-        glassSidebar: RGBA(0x232321, 0.72), glassInspector: RGBA(0x161614, 0.84), glassBar: RGBA(0x2A2A28, 0.78),
-        rimTop: RGBA(0xFFFFFF, 0.10), rimRing: RGBA(0xFFFFFF, 0.045),
+        windowTop: RGBA(0x121211), windowBottom: RGBA(0x121211),
+        glassSidebar: RGBA(0x1E1E1C), glassInspector: RGBA(0x1E1E1C), glassBar: RGBA(0x2A2A28, 0.78),
+        rimTop: RGBA(0xFFFFFF, 0.08), rimRing: RGBA(0xFFFFFF, 0.04),
+        rule: RGBA(0xFFFFFF, 0.07), wellFill: RGBA(0xFFFFFF, 0.05),
         panelShadow: [], barShadow: [],
-        panelContent: RGBA(0x1C1C1B), panelRing: RGBA(0xFFFFFF, 0.035),
-        stage: RGBA(0x111110),
+        panelContent: RGBA(0x1E1E1C), panelRing: nil,
+        stage: RGBA(0x121211),
         templateCard: RGBA(0xFFFFFF), templateCardShadow: [],
         selectList: RGBA(0x2C2C2A), selectSidebar: RGBA(0xFFFFFF, 0.10),
         controlGround: RGBA(0xFFFFFF, 0.07), chipGround: RGBA(0xFFFFFF, 0.07),
         screenFill: RGBA(0x0D0D0C),
-        screenInsetShadow: RGBA(0x000000, 0.55), screenInsetLight: RGBA(0xFFFFFF, 0.05),
+        screenInsetShadow: RGBA(0x000000, 0.60), screenInsetLight: RGBA(0xFFFFFF, 0.06),
         textPrimary: RGBA(0xEDEBE5), textSecondary: RGBA(0xA5A29A),
         onPrimaryButton: RGBA(0x161615),
         signal: RGBA(0xE5341D),
@@ -117,18 +120,19 @@ struct Theme {
 
     static let light = Theme(
         isDark: false,
-        windowTop: RGBA(0xE3E5EE), windowBottom: RGBA(0xEFEDF2),
-        glassSidebar: RGBA(0xFFFFFF, 0.58), glassInspector: RGBA(0xFFFFFF, 0.58), glassBar: RGBA(0xFFFFFF, 0.72),
-        rimTop: RGBA(0xFFFFFF, 0.95), rimRing: RGBA(0xFFFFFF, 0.60),
-        panelShadow: [ShadowSpec(color: RGBA(0x1E2846, 0.10), radius: 14, y: 8), ShadowSpec(color: RGBA(0x1E2846, 0.08), radius: 1, y: 1)],
+        windowTop: RGBA(0xF1F1EE), windowBottom: RGBA(0xF1F1EE),
+        glassSidebar: RGBA(0xFFFFFF), glassInspector: RGBA(0xFFFFFF), glassBar: RGBA(0xFFFFFF, 0.72),
+        rimTop: RGBA(0xFFFFFF, 0.95), rimRing: RGBA(0x000000, 0.04),
+        rule: RGBA(0x000000, 0.08), wellFill: RGBA(0x000000, 0.04),
+        panelShadow: [ShadowSpec(color: RGBA(0x1E1E1C, 0.06), radius: 10, y: 4), ShadowSpec(color: RGBA(0x1E1E1C, 0.05), radius: 1, y: 1)],
         barShadow: [ShadowSpec(color: RGBA(0x000000, 0.08), radius: 5, y: 2)],
         panelContent: RGBA(0xFFFFFF), panelRing: nil,
-        stage: RGBA(0xF2F2F0),
+        stage: RGBA(0xF1F1EE),
         templateCard: RGBA(0xFFFFFF), templateCardShadow: [ShadowSpec(color: RGBA(0x000000, 0.10), radius: 1.5, y: 1)],
         selectList: RGBA(0xEAEAE7), selectSidebar: RGBA(0x000000, 0.07),
-        controlGround: RGBA(0xF2F2F4), chipGround: RGBA(0x000000, 0.05),
-        screenFill: RGBA(0xEFEFEC),
-        screenInsetShadow: RGBA(0x000000, 0.10), screenInsetLight: RGBA(0xFFFFFF, 0.90),
+        controlGround: RGBA(0x000000, 0.05), chipGround: RGBA(0x000000, 0.05),
+        screenFill: RGBA(0xEDEDEA),
+        screenInsetShadow: RGBA(0x000000, 0.16), screenInsetLight: RGBA(0xFFFFFF, 0.90),
         textPrimary: RGBA(0x1D1D1F), textSecondary: RGBA(0x5F5F64),
         onPrimaryButton: RGBA(0xFFFFFF),
         signal: RGBA(0xE5341D),
@@ -268,7 +272,7 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
         let shadows = bar ? theme.barShadow : theme.panelShadow
         content
             .background(shape.fill(theme[keyPath: fill].color))
-            .background { SystemGlass(shape: shape) }
+            .background { if bar { SystemGlass(shape: shape) } }      // panels are opaque: only bars float over something
             .overlay(
                 shape.strokeBorder(theme.rimRing.color, lineWidth: 1)
             )
@@ -311,7 +315,7 @@ extension View {
     }
 }
 
-/// A recessed screen: dark well with an inner top shadow and a lit bottom edge. Both themes.
+/// A screen: live numbers only. One inner shadow from above, and in both themes a thin lit edge at the bottom.
 struct RecessedScreen: ViewModifier {
     @Environment(\.theme) private var theme
     var radius: CGFloat = 12
@@ -319,23 +323,46 @@ struct RecessedScreen: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
-            .background(shape.fill(theme.screenFill.color))
+            .background(shape.fill(theme.screenFill.color.shadow(.inner(color: theme.screenInsetShadow.color, radius: 1.5, x: 0, y: 1))))
             .overlay(
-                shape.strokeBorder(theme.screenInsetShadow.color, lineWidth: 3)
-                    .blur(radius: 1.5).offset(y: 1.5)
-                    .clipShape(shape)
-                    .allowsHitTesting(false)
-            )
-            .overlay(
-                shape.strokeBorder(theme.screenInsetLight.color, lineWidth: 1)
-                    .mask(LinearGradient(colors: [.clear, .black], startPoint: UnitPoint(x: 0.5, y: 0.7), endPoint: .bottom))
+                shape.strokeBorder(theme.screenInsetLight.color, lineWidth: 0.5)
+                    .mask(LinearGradient(colors: [.clear, .black], startPoint: UnitPoint(x: 0.5, y: 0.75), endPoint: .bottom))
                     .allowsHitTesting(false)
             )
     }
 }
 
+/// A well: a flat ground for specimens inside a panel. No shadow, so nothing competes with the letters.
+struct WellSurface: ViewModifier {
+    @Environment(\.theme) private var theme
+    var radius: CGFloat = 10
+    func body(content: Content) -> some View {
+        content.background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(theme.wellFill.color))
+    }
+}
+
+/// The one line between inspector sections. It runs to the panel's edges: the content lane is `Metrics.lane` wide.
+struct SectionRule: View {
+    @Environment(\.theme) private var theme
+    var body: some View {
+        Rectangle().fill(theme.rule.color).frame(height: 1).padding(.horizontal, -Metrics.lane).accessibilityHidden(true)
+    }
+}
+
+/// The shared measures. One top line, one side lane, three control heights.
+enum Metrics {
+    static let lane: CGFloat = 20
+    static let panelRadius: CGFloat = 20
+    static let control: CGFloat = 28
+    static let inline: CGFloat = 22
+    static let primary: CGFloat = 40
+    /// Panel padding that puts a 22-pt title on the top line shared with the traffic lights and the search row.
+    static let inspectorTop: CGFloat = 19
+}
+
 extension View {
     func recessed(radius: CGFloat = 12) -> some View { modifier(RecessedScreen(radius: radius)) }
+    func well(radius: CGFloat = 10) -> some View { modifier(WellSurface(radius: radius)) }
 }
 
 /// The neutral selection pill used by the Text list and the sidebar.
@@ -404,7 +431,8 @@ struct PillBackground: ViewModifier {
     @Environment(\.theme) private var theme
     var chip = false
     func body(content: Content) -> some View {
-        content.background(Capsule().fill((chip ? theme.chipGround : theme.controlGround).color))
+        content.frame(minHeight: chip ? nil : Metrics.control)
+            .background(Capsule().fill((chip ? theme.chipGround : theme.controlGround).color))
     }
 }
 
