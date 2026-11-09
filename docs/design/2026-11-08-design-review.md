@@ -54,7 +54,8 @@ Three findings explain most of what feels off:
 | Token | Dark | Light | Used for |
 |---|---|---|---|
 | ground | #121211 | #F1F1EE | window, gutters, grid, stage, Set page |
-| panel | #1E1E1C + grain | #FFFFFF + soft shadow | sidebar, inspector, Text list, cards |
+| panel | #1E1E1C + grain | #FFFFFF + soft shadow | sidebar, inspector, Text list |
+| card | panel fill | white + tight shadow, one step lower than a panel | Display grid |
 | bar | glass | glass | only what floats over the stage |
 | screen | #0D0D0C, inner shadow | #EDEDEA, inner shadow | live numbers |
 | well | white 5% | black 4% | specimens inside a panel |

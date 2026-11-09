@@ -199,6 +199,7 @@ struct FamilyCard: View {
             Button(isHidden ? Lexicon.Finder.unhide : Lexicon.Finder.hide, systemImage: isHidden ? "eye" : "eye.slash", action: toggleHidden)
         }
         .background(RoundedRectangle(cornerRadius: 12).fill(theme.panelContent.color))
+            .shadow(color: theme.templateCardShadow.first?.color.color ?? .clear, radius: theme.templateCardShadow.first?.radius ?? 0, y: theme.templateCardShadow.first?.y ?? 0)
         // board 16 option B: a 1.5 pt ring, grids only. One ring glides from tile to tile.
         .overlay { SelectionMark(on: isSelected, shape: RoundedRectangle(cornerRadius: 12), fill: theme.textPrimary.color.opacity(0.65), ring: 1.5) }
         .overlay { if showFocus {

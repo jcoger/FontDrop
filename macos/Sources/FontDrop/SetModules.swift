@@ -103,20 +103,9 @@ private struct FaceAxes: View {
 
     private func axisControl(label: String, axis: FontLoader.Axis, value: Double, readout: String, held: Bool, help: String,
                              onChange: @escaping (Double) -> Void, back: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label).moduleLabel()
-                Spacer()
-                Text(readout).font(InstrumentFonts.label(10)).tracking(1.4).textCase(.uppercase)
-                    .foregroundStyle((held ? theme.textPrimary : theme.textSecondary).color)
-                if held {
-                    Button(action: back) { Text(Lexicon.SetScreen.backToAuto).moduleLabel() }
-                        .buttonStyle(.plain).padding(.leading, 8)
-                }
-            }
-            BodySlider(value: value, range: axis.min...axis.max, enabled: true, step: 1, label: label,
-                       valueText: { "\(Int($0.rounded()))" }, autoText: axis.tag == "opsz" && !held ? Lexicon.auto : nil, onChange: onChange)
-        }
-        .help(help)
+        BodySlider(value: value, range: axis.min...axis.max, step: 1, label: label, valueText: { _ in readout },
+                   autoText: axis.tag == "opsz" && !held ? Lexicon.auto : nil, dim: !held,
+                   reset: held ? back : nil, onChange: onChange)
+            .help(help)
     }
 }

@@ -78,8 +78,6 @@ struct ScaleModule: View {
                 Button { model.returnToAuto() } label: { Text(Lexicon.SetScreen.backToAuto).font(.system(size: 12)) }
                     .buttonStyle(.themeLink)
                     .accessibilityLabel(Lexicon.Dial.returnToAuto)
-            } else {
-                Text(Lexicon.Dial.turnToLock).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             }
         }
         .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.autoHelp)

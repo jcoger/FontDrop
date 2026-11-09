@@ -545,7 +545,7 @@ enum Lexicon {
         static let body = "Body"
         static let ratio = "Ratio"
         static let autoNote = "Auto: sizes fit each font"
-        static let autoHelp = "Auto sizes each face to match the board's letter height, and headlines fill their column. Lock to choose the sizes by hand."
+        static let autoHelp = "Auto sizes each face to match the board's letter height, and headlines fill their column. Move the dial or Body to choose the sizes by hand."
         static let lockedHelp = "Every size is the body size times the ratio, once for each step up. Headlines still wrap and never split a word."
         static let controlsOffHelp = "Lock sizes to change the body size and ratio"
         static func bodyReadout(_ pt: Double) -> String { "\(Int(pt.rounded())) pt" }

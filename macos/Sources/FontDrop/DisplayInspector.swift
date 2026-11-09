@@ -42,7 +42,7 @@ struct FamilyInspector: View {
         let isCurrent = model.choices[job] == family.name
         var parts = [isCurrent ? Lexicon.R4.currentTitle(job) : Lexicon.R4.candidateTitle(job), Lexicon.Why.styles(Int(family.styleCount))]
         if family.isTrial { parts.append(Lexicon.Reading.trialTag) }
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 4) {
             Text(family.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.textPrimary.color)
             Text(parts.joined(separator: " \u{00B7} ")).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             if let urlText = family.foundryUrl, let url = URL(string: urlText) {
@@ -50,6 +50,7 @@ struct FamilyInspector: View {
                     .font(.system(size: 13)).foregroundStyle(theme.textSecondary.color).lineLimit(1)
             }
         }
+        .padding(.bottom, 16)
     }
 
     @ViewBuilder
