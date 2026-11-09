@@ -84,8 +84,14 @@ struct SampleModule: View {
                 .frame(height: SampleFit.fieldHeight)
                 .frame(maxWidth: .infinity)
                 .recessed(radius: 12)
+                .contentShape(Rectangle())
+                .onTapGesture { typing = true }                                   // the big line is the way in: a click starts typing
+                .onHover { inside in if inside { NSCursor.iBeam.push() } else { NSCursor.pop() } }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(model.sampleText)
+                .accessibilityIdentifier("sample-screen")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { typing = true }
             HStack(spacing: 6) {
                 TextField(Lexicon.R4.samplePlaceholder, text: Binding(get: { model.customSample ?? "" }, set: { model.setSample($0) }),
                           axis: .vertical)
@@ -101,6 +107,12 @@ struct SampleModule: View {
                         .accessibilityLabel(Lexicon.R4.sampleClear)
                 }
             }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(theme.controlGround.color))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(theme.textPrimary.color.opacity(typing ? 0.45 : 0), lineWidth: 1))
+            .contentShape(Rectangle())
+            .onTapGesture { typing = true }
         }
     }
 }

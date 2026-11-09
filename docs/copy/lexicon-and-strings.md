@@ -550,7 +550,7 @@ One row for the Display filters, one row for the Text list head, a Display inspe
 | 21.6 | text.filters | **Filters** · **Filters · 2** | One menu holds Source, Difference, Structure and Foundry. The number counts what narrows the list. Hover: **Source, Difference, Structure and Foundry**. Sort stays its own menu, showing only its value (**Best match**) |
 | 21.7 | inspector.display.modules | **01 Sample** · **02 Face** · **03 Alternates** · **04 Letters** | Module labels, as on the Text inspector. Face holds Style and **Spacing and features** (the same disclosure) |
 | 21.8 | inspector.display.header | **Current Display face · 16 styles** · **Display candidate · 16 styles** · adds **Trial** | The quiet line under the name. The foundry link (or **Get the license** for a trial) sits under it. Save and Hide left the inspector (S1): the star shows on hover, Hide is in the card's menu |
-| 21.9 | sample.placeholder | **Type your own line. Defaults to the brand name.** · clear button **Back to the brand name** | Empty means the brand name. Kept per brand |
+| 21.9 | sample.placeholder | **Type your own line** · clear button **Back to the brand name** | Empty means the brand name. Kept per brand |
 | 21.10 | alternates | Tiles show the changed letters. Hover: **Alt a · ss01** or **ss03**. Hint **Alternate letters show as the glyph. Codes on hover.** · **Show all 12** · **Show fewer** · **This face has no alternate letters.** | The font's own name for a set when it has one. Never "ss01" on the surface (S6) |
 | 21.11 | inspector.display.empty | **No family selected** · **Select a family to try its styles and letters.** | Replaces "styles, axes and x-height", which the inspector no longer lists |
 

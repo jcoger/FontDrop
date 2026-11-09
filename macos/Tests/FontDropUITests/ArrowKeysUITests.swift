@@ -157,6 +157,21 @@ final class ArrowKeysUITests: XCTestCase {
         XCTAssertNotEqual(selected(), "Georgia", "after Escape the arrows move the grid")
     }
 
+    /// A click on the big sample line starts typing, and what you type shows in it.
+    func testClickingTheBigSampleLineStartsTyping() throws {
+        ready()
+        card("Georgia").click()
+        XCTAssertTrue(wait(5) { self.selected() == "Georgia" })
+        let screen = app.descendants(matching: .any)["sample-screen"]
+        XCTAssertTrue(screen.waitForExistence(timeout: 10))
+        screen.click()
+        app.typeText("Hello")
+        let sample = app.textFields.matching(NSPredicate(format: "placeholderValue BEGINSWITH %@", "Type your own line")).firstMatch
+        XCTAssertTrue(wait(5) { (sample.value as? String) == "Hello" }, "typing after a click on the big line fills the field")
+        XCTAssertEqual(screen.label, "Hello", "the big line shows the typed text")
+        XCTAssertEqual(selected(), "Georgia", "typing did not move the grid")
+    }
+
     /// Space previews the selected face.
     func testSpacePreviews() throws {
         ready()
