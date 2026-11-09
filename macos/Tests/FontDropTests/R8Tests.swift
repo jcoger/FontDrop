@@ -107,10 +107,10 @@ final class R8Tests: XCTestCase {
     }
 
     func testButtonsSitTwentyPointsInsideThePanel() {
-        let h = WindowChrome.panelGutter + WindowChrome.buttonInset + 14 + WindowChrome.panelGutter
+        let h = WindowChrome.panelGutter + WindowChrome.buttonTop + 14 + WindowChrome.panelGutter
         let pts = WindowButtons.layout(buttonSize: CGSize(width: 14, height: 14), step: 20, stripHeight: h)
         XCTAssertEqual(pts[0].x, 28)
-        XCTAssertEqual(h - pts[0].y - 14, 28, "top edge: gutter plus inset")
+        XCTAssertEqual(h - pts[0].y - 14, 31, "top edge: centred on the 28-pt top row (8 + 16 + 14 - 7)")
         XCTAssertEqual(pts[2].x, 68)
         let rightEdge = pts[2].x + 14
         XCTAssertGreaterThanOrEqual(ReadingLayout.hiddenInset + WindowChrome.panelGutter, rightEdge + 8, "content clears the lights when the sidebar is hidden")

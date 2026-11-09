@@ -17,10 +17,11 @@ struct ScaleModule: View {
         let scale = model.scale
         let sizes = model.solvedSizes(reading: family, fallbackPath: fallbackPath)
         let auto = sizes.flatMap { DialMath.autoRatio(headline: $0.headline, body: $0.body, steps: $0.headlineStep) }
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             if !inline {
+                SectionRule().padding(.bottom, 4)
                 HStack {
-                    Text("01 \u{00B7} \(Lexicon.Scale.title)").moduleLabel()
+                    Text(Lexicon.Scale.title).moduleLabel()
                     Spacer()
                     HStack(spacing: 6) {
                         SignalLight(lit: scale.locked)
@@ -31,12 +32,12 @@ struct ScaleModule: View {
             }
             dialScreen(scale: scale, auto: auto)
             BodyControl(scale: scale, autoBody: sizes?.body) { body in
-                model.updateScale { $0.body = body }
+                model.setBody(body, reading: family, fallbackPath: fallbackPath)
             }
             footer(scale: scale, sizes: sizes)
         }
-        .padding(.top, inline ? 12 : 22)
-        .padding(.bottom, inline ? 4 : 0)
+        .padding(.top, inline ? 0 : 16)
+        .padding(.bottom, inline ? 4 : 20)
     }
 
     private func dialScreen(scale: TypeScale, auto: Double?) -> some View {
@@ -70,15 +71,15 @@ struct ScaleModule: View {
         HStack(alignment: .firstTextBaseline) {
             if let sizes, sizes.body > 0 {
                 Text(Lexicon.Scale.footer(headline: sizes.headline, times: sizes.headline / sizes.body))
-                    .moduleLabel(color: \.textPrimary)
+                    .font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             }
             Spacer(minLength: 8)
             if scale.locked {
-                Button { model.returnToAuto() } label: { Text(Lexicon.Dial.pressForAuto).moduleLabel() }
-                    .buttonStyle(.plain)
+                Button { model.returnToAuto() } label: { Text(Lexicon.SetScreen.backToAuto).font(.system(size: 12)) }
+                    .buttonStyle(.themeLink)
                     .accessibilityLabel(Lexicon.Dial.returnToAuto)
             } else {
-                Text(Lexicon.Dial.turnToLock).moduleLabel()
+                Text(Lexicon.Dial.turnToLock).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             }
         }
         .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.autoHelp)
@@ -87,67 +88,56 @@ struct ScaleModule: View {
 
 // MARK: - Body
 
-/// BODY label, the value in Doto 30, a ruler, the track and thumb, and the 9 and 24 range labels.
-/// In Auto the value is what Auto solved to and the slider rests; turning the dial unlocks it.
+/// Body size. Always live: touching it takes the scale out of Auto and sets the size.
 struct BodyControl: View {
-    @Environment(\.theme) private var theme
     let scale: TypeScale
     let autoBody: Double?
     let onChange: (Double) -> Void
 
     var body: some View {
         let value = scale.locked ? scale.body : (autoBody.map { min(max($0.rounded(), TypeScale.bodyRange.lowerBound), TypeScale.bodyRange.upperBound) } ?? scale.body)
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Lexicon.Scale.body).moduleLabel()
-                Text("\(Int(value.rounded()))")
-                    .font(InstrumentFonts.doto(30))
-                    .foregroundStyle((scale.locked ? theme.textPrimary : theme.textSecondary).color)
-                    .frame(minWidth: 42, alignment: .leading)
-            }
-            .accessibilityHidden(true)
-            VStack(spacing: 4) {
-                BodySlider(value: value, range: TypeScale.bodyRange, enabled: scale.locked, numberField: false, onChange: onChange)
-                HStack {
-                    Text("\(Int(TypeScale.bodyRange.lowerBound))").moduleLabel().accessibilityHidden(true)
-                    Spacer()
-                    NumberField(label: Lexicon.Scale.body, value: value, range: TypeScale.bodyRange, step: 1, unit: "pt",
-                                enabled: scale.locked, onChange: onChange)
-                    Spacer()
-                    Text("\(Int(TypeScale.bodyRange.upperBound))").moduleLabel().accessibilityHidden(true)
-                }
-            }
-        }
-        .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.controlsOffHelp)
+        BodySlider(value: value, range: TypeScale.bodyRange, unit: "pt", dim: !scale.locked, onChange: onChange)
+            .help(scale.locked ? Lexicon.Scale.lockedHelp : Lexicon.Scale.autoHelp)
     }
 }
 
-/// A ruler of ticks over a thin track with a thumb. Whole points by default (`step`). VoiceOver adjusts it a step at a time.
-/// Set uses it for Measure, Line height and the face axes too, with their own label and readout text.
+/// The value row: label and value on one line, one track under them. Click the value to type, Up and Down step it.
+/// Every number in the inspectors is one of these. `dim` means the value is following Auto. `reset` adds a way back.
 struct BodySlider: View {
     @Environment(\.theme) private var theme
     let value: Double
     let range: ClosedRange<Double>
-    let enabled: Bool
+    var enabled = true
     var step: Double = 1
     var label = Lexicon.Scale.body
     var valueText: (Double) -> String = Lexicon.Scale.bodyReadout
-    /// A typed number with steppers beside the track (R7). Off where the caller draws its own (the Body control).
-    var numberField = true
     var decimals = 0
     var unit: String?
     var autoText: String?
+    var dim = false
+    var reset: (() -> Void)?
+    var resetHelp = Lexicon.SetScreen.backToAuto
     let onChange: (Double) -> Void
 
-    private let thumb: CGFloat = 16
+    private let thumb: CGFloat = 14
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            track
-            if numberField {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(label).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color).lineLimit(1)
+                Spacer(minLength: 4)
+                if let reset {
+                    Button(action: reset) {
+                        Image(systemName: "arrow.uturn.backward").font(.system(size: 10, weight: .medium))
+                            .frame(width: 18, height: Metrics.inline).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).foregroundStyle(theme.textSecondary.color)
+                    .help(resetHelp).accessibilityLabel(resetHelp)
+                }
                 NumberField(label: label, value: value, range: range, step: step, decimals: decimals, unit: unit,
-                            enabled: enabled, autoText: autoText, onChange: onChange)
+                            enabled: enabled, autoText: autoText, dim: dim, onChange: onChange)
             }
+            track
         }
     }
 
@@ -156,22 +146,15 @@ struct BodySlider: View {
             let usable = max(geo.size.width - thumb, 1)
             let t = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
             let x = thumb / 2 + CGFloat(t) * usable
-            ZStack(alignment: .topLeading) {
-                Canvas { context, size in
-                    var x: CGFloat = 0.5
-                    while x < size.width {
-                        context.fill(Path(CGRect(x: x, y: 0, width: 1, height: 9)), with: .color(theme.rulerTick.color))
-                        x += 8
-                    }
-                }
-                .frame(height: 9)
-                Capsule().fill(theme.sliderTrack.color).frame(height: 4).offset(y: 18)
-                Capsule().fill(theme.sliderFill.color).frame(width: max(x, 0), height: 4).offset(y: 18)
+            ZStack(alignment: .leading) {
+                Capsule().fill(theme.sliderTrack.color).frame(height: 2)
+                Capsule().fill(theme.sliderFill.color.opacity(dim ? 0.55 : 1)).frame(width: max(x, 0), height: 2)
                 Circle().fill(theme.sliderThumb.color)
                     .frame(width: thumb, height: thumb)
-                    .shadow(color: .black.opacity(theme.isDark ? 0.6 : 0.25), radius: theme.isDark ? 1.5 : 2, y: 1)
-                    .offset(x: x - thumb / 2, y: 12)
+                    .shadow(color: .black.opacity(theme.isDark ? 0.5 : 0.25), radius: 1, y: 0.5)
+                    .offset(x: x - thumb / 2)
             }
+            .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
                 guard enabled else { return }
@@ -181,8 +164,7 @@ struct BodySlider: View {
                 if abs(v - value) > step / 100 { onChange(v) }
             })
         }
-        .frame(height: 32)
-        .opacity(enabled ? 1 : 0.55)
+        .frame(height: 20)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityValue(valueText(value))

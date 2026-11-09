@@ -1192,6 +1192,12 @@ final class AppModel {
     }
 
     /// Pressing the dial: the sizes go back to Auto. The saved body and ratio stay for the next lock.
+    /// Touching Body takes the scale out of Auto. A control never waits for another one to unlock it.
+    func setBody(_ body: Double, reading name: String, fallbackPath: String? = nil) {
+        if !scale.locked { lockScale(reading: name, fallbackPath: fallbackPath) }
+        updateScale { $0.body = body }
+    }
+
     func returnToAuto() { updateScale { $0.locked = false } }
 
     /// Loads every style file of these families, so a face set to a non-regular style draws at once.

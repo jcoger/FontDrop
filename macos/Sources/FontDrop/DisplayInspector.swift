@@ -18,21 +18,22 @@ struct FamilyInspector: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header(family, job: job)
-                    InspectorSection(title: "01 \u{00B7} \(Lexicon.R4.sample)") { SampleModule(job: job, family: family) }
-                    InspectorSection(title: "02 \u{00B7} \(Lexicon.Why.face)") {
+                    InspectorSection(title: Lexicon.R4.sample) { SampleModule(job: job, family: family) }
+                    InspectorSection(title: Lexicon.Why.face) {
                         PlaygroundGroup(job: job, family: family, title: family.name, preview: "", startOpen: true, mode: .face)
                     }
-                    InspectorSection(title: "03 \u{00B7} \(Lexicon.R4.alternates)") { AlternatesModule(job: job, family: family) }
-                    InspectorSection(title: "04 \u{00B7} \(Lexicon.Why.letters)") {
+                    InspectorSection(title: Lexicon.R4.alternates) { AlternatesModule(job: job, family: family) }
+                    InspectorSection(title: Lexicon.Why.letters) {
                         LettersStrip(face: model.face(job, family), tick: model.fontTick)
                     }
                 }
-                .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
+                .padding(.horizontal, 20).padding(.top, Metrics.inspectorTop).padding(.bottom, 24)
             }
-            .safeAreaInset(edge: .bottom) { action(family).background(.ultraThinMaterial) }
+            .safeAreaInset(edge: .bottom) { action(family).background(theme.glassInspector.color)
+                    .overlay(alignment: .top) { Rectangle().fill(theme.rule.color).frame(height: 1) } }
             .animation(Motion.ok(Motion.quick), value: model.choices[screen.job ?? ""] == family.name)
         } else {
-            EmptyScreen(label: Lexicon.R4.noSelection, line: Lexicon.R4.noSelectionHelp)
+            EmptyScreen(label: Lexicon.R4.noSelection, line: Lexicon.R4.noSelectionHelp, compact: true)
         }
     }
 
@@ -43,7 +44,7 @@ struct FamilyInspector: View {
         if family.isTrial { parts.append(Lexicon.Reading.trialTag) }
         return VStack(alignment: .leading, spacing: 6) {
             Text(family.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.textPrimary.color)
-            Text(parts.joined(separator: " \u{00B7} ")).moduleLabel()
+            Text(parts.joined(separator: " \u{00B7} ")).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
             if let urlText = family.foundryUrl, let url = URL(string: urlText) {
                 Link(family.isTrial ? Lexicon.getLicense : (url.host() ?? Lexicon.R4.foundryPage), destination: url)
                     .font(.system(size: 13)).foregroundStyle(theme.textSecondary.color).lineLimit(1)
@@ -83,7 +84,7 @@ struct SampleModule: View {
                 .foregroundStyle(theme.textPrimary.color)
                 .frame(height: SampleFit.fieldHeight)
                 .frame(maxWidth: .infinity)
-                .recessed(radius: 12)
+                .well(radius: 12)
                 .contentShape(Rectangle())
                 .onTapGesture { typing = true }                                   // the big line is the way in: a click starts typing
                 .onHover { inside in if inside { NSCursor.iBeam.push() } else { NSCursor.pop() } }

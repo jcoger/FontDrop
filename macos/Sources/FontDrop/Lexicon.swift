@@ -783,6 +783,9 @@ enum Lexicon {
     /// Section 26 (R9a): empty states, Appearance, the inline scale.
     enum R9 {
         static let nothingSelected = "Nothing selected"
+        static let stageEmptyTitle = "Choose a Text face"
+        static let stageEmptyLine = "Pick one from the list to set it under your headline."
+        static let inspectorEmptyLine = "Why it pairs shows here."
         static let noMatchesLabel = "No matches"
         static let nothingSavedLabel = "Nothing saved"
         static let couldNotLoadLabel = "Could not load"

@@ -14,16 +14,17 @@ struct ReadingInspector: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header(c)
-                    ScaleReadoutLine(open: $model.textScaleOpen).padding(.top, 18)
-                    if model.textScaleOpen { ScaleModule(family: c.family, fallbackPath: c.filePath, inline: true) }
+                    SectionRule().padding(.top, 16)
+                    ScaleReadoutLine(open: $model.textScaleOpen).padding(.vertical, 16)
+                    if model.textScaleOpen { ScaleModule(family: c.family, fallbackPath: c.filePath, inline: true).padding(.bottom, 16) }
                     if model.displayFamily != nil { whyModule(c) }
                     faceModule(c)
                     lettersModule(c)
                 }
-                .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
+                .padding(.horizontal, 20).padding(.top, Metrics.inspectorTop).padding(.bottom, 24)
             }
         } else {
-            EmptyScreen(label: Lexicon.R9.nothingSelected, line: Lexicon.Reading.pickOne)
+            EmptyScreen(label: Lexicon.R9.nothingSelected, line: Lexicon.R9.inspectorEmptyLine, compact: true)
         }
     }
 
@@ -31,7 +32,7 @@ struct ReadingInspector: View {
         let isCurrent = model.chosen(.reading) == c.family
         return VStack(alignment: .leading, spacing: 6) {
             Text(c.family).font(.system(size: 17, weight: .semibold)).foregroundStyle(theme.textPrimary.color)
-            Text(isCurrent ? Lexicon.Reading.currentTitle : Lexicon.Reading.candidateTitle).moduleLabel()
+            Text(isCurrent ? Lexicon.Reading.currentTitle : Lexicon.Reading.candidateTitle).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
         }
     }
 
@@ -40,15 +41,16 @@ struct ReadingInspector: View {
     private func whyModule(_ c: Candidate) -> some View {
         let family = model.familyByName[c.family]
         let summary = WhySummary.make(c, styleCount: Int(family?.styleCount ?? 0), xHeightNote: inspectorXHeightNote(c))
-        return InspectorSection(title: "01 \u{00B7} \(Lexicon.whyItPairs)") {
+        return InspectorSection(title: Lexicon.whyItPairs) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(summary.verdict).font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.textPrimary.color)
                     .fixedSize(horizontal: false, vertical: true)
                 if !summary.chips.isEmpty {
-                    FlowLayout(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
                         ForEach(Array(summary.chips.enumerated()), id: \.offset) { _, chip in
-                            EvidenceChip(text: chip.text, effect: chip.effect, warning: chip.warning)
+                            Text(chip.text).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -118,7 +120,7 @@ struct ReadingInspector: View {
     @ViewBuilder
     private func faceModule(_ c: Candidate) -> some View {
         if let family = model.familyByName[c.family] {
-            InspectorSection(title: "\(model.displayFamily == nil ? "01" : "02") \u{00B7} \(Lexicon.Why.face)") {
+            InspectorSection(title: Lexicon.Why.face) {
                 PlaygroundGroup(job: "reading", family: family, title: family.name, preview: "", startOpen: true, mode: .face)
             }
         }
@@ -129,7 +131,7 @@ struct ReadingInspector: View {
     @ViewBuilder
     private func lettersModule(_ c: Candidate) -> some View {
         if let family = model.familyByName[c.family] {
-            InspectorSection(title: "\(model.displayFamily == nil ? "02" : "03") \u{00B7} \(Lexicon.Why.letters)") {
+            InspectorSection(title: Lexicon.Why.letters) {
                 LettersStrip(face: model.face("reading", family), tick: model.fontTick)
             }
         }
@@ -181,15 +183,17 @@ struct ScaleReadoutLine: View {
         Button { withAnimationIfAllowed { open.toggle() } } label: {
             HStack(spacing: 10) {
                 Text(Lexicon.Scale.title).moduleLabel()
-                Text(Lexicon.Scale.readoutLine(scale)).font(InstrumentFonts.doto(18)).foregroundStyle(theme.textPrimary.color)
-                    .lineLimit(1).minimumScaleFactor(0.7)
+                if !open {          // open, the dial below says it
+                    Text(Lexicon.Scale.readoutLine(scale)).font(InstrumentFonts.doto(18)).foregroundStyle(theme.textPrimary.color)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
                 Spacer(minLength: 4)
                 SignalLight(lit: scale.locked)
                 Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.textSecondary.color)
                     .rotationEffect(.degrees(open ? 90 : 0))
             }
-            .padding(.horizontal, 14).frame(height: 48)
-            .recessed(radius: 12)
+            .padding(.horizontal, open ? 0 : 14).frame(height: open ? 20 : 44)
+            .background { if !open { Color.clear.recessed(radius: 12) } }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -218,7 +222,7 @@ struct LettersStrip: View {
                     .lineLimit(1).minimumScaleFactor(0.5)
                     .foregroundStyle(theme.textPrimary.color)
                     .frame(maxWidth: .infinity).frame(height: 56)
-                    .recessed(radius: 10)
+                    .well(radius: 10)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -239,7 +243,7 @@ struct SetInspector: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(model.brand?.name ?? "FontDrop").font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(theme.textPrimary.color)
-                    Text(Lexicon.Scale.setSubtitle).moduleLabel()
+                    Text(Lexicon.Scale.setSubtitle).font(.system(size: 12)).foregroundStyle(theme.textSecondary.color)
                 }
                 if let reading = model.readingFamily {
                     ScaleModule(family: reading.name, fallbackPath: reading.filePath)
@@ -248,50 +252,11 @@ struct SetInspector: View {
                 } else {
                     EmptyScreen(label: Lexicon.Scale.title, line: Lexicon.Scale.needsText,
                                 actionTitle: Lexicon.SetScreen.goToText, actionHint: "\u{2318}2", actionHelp: Lexicon.SetScreen.goToTextHelp,
-                                action: { model.screen = .reading })
+                                action: { model.screen = .reading }, compact: true)
                         .frame(minHeight: 240)
                 }
-                ExportFoot()
             }
-            .padding(.horizontal, 20).padding(.top, 52).padding(.bottom, 24)
-        }
-    }
-}
-
-/// The foot of the Set inspector: Export as five plain actions, or the one reason they are off.
-struct ExportFoot: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Rectangle().fill(theme.sliderTrack.color).frame(height: 1)
-            Text(Lexicon.Export.menu).moduleLabel()
-            if let reason = model.exportReason {
-                Text(reason).font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
-            }
-            row([(Lexicon.Export.copyCSS, Lexicon.Export.helpCSS, { model.copyExport(.css) }),
-                 (Lexicon.Export.copyTailwind, Lexicon.Export.helpTailwind, { model.copyExport(.tailwind) })])
-            row([(Lexicon.Export.copyPaper, Lexicon.Export.helpPaper, { model.copyExport(.paper) }),
-                 (Lexicon.Export.specPage, Lexicon.Export.helpSpec, { model.saveSpecPage() })])
-            row([(Lexicon.Export.copyLicenses, Lexicon.Export.helpLicenses, { model.copyExport(.licenses) })])
-        }
-        .padding(.top, 26)
-        .opacity(model.canExport ? 1 : 0.55)
-    }
-
-    private func row(_ items: [(String, String, () -> Void)]) -> some View {
-        HStack(spacing: 8) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                Button(action: item.2) {
-                    Text(item.0).font(.system(size: 12)).foregroundStyle(theme.textPrimary.color).lineLimit(1)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .pill()
-                }
-                .buttonStyle(.plain).disabled(!model.canExport)
-                .help(item.1)
-            }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 20).padding(.top, Metrics.inspectorTop).padding(.bottom, 24)
         }
     }
 }

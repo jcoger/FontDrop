@@ -13,7 +13,7 @@ struct RootView: View {
                 if model.showSidebar {
                     SidebarView()
                         .frame(width: 235)
-                        .modifier(PanelChrome(fill: \.glassSidebar, radius: 24))
+                        .modifier(PanelChrome(fill: \.glassSidebar, radius: Metrics.panelRadius))
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel(Lexicon.sidebarRegion)
                         .transition(.move(edge: .leading).combined(with: .opacity))
@@ -25,7 +25,7 @@ struct RootView: View {
                 if model.showInspector && !model.hidesInspector {
                     InspectorRouter().selectionFade(model.inspectorFadeKey)
                         .frame(width: 330)
-                        .modifier(PanelChrome(fill: \.glassInspector, radius: 24))
+                        .modifier(PanelChrome(fill: \.glassInspector, radius: Metrics.panelRadius))
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel(Lexicon.inspectorRegion)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -190,25 +190,17 @@ struct PanelChrome: ViewModifier {
     }
 }
 
-/// The middle panel: the white (or #1C1C1B) page the list, the stage and the Display grid sit on.
+/// The middle: the work sits straight on the window's ground. Tools float on it as panels.
 struct ContentPanel<Content: View>: View {
-    @Environment(\.theme) private var theme
     @Environment(AppModel.self) private var model
     @ViewBuilder var content: Content
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         VStack(spacing: 0) {
             if (model.screen == .display || model.screen == .ui || model.screen == .mono) && !model.hidesInspector { DisplayTopRow() }
             content
         }
         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.panelContent.color)
-        .background(Grain())
-        .clipShape(shape)
-        .overlay { if let ring = theme.panelRing { shape.strokeBorder(ring.color, lineWidth: 1) } }
-        .shadow(color: theme.panelShadow.first?.color.color ?? .clear, radius: theme.panelShadow.first?.radius ?? 0, y: theme.panelShadow.first?.y ?? 0)
-        .shadow(color: theme.panelShadow.last?.color.color ?? .clear, radius: theme.panelShadow.last?.radius ?? 0, y: theme.panelShadow.last?.y ?? 0)
     }
 }
 
@@ -253,7 +245,7 @@ struct SearchField: View {
                     .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 10).padding(.vertical, 5)
+        .padding(.horizontal, 10)
         .pill()
         .overlay { if focused { Capsule().strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 2) } }
     }
@@ -293,6 +285,8 @@ enum WindowChrome {
 
     /// The traffic lights sit this far from the sidebar panel's left and top edges (the panel is 8 pt from the window's).
     static let buttonInset: CGFloat = 20
+    /// From the panel's top to the buttons: centres them on the top line (the 28-pt search row, 16 pt down).
+    static let buttonTop: CGFloat = 23
     static let panelGutter: CGFloat = 8
 }
 
@@ -318,9 +312,18 @@ final class WindowButtons {
         let names: [Notification.Name] = [NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification,
                                           NSWindow.didExitFullScreenNotification, NSWindow.didBecomeKeyNotification,
                                           NSWindow.didChangeScreenNotification, NSWindow.didDeminiaturizeNotification]
+        // AppKit moves the buttons on layout passes that post no window notification. Their own frames report every one,
+        // and correcting in the same pass means the move is never drawn.
+        for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let button = window.standardWindowButton(b) else { continue }
+            button.postsFrameChangedNotifications = true
+            tokens.append(NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: button, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated { self?.place() }
+            })
+        }
         for n in names {
             tokens.append(NotificationCenter.default.addObserver(forName: n, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.place(); DispatchQueue.main.async { self?.place() } }
+                MainActor.assumeIsolated { self?.place() }
             })
         }
     }
@@ -328,11 +331,16 @@ final class WindowButtons {
     /// Frames for the three buttons, from the top-left of the strip that holds them. Pure, for the test.
     static func layout(buttonSize: CGSize, step: CGFloat, stripHeight: CGFloat) -> [CGPoint] {
         let x0 = WindowChrome.panelGutter + WindowChrome.buttonInset
-        let y = stripHeight - (WindowChrome.panelGutter + WindowChrome.buttonInset) - buttonSize.height
+        let y = stripHeight - (WindowChrome.panelGutter + WindowChrome.buttonTop) - buttonSize.height
         return (0..<3).map { CGPoint(x: x0 + CGFloat($0) * step, y: y) }
     }
 
+    private var placing = false
+
     func place() {
+        guard !placing else { return }        // our own moves post frame changes too
+        placing = true
+        defer { placing = false }
         guard let w = window, !w.styleMask.contains(.fullScreen),
               let close = w.standardWindowButton(.closeButton),
               let mini = w.standardWindowButton(.miniaturizeButton),
@@ -341,7 +349,7 @@ final class WindowButtons {
               let content = w.contentView else { return }
         let size = close.frame.size
         let step = max(mini.frame.minX - close.frame.minX, size.width + 6)
-        let stripHeight = WindowChrome.panelGutter + WindowChrome.buttonInset + size.height + WindowChrome.panelGutter
+        let stripHeight = WindowChrome.panelGutter + WindowChrome.buttonTop + size.height + WindowChrome.panelGutter
         let top = content.frame.maxY
         let frame = NSRect(x: 0, y: top - stripHeight, width: container.superview?.bounds.width ?? w.frame.width, height: stripHeight)
         if container.frame != frame { container.frame = frame }

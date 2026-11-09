@@ -44,7 +44,7 @@ struct SetView: View {
             EmptyScreen(label: Lexicon.SetScreen.neitherLabel, line: Lexicon.SetScreen.neitherLine,
                         actionTitle: Lexicon.SetScreen.goToDisplay, actionHint: "\u{2318}1", actionHelp: Lexicon.SetScreen.goToDisplayHelp,
                         action: { model.screen = .display })
-                .frame(minHeight: 420)
+                .containerRelativeFrame(.vertical)
         } else {
             // One face is enough to start: its steps are drawn, and the other face's steps hold a quiet row that says so.
             let sizes = reading.map { SetSizes.resolve(model: model, reading: $0) } ?? SetSizes.fromScale(model.scale)
@@ -69,7 +69,7 @@ struct SetView: View {
                 }
                 scaledNote(sizes: sizes, display: displayFace, text: textFace, specWidth: specWidth)
             }
-            .padding(.horizontal, pad).padding(.top, 52).padding(.bottom, 32)
+            .padding(.horizontal, pad).padding(.top, Metrics.inspectorTop).padding(.bottom, 32)
         }
     }
 
@@ -90,7 +90,7 @@ struct SetView: View {
             Text(needsDisplay ? "\u{2318}1" : "\u{2318}2").moduleLabel()
         }
         return VStack(alignment: .leading, spacing: 0) {
-            Rectangle().fill(theme.sliderTrack.color).frame(height: 1)
+            Rectangle().fill(theme.rule.color).frame(height: 1)
             if stacked {
                 VStack(alignment: .leading, spacing: 8) { label; chooser }.padding(.vertical, 14)
             } else {
@@ -130,7 +130,7 @@ struct SetView: View {
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         return VStack(alignment: .leading, spacing: 0) {
-            Rectangle().fill(theme.sliderTrack.color).frame(height: 1)
+            Rectangle().fill(theme.rule.color).frame(height: 1)
             if stacked {
                 VStack(alignment: .leading, spacing: 8) { label; specimen }.padding(.vertical, 14)
             } else {
@@ -240,7 +240,7 @@ struct SetBar: View {
             if let note = model.exportNotice {
                 Text(note).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                     .foregroundStyle(theme.textPrimary.color)
-                    .padding(.horizontal, 14).frame(height: 36)
+                    .padding(.horizontal, 14).frame(height: Metrics.control)
                     .glass(\.glassBar, in: Capsule(), bar: true)
                     .transition(.opacity)
                     .accessibilityLabel(note)
@@ -255,7 +255,7 @@ struct SetBar: View {
                 .contentShape(Rectangle())
             }
             .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
-            .padding(.horizontal, 14).frame(height: 36)
+            .padding(.horizontal, 14).frame(height: Metrics.control)
             .glass(\.glassBar, in: Capsule(), bar: true)
             .disabled(!model.canExport)
             .help(model.exportReason ?? Lexicon.Export.menu)

@@ -10,9 +10,10 @@ struct ReadingView: View {
 
     var body: some View {
         GeometryReader { geo in
-            HStack(spacing: 0) {
+            HStack(spacing: 8) {
                 ReadingList()
                     .frame(width: ReadingLayout.listWidth(for: geo.size.width))
+                    .modifier(PanelChrome(fill: \.glassInspector, radius: Metrics.panelRadius))
                 ReadingStage()
                     .frame(minWidth: 0, maxWidth: .infinity)
             }
@@ -49,13 +50,13 @@ struct ReadingList: View {
             ProgressView(model.displayFamily.map { Lexicon.Reading.finding($0.name) } ?? Lexicon.Reading.findingFaces)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = model.candidatesError {
-            EmptyScreen(label: Lexicon.R9.couldNotLoadLabel, line: error)
+            EmptyScreen(label: Lexicon.R9.couldNotLoadLabel, line: error, compact: true)
         } else if rows.isEmpty {
             EmptyScreen(label: Lexicon.R9.noMatchesLabel,
                         line: ([model.candidates.isEmpty ? Lexicon.Reading.findingNone : Lexicon.readingNone]
                                + (result.hidden > 0 ? [Lexicon.Reading.hiddenByFilters(result.hidden) + "."] : [])).joined(separator: " "),
                         actionTitle: model.lenses.isNeutral ? nil : Lexicon.clearFilters,
-                        action: model.lenses.isNeutral ? nil : { model.resetLenses() })
+                        action: model.lenses.isNeutral ? nil : { model.resetLenses() }, compact: true)
         } else {
             ScrollViewReader { proxy in
                 ScrollView {

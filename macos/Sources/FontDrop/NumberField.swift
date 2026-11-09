@@ -49,38 +49,38 @@ struct NumberField: View {
     var enabled = true
     /// Shown instead of the number while the value is following Auto and has not been edited (optical size).
     var autoText: String?
+    /// Following Auto: drawn dim, and bright once someone has set it.
+    var dim = false
     let onChange: (Double) -> Void
 
     @State private var draft = ""
+    @State private var hovering = false
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 0) {
-            stepButton("minus", direction: -1)
-            TextField(label, text: $draft)
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 12).monospacedDigit())
-                .foregroundStyle((autoText != nil && !focused ? theme.textSecondary : theme.textPrimary).color)
-                .frame(width: unit == nil ? 44 : 56)
-                .focused($focused)
-                .disabled(!enabled)
-                .onSubmit { commit() }
-                .onExitCommand { draft = shown; focused = false }
-                .onKeyPress(.upArrow) { nudge(1); return .handled }
-                .onKeyPress(.downArrow) { nudge(-1); return .handled }
-                .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
-                .accessibilityLabel(label)
-                .accessibilityValue(shown)
-            stepButton("plus", direction: 1)
-        }
-        .padding(.vertical, 2)
-        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(theme.controlGround.color))
-        .opacity(enabled ? 1 : 0.55)
-        .fixedSize()
-        .onAppear { draft = shown }
-        .onChange(of: value) { _, _ in if !focused { draft = shown } }
-        .onChange(of: autoText) { _, _ in if !focused { draft = shown } }
+        TextField(label, text: $draft)
+            .textFieldStyle(.plain)
+            .multilineTextAlignment(.trailing)
+            .font(.system(size: 13).monospacedDigit())
+            .foregroundStyle((dim && !focused ? theme.textSecondary : theme.textPrimary).color)
+            .focused($focused)
+            .disabled(!enabled)
+            .onSubmit { commit() }
+            .onExitCommand { draft = shown; focused = false }
+            .onKeyPress(.upArrow) { nudge(1); return .handled }
+            .onKeyPress(.downArrow) { nudge(-1); return .handled }
+            .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+            .accessibilityLabel(label)
+            .accessibilityValue(shown)
+            .frame(width: 76, height: Metrics.inline)
+            .padding(.horizontal, 6)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(theme.controlGround.color.opacity(focused || hovering ? 1 : 0)))
+            .overlay { if focused { RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(theme.textPrimary.color.opacity(0.45), lineWidth: 1) } }
+            .padding(.trailing, -6)                    // the digits, not the hover plate, sit on the lane
+            .onHover { hovering = $0 }
+            .onAppear { draft = shown }
+            .onChange(of: value) { _, _ in if !focused { draft = shown } }
+            .onChange(of: autoText) { _, _ in if !focused { draft = shown } }
     }
 
     /// What the field shows at rest.
@@ -88,17 +88,6 @@ struct NumberField: View {
         if let autoText { return autoText }
         let n = NumberFieldMath.text(value, decimals: decimals)
         return unit.map { "\(n) \($0)" } ?? n
-    }
-
-    private func stepButton(_ symbol: String, direction: Int) -> some View {
-        Button { nudge(direction) } label: {
-            Image(systemName: symbol).font(.system(size: 9, weight: .semibold))
-                .frame(width: 20, height: 20).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(theme.textSecondary.color)
-        .disabled(!enabled || (direction < 0 ? value <= range.lowerBound : value >= range.upperBound))
-        .accessibilityLabel(Lexicon.Keyboard.stepLabel(label, up: direction > 0))
     }
 
     private func nudge(_ direction: Int) {

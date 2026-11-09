@@ -14,67 +14,23 @@ struct TextModule: View {
         let scale = model.scale
         let measure = TextRules.measure(scale)
         let lineHeight = TextRules.lineHeight(scale)
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("02 \u{00B7} \(Lexicon.SetScreen.titleText)").moduleLabel()
-                Spacer()
-            }
-            HStack(alignment: .top, spacing: 12) {
-                readout(Lexicon.SetScreen.measure, "\(measure)", unit: Lexicon.SetScreen.measureUnit, held: scale.measure != nil)
-                readout(Lexicon.SetScreen.lineHeight, String(format: "%.2f", lineHeight), unit: nil, held: scale.lineHeight != nil)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 12)
-            .recessed(radius: 14)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(Lexicon.SetScreen.measure) \(measure) characters, \(Lexicon.SetScreen.lineHeight) " + String(format: "%.2f", lineHeight))
-
-            control(label: Lexicon.SetScreen.measure,
-                    slider: BodySlider(value: Double(measure), range: Double(TextRules.measureRange.lowerBound)...Double(TextRules.measureRange.upperBound),
-                                       enabled: true, step: 1, label: Lexicon.SetScreen.measure,
-                                       valueText: { "\(Int($0)) characters" }) { v in model.updateScale { $0.measure = Int(v) } },
-                    held: scale.measure != nil, help: Lexicon.SetScreen.measureHelp) { model.updateScale { $0.measure = nil } }
-            control(label: Lexicon.SetScreen.lineHeight,
-                    slider: BodySlider(value: lineHeight, range: TextRules.lineHeightRange, enabled: true, step: 0.05,
-                                       label: Lexicon.SetScreen.lineHeight, valueText: { String(format: "%.2f", $0) }, decimals: 2) { v in
-                        model.updateScale { $0.lineHeight = v } },
-                    held: scale.lineHeight != nil, help: Lexicon.SetScreen.lineHeightHelp,
-                    idle: Lexicon.SetScreen.lineHeightFollows) { model.updateScale { $0.lineHeight = nil } }
+        VStack(alignment: .leading, spacing: 12) {
+            SectionRule().padding(.bottom, 4)
+            Text(Lexicon.SetScreen.titleText).moduleLabel()
+            BodySlider(value: Double(measure), range: Double(TextRules.measureRange.lowerBound)...Double(TextRules.measureRange.upperBound),
+                       step: 1, label: Lexicon.SetScreen.measure, valueText: { "\(Int($0)) characters" }, unit: "ch", dim: scale.measure == nil,
+                       reset: scale.measure == nil ? nil : { model.updateScale { $0.measure = nil } }) { v in model.updateScale { $0.measure = Int(v) } }
+                .help(Lexicon.SetScreen.measureHelp)
+            BodySlider(value: lineHeight, range: TextRules.lineHeightRange, step: 0.05, label: Lexicon.SetScreen.lineHeight,
+                       valueText: { String(format: "%.2f", $0) }, decimals: 2, dim: scale.lineHeight == nil,
+                       reset: scale.lineHeight == nil ? nil : { model.updateScale { $0.lineHeight = nil } }) { v in model.updateScale { $0.lineHeight = v } }
+                .help(Lexicon.SetScreen.lineHeightHelp)
 
             Text(Lexicon.SetScreen.measureRule(measure))
                 .font(.system(size: 13)).foregroundStyle(theme.textSecondary.color)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, 22)
-    }
-
-    private func readout(_ label: String, _ value: String, unit: String?, held: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).moduleLabel().lineLimit(1).minimumScaleFactor(0.7)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value).font(InstrumentFonts.doto(30)).lineLimit(1).minimumScaleFactor(0.6)
-                    .foregroundStyle((held ? theme.textPrimary : theme.textSecondary).color)
-                if let unit { Text(unit).moduleLabel() }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func control(label: String, slider: BodySlider, held: Bool, help: String, idle: String = Lexicon.auto,
-                         back: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label).moduleLabel()
-                Spacer()
-                if held {
-                    Button(action: back) { Text(Lexicon.SetScreen.backToAuto).moduleLabel() }
-                        .buttonStyle(.plain)
-                } else {
-                    Text(idle).moduleLabel()
-                }
-            }
-            slider
-        }
-        .help(help)
+        .padding(.top, 16).padding(.bottom, 20)
     }
 }
 
@@ -87,15 +43,13 @@ struct FacesModule: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("03 \u{00B7} \(Lexicon.SetScreen.titleFaces)").moduleLabel()
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            SectionRule().padding(.bottom, 4)
+            Text(Lexicon.SetScreen.titleFaces).moduleLabel()
             if let d = model.displayFamily { FaceAxes(job: "display", title: "Display", family: d) }
             if let t = model.readingFamily { FaceAxes(job: "reading", title: "Text", family: t) }
         }
-        .padding(.top, 22)
+        .padding(.top, 16).padding(.bottom, 20)
     }
 }
 
