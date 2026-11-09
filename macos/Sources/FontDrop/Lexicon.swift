@@ -276,7 +276,7 @@ enum Lexicon {
         // Display inspector modules
         static let sample = "Sample"
         static let alternates = "Alternates"
-        static let samplePlaceholder = "Type your own line. Defaults to the brand name."
+        static let samplePlaceholder = "Type your own line"
         static let sampleClear = "Back to the brand name"
         static let alternatesHint = "Alternate letters show as the glyph. Codes on hover."
         static let noAlternates = "This face has no alternate letters."
